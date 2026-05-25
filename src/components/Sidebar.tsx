@@ -20,7 +20,8 @@ import {
   ChevronDown,
   ChevronRight,
   Server,
-  Bot
+  Bot,
+  Send
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -47,6 +48,7 @@ const Sidebar = () => {
         { label: t('sidebar.campanhas'), icon: Megaphone, path: '/gestao/campanhas' },
         { label: t('sidebar.produtos'), icon: Package, path: '/gestao/produtos' },
         { label: t('sidebar.status'), icon: BarChart3, path: '/gestao/status' },
+        { label: t('sidebar.publicador') || 'Publicador Automático', icon: Send, path: '/publicador-automatico' },
       ]
     },
     {

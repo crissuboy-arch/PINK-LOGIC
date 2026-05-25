@@ -33,6 +33,7 @@ export const translations = {
       stickers: "Sticker Studio",
       estrategia: "Estratégia",
       biblioteca: "Meus Projetos",
+      publicador: "Publicador Automático",
     },
     dashboard: {
       welcome: "Olá, {name}! 👋",
@@ -232,6 +233,7 @@ export const translations = {
       stickers: "Sticker Studio",
       estrategia: "Strategy",
       biblioteca: "My Projects",
+      publicador: "Auto Publisher",
     },
     dashboard: {
       welcome: "Hello, {name}! 👋",
@@ -431,6 +433,7 @@ export const translations = {
       stickers: "Sticker Studio",
       estrategia: "Estratégia",
       biblioteca: "Mis Proyectos",
+      publicador: "Publicador Automático",
     },
     dashboard: {
       welcome: "¡Hola, {name}! 👋",

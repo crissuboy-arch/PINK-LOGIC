@@ -19,41 +19,46 @@ import { EditorProvider } from './contexts/EditorContext';
 import { GestaoProvider } from './contexts/GestaoContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ProductProvider } from './contexts/ProductContext';
+import { PublisherProvider } from './contexts/PublisherContext';
+import PublicadorAutomatico from './pages/Gestao/PublicadorAutomatico';
 
 function App() {
   return (
     <LanguageProvider>
       <ProductProvider>
-      <GestaoProvider>
-        <EditorProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="gestao/calendario" element={<Calendario />} />
-                <Route path="gestao/ideias" element={<Ideias />} />
-                <Route path="gestao/checklists" element={<Checklist />} />
-                <Route path="gestao/campanhas" element={<Campanhas />} />
-                <Route path="gestao/produtos" element={<Produtos />} />
-                <Route path="gestao/status" element={<Status />} />
-                
-                <Route path="criacao/editor" element={<Editor />} />
-                <Route path="criacao/story" element={<StoryCreator />} />
-                <Route path="criacao/copy" element={<CopyGenerator />} />
-                <Route path="criacao/logo" element={<LogoMaker />} />
-                <Route path="criacao/vision" element={<StrategicVision />} />
-                <Route path="criacao/stickers" element={<StickerStudio />} />
-                
-                <Route path="estrategia" element={<Estrategia />} />
-                <Route path="biblioteca" element={<MeusProjetos />} />
-                <Route path="sistema/agentes" element={<AgentDashboard />} />
-                <Route path="sistema/execucao" element={<ExecutionDashboard />} />
-              </Route>
-            </Routes>
-          </Router>
-        </EditorProvider>
-      </GestaoProvider>
+        <PublisherProvider>
+          <GestaoProvider>
+            <EditorProvider>
+              <Router>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="gestao/calendario" element={<Calendario />} />
+                    <Route path="gestao/ideias" element={<Ideias />} />
+                    <Route path="gestao/checklists" element={<Checklist />} />
+                    <Route path="gestao/campanhas" element={<Campanhas />} />
+                    <Route path="gestao/produtos" element={<Produtos />} />
+                    <Route path="gestao/status" element={<Status />} />
+                    <Route path="publicador-automatico" element={<PublicadorAutomatico />} />
+                    
+                    <Route path="criacao/editor" element={<Editor />} />
+                    <Route path="criacao/story" element={<StoryCreator />} />
+                    <Route path="criacao/copy" element={<CopyGenerator />} />
+                    <Route path="criacao/logo" element={<LogoMaker />} />
+                    <Route path="criacao/vision" element={<StrategicVision />} />
+                    <Route path="criacao/stickers" element={<StickerStudio />} />
+                    
+                    <Route path="estrategia" element={<Estrategia />} />
+                    <Route path="biblioteca" element={<MeusProjetos />} />
+                    <Route path="sistema/agentes" element={<AgentDashboard />} />
+                    <Route path="sistema/execucao" element={<ExecutionDashboard />} />
+                  </Route>
+                </Routes>
+              </Router>
+            </EditorProvider>
+          </GestaoProvider>
+        </PublisherProvider>
       </ProductProvider>
     </LanguageProvider>
   );

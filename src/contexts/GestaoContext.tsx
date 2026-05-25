@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useContent } from '../providers/ContentProvider';
+import { usePublisher } from './PublisherContext';
 
 export interface Post {
   id: string;
@@ -44,6 +45,7 @@ const GestaoContext = createContext<GestaoContextType | undefined>(undefined);
 export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Bridge to ContentProvider — posts are synced with the new content system
   const { createContent, removeContent, updateContent } = useContent();
+  const { scheduledPosts, deleteScheduledPost, updatePostStatus: updatePostStatusInPublisher, updateScheduledPostDate } = usePublisher();
 
   const [posts, setPosts] = useState<Post[]>(() => {
     const saved = localStorage.getItem('pink_logic_posts');
@@ -109,16 +111,29 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deletePost = (id: string) => {
+    if ((scheduledPosts || []).some(p => p.id === id)) {
+      deleteScheduledPost(id);
+      return;
+    }
     setPosts(prev => prev.filter(p => p.id !== id));
     removeContent(id);
   };
 
   const updatePostStatus = (id: string, status: Post['status']) => {
+    if ((scheduledPosts || []).some(p => p.id === id)) {
+      const spStatus = status === 'posted' ? 'published' : status === 'error' ? 'failed' : 'scheduled';
+      updatePostStatusInPublisher(id, spStatus);
+      return;
+    }
     setPosts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
     updateContent(id, { status: mapPostStatusToContentStatus(status) });
   };
 
   const updatePostDate = (id: string, newDate: Date) => {
+    if ((scheduledPosts || []).some(p => p.id === id)) {
+      updateScheduledPostDate(id, newDate);
+      return;
+    }
     setPosts(prev => prev.map(p => p.id === id ? { ...p, date: newDate.toISOString() } : p));
   };
 
@@ -139,9 +154,40 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTasks(prev => prev.filter(t => t.id !== id));
   };
 
+  // Convert ScheduledPosts to Gestao Post schema
+  const adaptedScheduledPosts = (scheduledPosts || []).map((sp): Post => {
+    let pType: Post['type'] = 'Post';
+    if (sp.media_type === 'video') pType = 'Video';
+
+    let platformMapped: Post['platform'] = 'Instagram';
+    const mainPlat = sp.platforms[0];
+    if (mainPlat === 'Instagram') platformMapped = 'Instagram';
+    else if (mainPlat === 'Facebook') platformMapped = 'Facebook';
+    // X, LinkedIn, etc., map to Instagram/Facebook or let it cast if it satisfies visual checks
+    else platformMapped = 'Instagram';
+
+    let statusMapped: Post['status'] = 'pending';
+    if (sp.status === 'published') statusMapped = 'posted';
+    else if (sp.status === 'failed') statusMapped = 'error';
+
+    return {
+      id: sp.id,
+      title: `${sp.title} (Agendado)`,
+      date: sp.scheduled_at,
+      type: pType,
+      product: 'Publicador',
+      status: statusMapped,
+      platform: platformMapped,
+      reach: '-',
+      engagement: '-'
+    };
+  });
+
+  const combinedPosts = [...posts, ...adaptedScheduledPosts];
+
   const metrics = {
-    totalPosts: posts.length,
-    pendingPosts: posts.filter(p => p.status === 'pending').length,
+    totalPosts: combinedPosts.length,
+    pendingPosts: combinedPosts.filter(p => p.status === 'pending').length,
     completedTasks: tasks.filter(t => t.completed).length,
     totalTasks: tasks.length,
     activeCampaigns: 5,
@@ -150,7 +196,7 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   return (
     <GestaoContext.Provider value={{
-      posts,
+      posts: combinedPosts,
       tasks,
       addPost,
       deletePost,
