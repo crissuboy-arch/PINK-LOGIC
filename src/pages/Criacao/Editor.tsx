@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Type, 
@@ -58,6 +58,39 @@ const Editor = () => {
     applyResolvedDesign(document.documentElement, { cssVariables });
     designApplied.current = true;
   }
+
+  // Auto-calculate scale/zoom to fit canvas perfectly in the workspace
+  useEffect(() => {
+    const fitToScreen = () => {
+      const workspace = document.querySelector('.editor-workspace') as HTMLElement;
+      if (workspace) {
+        // Safe area margins: 80px horizontal, 180px vertical (to account for header and slide strip)
+        const safeWidth = workspace.clientWidth - 80;
+        const safeHeight = workspace.clientHeight - 180;
+        
+        if (safeWidth > 0 && safeHeight > 0) {
+          const scaleX = safeWidth / canvasFormat.width;
+          const scaleY = safeHeight / canvasFormat.height;
+          // Use the limiting dimension to ensure the canvas is fully visible
+          const optimalZoom = Math.min(scaleX, scaleY);
+          // Limit maximum zoom to 0.95 for a nice safe area border
+          setZoom(Math.min(Number(optimalZoom.toFixed(2)), 0.95));
+        }
+      }
+    };
+
+    // Calculate immediately and also resize listener
+    fitToScreen();
+    window.addEventListener('resize', fitToScreen);
+    
+    // Fallback timer to ensure layout is settled
+    const timer = setTimeout(fitToScreen, 100);
+    
+    return () => {
+      window.removeEventListener('resize', fitToScreen);
+      clearTimeout(timer);
+    };
+  }, [canvasFormat]);
 
   const [showFormatModal, setShowFormatModal] = useState(true);
   const [showAIModal, setShowAIModal] = useState(false);
@@ -543,17 +576,40 @@ const Editor = () => {
         </div>
 
         {/* Workspace Center */}
-        <div className="editor-workspace">
+        <div className="editor-workspace" onClick={() => setSelectedElementId(null)}>
           <div 
-            className="canvas-container"
-            style={{ 
-              width: `${canvasFormat.width}px`, 
-              height: `${canvasFormat.height}px`,
-              transform: `scale(${zoom})`,
+            className="canvas-wrapper" 
+            style={{
+              width: `${canvasFormat.width * zoom}px`,
+              height: `${canvasFormat.height * zoom}px`,
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: 'auto',
+              flexShrink: 0,
+              transition: 'width 0.2s ease, height 0.2s ease',
             }}
-            ref={canvasRef}
-            onClick={() => setSelectedElementId(null)}
           >
+            <div 
+              className="canvas-container"
+              style={{ 
+                width: `${canvasFormat.width}px`, 
+                height: `${canvasFormat.height}px`,
+                transform: `scale(${zoom})`,
+                transformOrigin: 'center center',
+                position: 'absolute',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                overflow: 'hidden',
+                background: 'white',
+                border: '1px solid var(--border)',
+              }}
+              ref={canvasRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedElementId(null);
+              }}
+            >
             {/* Background Layer */}
             <div className="canvas-bg" style={{
               position: 'absolute', inset: 0,
@@ -666,6 +722,7 @@ const Editor = () => {
                 )}
               </motion.div>
               ))}
+            </div>
           </div>
 
           {/* Slide Manager Bar */}
@@ -1121,10 +1178,21 @@ const Editor = () => {
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: flex-start;
+          justify-content: center;
           overflow: auto;
           position: relative;
-          padding: 2rem 1rem 100px;
+          padding: 2rem 1rem;
+        }
+
+        .canvas-wrapper {
+          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          transition: width 0.2s ease, height 0.2s ease;
+          margin: auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border-radius: var(--radius-md);
         }
 
         .canvas-container {
@@ -1136,7 +1204,7 @@ const Editor = () => {
           overflow: hidden;
           background: white;
           flex-shrink: 0;
-          transform-origin: top center;
+          transform-origin: center center;
         }
 
         .upload-area {
