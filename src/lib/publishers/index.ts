@@ -11,8 +11,14 @@ import { publishToBlog } from './blog';
  * Updates the post status in localStorage and emits events for real-time UI synchronization.
  */
 export async function publishPost(postId: string): Promise<ScheduledPost> {
-  const raw = localStorage.getItem('pink_logic_scheduled_posts');
-  const posts: ScheduledPost[] = raw ? JSON.parse(raw) : [];
+  let posts: ScheduledPost[] = [];
+  try {
+    const raw = localStorage.getItem('pink_logic_scheduled_posts');
+    const parsed = raw ? JSON.parse(raw) : [];
+    posts = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : []);
+  } catch {
+    posts = [];
+  }
   const postIndex = posts.findIndex((p) => p.id === postId);
 
   if (postIndex === -1) {
@@ -70,8 +76,14 @@ export async function publishPost(postId: string): Promise<ScheduledPost> {
   await Promise.all(publishPromises);
 
   // 3. Reload current posts (to prevent overwriting concurrent updates) and finalize status
-  const currentRaw = localStorage.getItem('pink_logic_scheduled_posts');
-  const currentPosts: ScheduledPost[] = currentRaw ? JSON.parse(currentRaw) : [];
+  let currentPosts: ScheduledPost[] = [];
+  try {
+    const currentRaw = localStorage.getItem('pink_logic_scheduled_posts');
+    const parsed = currentRaw ? JSON.parse(currentRaw) : [];
+    currentPosts = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : []);
+  } catch {
+    currentPosts = [];
+  }
   const currentIdx = currentPosts.findIndex((p) => p.id === postId);
 
   if (currentIdx !== -1) {

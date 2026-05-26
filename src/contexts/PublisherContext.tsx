@@ -43,13 +43,35 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const savedAccounts = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS);
 
       if (savedPosts) {
-        setScheduledPosts(JSON.parse(savedPosts));
+        try {
+          const parsed = JSON.parse(savedPosts);
+          if (Array.isArray(parsed)) {
+            setScheduledPosts(parsed);
+          } else if (parsed && typeof parsed === 'object') {
+            setScheduledPosts(Object.values(parsed));
+          } else {
+            setScheduledPosts([]);
+          }
+        } catch {
+          setScheduledPosts([]);
+        }
       } else {
         setScheduledPosts([]);
       }
 
       if (savedAccounts) {
-        setSocialAccounts(JSON.parse(savedAccounts));
+        try {
+          const parsed = JSON.parse(savedAccounts);
+          if (Array.isArray(parsed)) {
+            setSocialAccounts(parsed);
+          } else if (parsed && typeof parsed === 'object') {
+            setSocialAccounts(Object.values(parsed));
+          } else {
+            setSocialAccounts(DEFAULT_ACCOUNTS);
+          }
+        } catch {
+          setSocialAccounts(DEFAULT_ACCOUNTS);
+        }
       } else {
         setSocialAccounts(DEFAULT_ACCOUNTS);
         localStorage.setItem(LOCAL_STORAGE_ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));

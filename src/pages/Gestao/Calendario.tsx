@@ -58,7 +58,27 @@ const Calendario = () => {
 
   const postingTimes = ['09:00', '15:00', '21:00'];
 
-  const transformedScheduledPosts: CalendarEvent[] = scheduledPosts.map(sp => {
+  const safeScheduledPosts = Array.isArray(scheduledPosts)
+    ? scheduledPosts
+    : scheduledPosts && typeof scheduledPosts === 'object'
+      ? Object.values(scheduledPosts)
+      : [];
+
+  const safePosts = Array.isArray(posts)
+    ? posts
+    : posts && typeof posts === 'object'
+      ? Object.values(posts)
+      : [];
+
+  const weekdaysVal = t('calendar.weekdays');
+  const safeWeekdays = Array.isArray(weekdaysVal)
+    ? weekdaysVal
+    : typeof weekdaysVal === 'string'
+      ? weekdaysVal.split(',')
+      : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  const transformedScheduledPosts: CalendarEvent[] = (safeScheduledPosts as any[]).map(sp => {
+    if (!sp || typeof sp !== 'object') return null;
     let mappedStatus: CalendarEvent['status'] = 'pending';
     if (sp.status === 'published') mappedStatus = 'posted';
     else if (sp.status === 'failed') mappedStatus = 'failed';
@@ -67,30 +87,34 @@ const Calendario = () => {
     else if (sp.status === 'draft') mappedStatus = 'draft';
     else if (sp.status === 'cancelled') mappedStatus = 'cancelled';
 
-    const platformStr = sp.platforms && sp.platforms.length > 0 ? sp.platforms[0] : 'Instagram';
+    const platforms = Array.isArray(sp.platforms) ? sp.platforms : [];
+    const platformStr = platforms.length > 0 ? platforms[0] : 'Instagram';
 
     return {
-      id: sp.id,
-      title: sp.title,
-      type: sp.platforms.join(', '),
+      id: sp.id || crypto.randomUUID(),
+      title: sp.title || 'Sem título',
+      type: platforms.join(', ') || 'Nenhum',
       platform: platformStr,
       status: mappedStatus,
-      date: sp.scheduled_at,
+      date: sp.scheduled_at || new Date().toISOString(),
       isScheduledPost: true,
       scheduledPostData: sp
     };
-  });
+  }).filter(Boolean) as CalendarEvent[];
 
   const allEvents: CalendarEvent[] = [
-    ...posts.map(p => ({
-      id: p.id,
-      title: p.title,
-      type: p.type,
-      platform: p.platform,
-      status: p.status as CalendarEvent['status'],
-      date: p.date,
-      isScheduledPost: false
-    })),
+    ...(safePosts as any[]).map(p => {
+      if (!p || typeof p !== 'object') return null;
+      return {
+        id: p.id || crypto.randomUUID(),
+        title: p.title || 'Sem título',
+        type: p.type || 'Post',
+        platform: p.platform || 'Instagram',
+        status: (p.status || 'pending') as CalendarEvent['status'],
+        date: p.date || new Date().toISOString(),
+        isScheduledPost: false
+      };
+    }).filter(Boolean) as CalendarEvent[],
     ...transformedScheduledPosts
   ];
 
@@ -171,7 +195,7 @@ const Calendario = () => {
       <div className="calendar-layout">
       <div className="calendar-container">
         <div className="calendar-grid">
-          {(t('calendar.weekdays') as unknown as string[]).map(day => (
+          {safeWeekdays.map(day => (
             <div key={day} className="weekday-label">{day}</div>
           ))}
           
@@ -348,7 +372,7 @@ const Calendario = () => {
                     <div className="form-group">
                       <label>Canais / Plataformas</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                        {editPost.scheduledPostData?.platforms.map((p: string) => (
+                        {(Array.isArray(editPost.scheduledPostData?.platforms) ? editPost.scheduledPostData.platforms : []).map((p: string) => (
                           <span key={p} style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '100px', background: 'rgba(255, 45, 141, 0.1)', border: '1px solid rgba(255, 45, 141, 0.2)', color: 'var(--primary)', fontWeight: 600 }}>
                             {p}
                           </span>
