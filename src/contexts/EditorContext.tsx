@@ -47,6 +47,13 @@ export interface EditorElement {
   brightness?: number;
   glow?: string;
   isBackgroundRemoved?: boolean;
+  isLocked?: boolean;
+  shadowEnabled?: boolean;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
 }
 
 export interface Slide {
@@ -58,6 +65,9 @@ export interface Slide {
     blur: number;
     brightness: number;
     opacity: number;
+    color1?: string;
+    color2?: string;
+    direction?: 'tb' | 'lr' | 'diag';
   };
 }
 

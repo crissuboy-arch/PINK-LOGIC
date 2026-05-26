@@ -30,6 +30,40 @@ import { ColorPicker } from '../../components/Editor/ColorPicker';
 import type { EditorElement } from '../../contexts/EditorContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 
+const getGradientCss = (color1: string, color2: string, direction: 'tb' | 'lr' | 'diag') => {
+  const dirMap = {
+    tb: 'to bottom',
+    lr: 'to right',
+    diag: '135deg'
+  };
+  const dir = dirMap[direction] || 'to bottom';
+  return `linear-gradient(${dir}, ${color1}, ${color2})`;
+};
+
+const getShadowStyle = (el: EditorElement) => {
+  if (!el.shadowEnabled) return 'none';
+  const x = el.shadowOffsetX ?? 0;
+  const y = el.shadowOffsetY ?? 8;
+  const blur = el.shadowBlur ?? 20;
+  const color = el.shadowColor ?? '#000000';
+  const opacity = el.shadowOpacity ?? 25;
+
+  let r = 0, g = 0, b = 0;
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '');
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    }
+  }
+  return `drop-shadow(${x}px ${y}px ${blur}px rgba(${r}, ${g}, ${b}, ${opacity / 100}))`;
+};
+
 const Editor = () => {
   const { t } = useLanguage();
   const { 
@@ -41,7 +75,7 @@ const Editor = () => {
     colorHistory, addToHistory
   } = useEditor();
 
-  const { tokens, projectBranding, cssVariables } = useProjectDesign();
+  const { projectBranding, cssVariables } = useProjectDesign();
   const { brands: brandKits, activeBrand: activeBrandKit, setActiveBrand: setActiveBrandKit } = useBrand();
 
   const currentSlide = slides[currentSlideIndex];
@@ -170,6 +204,134 @@ const Editor = () => {
     updateCurrentSlide({ elements: elements.map(el => el.id === id ? { ...el, ...updates } : el) });
   };
 
+  const handleResizeStart = (e: React.MouseEvent, element: EditorElement, handle: 'nw' | 'ne' | 'sw' | 'se') => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = element.width;
+    const startHeight = element.height;
+    const startLeft = element.x;
+    const startTop = element.y;
+    const aspectRatio = startWidth / startHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = (moveEvent.clientX - startX) / zoom;
+      const deltaY = (moveEvent.clientY - startY) / zoom;
+
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+      let newX = startLeft;
+      let newY = startTop;
+
+      const maintainRatio = element.type === 'image' || moveEvent.shiftKey;
+
+      if (handle === 'se') {
+        if (maintainRatio) {
+          newWidth = Math.max(20, startWidth + deltaX);
+          newHeight = newWidth / aspectRatio;
+        } else {
+          newWidth = Math.max(20, startWidth + deltaX);
+          newHeight = Math.max(20, startHeight + deltaY);
+        }
+      } else if (handle === 'sw') {
+        if (maintainRatio) {
+          newWidth = Math.max(20, startWidth - deltaX);
+          newHeight = newWidth / aspectRatio;
+          newX = startLeft + (startWidth - newWidth);
+        } else {
+          newWidth = Math.max(20, startWidth - deltaX);
+          newHeight = Math.max(20, startHeight + deltaY);
+          newX = startLeft + (startWidth - newWidth);
+        }
+      } else if (handle === 'ne') {
+        if (maintainRatio) {
+          newWidth = Math.max(20, startWidth + deltaX);
+          newHeight = newWidth / aspectRatio;
+          newY = startTop + (startHeight - newHeight);
+        } else {
+          newWidth = Math.max(20, startWidth + deltaX);
+          newHeight = Math.max(20, startHeight - deltaY);
+          newY = startTop + (startHeight - newHeight);
+        }
+      } else if (handle === 'nw') {
+        if (maintainRatio) {
+          newWidth = Math.max(20, startWidth - deltaX);
+          newHeight = newWidth / aspectRatio;
+          newX = startLeft + (startWidth - newWidth);
+          newY = startTop + (startHeight - newHeight);
+        } else {
+          newWidth = Math.max(20, startWidth - deltaX);
+          newHeight = Math.max(20, startHeight - deltaY);
+          newX = startLeft + (startWidth - newWidth);
+          newY = startTop + (startHeight - newHeight);
+        }
+      }
+
+      updateElement(element.id, {
+        width: Math.round(newWidth),
+        height: Math.round(newHeight),
+        x: Math.round(newX),
+        y: Math.round(newY),
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleFillCanvas = (element: EditorElement) => {
+    updateElement(element.id, {
+      x: 0,
+      y: 0,
+      width: canvasFormat.width,
+      height: canvasFormat.height
+    });
+  };
+
+  const handleFitToCanvas = (element: EditorElement) => {
+    const aspectRatio = element.width / element.height;
+    const canvasRatio = canvasFormat.width / canvasFormat.height;
+
+    let newWidth, newHeight;
+    if (aspectRatio > canvasRatio) {
+      newWidth = canvasFormat.width;
+      newHeight = newWidth / aspectRatio;
+    } else {
+      newHeight = canvasFormat.height;
+      newWidth = newHeight * aspectRatio;
+    }
+
+    const x = (canvasFormat.width - newWidth) / 2;
+    const y = (canvasFormat.height - newHeight) / 2;
+
+    updateElement(element.id, {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(newWidth),
+      height: Math.round(newHeight)
+    });
+  };
+
+  const duplicateElement = (element: EditorElement) => {
+    const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex)) : 0;
+    const newEl: EditorElement = {
+      ...element,
+      id: Math.random().toString(36).substr(2, 9),
+      x: element.x + 30,
+      y: element.y + 30,
+      zIndex: maxZ + 1
+    };
+    updateCurrentSlide({ elements: [...elements, newEl] });
+    setSelectedElementId(newEl.id);
+  };
+
   const handleRemoveBackground = () => {
     if (!selectedElement || selectedElement.type !== 'image') return;
     setIsProcessing(true);
@@ -287,6 +449,36 @@ const Editor = () => {
         if (slide.background.type === 'color') {
           ctx.fillStyle = slide.background.value;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (slide.background.type === 'gradient') {
+          const color1 = slide.background.color1 || '#FF2D8D';
+          const color2 = slide.background.color2 || '#7000FF';
+          const direction = slide.background.direction || 'tb';
+
+          let grad;
+          if (direction === 'lr') {
+            grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+          } else if (direction === 'diag') {
+            grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+          } else {
+            grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+          }
+          grad.addColorStop(0, color1);
+          grad.addColorStop(1, color2);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (slide.background.type === 'image') {
+          const img = new Image();
+          await new Promise((resolve) => {
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              resolve(null);
+            };
+            img.onerror = () => resolve(null);
+            if (slide.background.value.startsWith('http')) {
+              img.crossOrigin = 'anonymous';
+            }
+            img.src = slide.background.value;
+          });
         }
 
         // Draw Elements (Sorted by Z-Index)
@@ -301,6 +493,28 @@ const Editor = () => {
           }
 
           if (el.type === 'shape') {
+            if (el.shadowEnabled) {
+              const opacity = el.shadowOpacity ?? 25;
+              const color = el.shadowColor ?? '#000000';
+              let r = 0, g = 0, b = 0;
+              if (color.startsWith('#')) {
+                const hex = color.replace('#', '');
+                if (hex.length === 3) {
+                  r = parseInt(hex[0] + hex[0], 16);
+                  g = parseInt(hex[1] + hex[1], 16);
+                  b = parseInt(hex[2] + hex[2], 16);
+                } else if (hex.length === 6) {
+                  r = parseInt(hex.substring(0, 2), 16);
+                  g = parseInt(hex.substring(2, 4), 16);
+                  b = parseInt(hex.substring(4, 6), 16);
+                }
+              }
+              ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+              ctx.shadowBlur = el.shadowBlur ?? 20;
+              ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+              ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+            }
+
             ctx.fillStyle = el.color || '#000';
             if (el.content === 'circle') {
               ctx.beginPath();
@@ -310,6 +524,28 @@ const Editor = () => {
               ctx.fillRect(el.x, el.y, el.width, el.height);
             }
           } else if (el.type === 'text') {
+            if (el.shadowEnabled) {
+              const opacity = el.shadowOpacity ?? 25;
+              const color = el.shadowColor ?? '#000000';
+              let r = 0, g = 0, b = 0;
+              if (color.startsWith('#')) {
+                const hex = color.replace('#', '');
+                if (hex.length === 3) {
+                  r = parseInt(hex[0] + hex[0], 16);
+                  g = parseInt(hex[1] + hex[1], 16);
+                  b = parseInt(hex[2] + hex[2], 16);
+                } else if (hex.length === 6) {
+                  r = parseInt(hex.substring(0, 2), 16);
+                  g = parseInt(hex.substring(2, 4), 16);
+                  b = parseInt(hex.substring(4, 6), 16);
+                }
+              }
+              ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+              ctx.shadowBlur = el.shadowBlur ?? 20;
+              ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+              ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+            }
+
             ctx.fillStyle = el.color || '#fff';
             ctx.font = `${el.fontWeight || 400} ${el.fontSize || 16}px ${el.fontFamily || 'Outfit'}`;
             ctx.textBaseline = 'top';
@@ -327,7 +563,6 @@ const Editor = () => {
                 const x = el.textAlign === 'left' ? el.x : el.textAlign === 'right' ? el.x + el.width : el.x + el.width / 2;
                 ctx.fillText(line, x, y);
               } else {
-                // Render letter by letter if there's spacing
                 let currentX = el.x;
                 if (el.textAlign === 'center') {
                   const totalWidth = ctx.measureText(line).width + (line.length - 1) * letterSpacing;
@@ -346,14 +581,94 @@ const Editor = () => {
             });
           } else if (el.type === 'image') {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.src = el.content;
             await new Promise((resolve) => {
               img.onload = () => {
-                ctx.drawImage(img, el.x, el.y, el.width, el.height);
+                if (el.borderRadius && el.borderRadius > 0) {
+                  const r = Math.min(el.borderRadius, el.width / 2, el.height / 2);
+                  if (el.shadowEnabled) {
+                    ctx.save();
+                    const opacity = el.shadowOpacity ?? 25;
+                    const color = el.shadowColor ?? '#000000';
+                    let cr = 0, cg = 0, cb = 0;
+                    if (color.startsWith('#')) {
+                      const hex = color.replace('#', '');
+                      if (hex.length === 3) {
+                        cr = parseInt(hex[0] + hex[0], 16);
+                        cg = parseInt(hex[1] + hex[1], 16);
+                        cb = parseInt(hex[2] + hex[2], 16);
+                      } else if (hex.length === 6) {
+                        cr = parseInt(hex.substring(0, 2), 16);
+                        cg = parseInt(hex.substring(2, 4), 16);
+                        cb = parseInt(hex.substring(4, 6), 16);
+                      }
+                    }
+                    ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${opacity / 100})`;
+                    ctx.shadowBlur = el.shadowBlur ?? 20;
+                    ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+                    ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(el.x + r, el.y);
+                    ctx.lineTo(el.x + el.width - r, el.y);
+                    ctx.quadraticCurveTo(el.x + el.width, el.y, el.x + el.width, el.y + r);
+                    ctx.lineTo(el.x + el.width, el.y + el.height - r);
+                    ctx.quadraticCurveTo(el.x + el.width, el.y + el.height, el.x + el.width - r, el.y + el.height);
+                    ctx.lineTo(el.x + r, el.y + el.height);
+                    ctx.quadraticCurveTo(el.x, el.y + el.height, el.x, el.y + el.height - r);
+                    ctx.lineTo(el.x, el.y + r);
+                    ctx.quadraticCurveTo(el.x, el.y, el.x + r, el.y);
+                    ctx.closePath();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.restore();
+                  }
+
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.moveTo(el.x + r, el.y);
+                  ctx.lineTo(el.x + el.width - r, el.y);
+                  ctx.quadraticCurveTo(el.x + el.width, el.y, el.x + el.width, el.y + r);
+                  ctx.lineTo(el.x + el.width, el.y + el.height - r);
+                  ctx.quadraticCurveTo(el.x + el.width, el.y + el.height, el.x + el.width - r, el.y + el.height);
+                  ctx.lineTo(el.x + r, el.y + el.height);
+                  ctx.quadraticCurveTo(el.x, el.y + el.height, el.x, el.y + el.height - r);
+                  ctx.lineTo(el.x, el.y + r);
+                  ctx.quadraticCurveTo(el.x, el.y, el.x + r, el.y);
+                  ctx.closePath();
+                  ctx.clip();
+                  ctx.drawImage(img, el.x, el.y, el.width, el.height);
+                  ctx.restore();
+                } else {
+                  if (el.shadowEnabled) {
+                    const opacity = el.shadowOpacity ?? 25;
+                    const color = el.shadowColor ?? '#000000';
+                    let cr = 0, cg = 0, cb = 0;
+                    if (color.startsWith('#')) {
+                      const hex = color.replace('#', '');
+                      if (hex.length === 3) {
+                        cr = parseInt(hex[0] + hex[0], 16);
+                        cg = parseInt(hex[1] + hex[1], 16);
+                        cb = parseInt(hex[2] + hex[2], 16);
+                      } else if (hex.length === 6) {
+                        cr = parseInt(hex.substring(0, 2), 16);
+                        cg = parseInt(hex.substring(2, 4), 16);
+                        cb = parseInt(hex.substring(4, 6), 16);
+                      }
+                    }
+                    ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${opacity / 100})`;
+                    ctx.shadowBlur = el.shadowBlur ?? 20;
+                    ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+                    ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+                  }
+                  ctx.drawImage(img, el.x, el.y, el.width, el.height);
+                }
                 resolve(null);
               };
               img.onerror = () => resolve(null);
+              if (el.content.startsWith('http')) {
+                img.crossOrigin = 'anonymous';
+              }
+              img.src = el.content;
             });
           }
           ctx.restore();
@@ -491,44 +806,159 @@ const Editor = () => {
               {activeTab === 'background' && (
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} key="background" className="tab-pane">
                   <h3>{t('editor.background')}</h3>
+
                   <div className="settings-section">
-                    <div className="color-picker-container">
-                      <ColorPicker 
-                        color={background.value} 
-                        onChange={(c) => {
+                    <label>Tipo de Fundo</label>
+                    <div className="alignment-toolbar mb-4">
+                      <button 
+                        className={background.type === 'color' ? 'active' : ''} 
+                        onClick={() => updateCurrentSlide({ 
+                          background: { 
+                            ...background, 
+                            type: 'color', 
+                            value: background.color1 || '#FF2D8D' 
+                          } 
+                        })}
+                      >Sólido</button>
+                      <button 
+                        className={background.type === 'gradient' ? 'active' : ''} 
+                        onClick={() => {
+                          const c1 = background.color1 || '#FF2D8D';
+                          const c2 = background.color2 || '#7000FF';
+                          const dir = background.direction || 'tb';
                           updateCurrentSlide({ 
                             background: { 
                               ...background, 
-                              type: c.includes('gradient') ? 'gradient' : 'color', 
-                              value: c 
+                              type: 'gradient', 
+                              color1: c1,
+                              color2: c2,
+                              direction: dir,
+                              value: getGradientCss(c1, c2, dir)
                             } 
                           });
-                          if (!c.includes('gradient')) addToHistory(c);
                         }}
-                        brandColors={getBrandColorsArray(projectBranding)}
-                        history={colorHistory}
-                      />
+                      >Gradiente</button>
                     </div>
                   </div>
 
-                  <div className="settings-section" style={{ display: 'none' }}>
-                    <label>{t('editor.premium_gradients')}</label>
-                    <div className="gradient-presets">
-                      {[
-                        'linear-gradient(135deg, #FF2D8D 0%, #7000FF 100%)',
-                        'linear-gradient(135deg, #00E0FF 0%, #7000FF 100%)',
-                        'linear-gradient(135deg, #FFB800 0%, #FF2D8D 100%)',
-                        'linear-gradient(135deg, #121212 0%, #2a2a2a 100%)'
-                      ].map(g => (
-                        <button 
-                          key={g} 
-                          className="gradient-thumb" 
-                          style={{ background: g }}
-                          onClick={() => updateCurrentSlide({ background: { ...background, type: 'gradient', value: g } })}
-                        ></button>
-                      ))}
+                  {background.type === 'color' && (
+                    <div className="settings-section">
+                      <label>Cor de Fundo</label>
+                      <div className="color-picker-container">
+                        <ColorPicker 
+                          color={background.value} 
+                          onChange={(c) => {
+                            updateCurrentSlide({ 
+                              background: { 
+                                ...background, 
+                                type: 'color', 
+                                value: c,
+                                color1: c
+                              } 
+                            });
+                            addToHistory(c);
+                          }}
+                          brandColors={getBrandColorsArray(projectBranding)}
+                          history={colorHistory}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {background.type === 'gradient' && (
+                    <>
+                      <div className="settings-section">
+                        <label>Cor 1 (Inicial)</label>
+                        <ColorPicker 
+                          color={background.color1 || '#FF2D8D'} 
+                          onChange={(c) => {
+                            const c2 = background.color2 || '#7000FF';
+                            const dir = background.direction || 'tb';
+                            updateCurrentSlide({ 
+                              background: { 
+                                ...background, 
+                                color1: c,
+                                value: getGradientCss(c, c2, dir)
+                              } 
+                            });
+                          }}
+                          brandColors={getBrandColorsArray(projectBranding)}
+                          history={colorHistory}
+                        />
+                      </div>
+
+                      <div className="settings-section">
+                        <label>Cor 2 (Final)</label>
+                        <ColorPicker 
+                          color={background.color2 || '#7000FF'} 
+                          onChange={(c) => {
+                            const c1 = background.color1 || '#FF2D8D';
+                            const dir = background.direction || 'tb';
+                            updateCurrentSlide({ 
+                              background: { 
+                                ...background, 
+                                color2: c,
+                                value: getGradientCss(c1, c, dir)
+                              } 
+                            });
+                          }}
+                          brandColors={getBrandColorsArray(projectBranding)}
+                          history={colorHistory}
+                        />
+                      </div>
+
+                      <div className="settings-section">
+                        <label>Direção do Gradiente</label>
+                        <div className="alignment-toolbar">
+                          <button 
+                            className={background.direction === 'tb' ? 'active' : ''} 
+                            onClick={() => {
+                              const c1 = background.color1 || '#FF2D8D';
+                              const c2 = background.color2 || '#7000FF';
+                              updateCurrentSlide({ 
+                                background: { 
+                                  ...background, 
+                                  direction: 'tb', 
+                                  value: getGradientCss(c1, c2, 'tb') 
+                                } 
+                              });
+                            }}
+                            title="Cima para Baixo"
+                          >↓</button>
+                          <button 
+                            className={background.direction === 'lr' ? 'active' : ''} 
+                            onClick={() => {
+                              const c1 = background.color1 || '#FF2D8D';
+                              const c2 = background.color2 || '#7000FF';
+                              updateCurrentSlide({ 
+                                background: { 
+                                  ...background, 
+                                  direction: 'lr', 
+                                  value: getGradientCss(c1, c2, 'lr') 
+                                } 
+                              });
+                            }}
+                            title="Esquerda para Direita"
+                          >→</button>
+                          <button 
+                            className={background.direction === 'diag' ? 'active' : ''} 
+                            onClick={() => {
+                              const c1 = background.color1 || '#FF2D8D';
+                              const c2 = background.color2 || '#7000FF';
+                              updateCurrentSlide({ 
+                                background: { 
+                                  ...background, 
+                                  direction: 'diag', 
+                                  value: getGradientCss(c1, c2, 'diag') 
+                                } 
+                              });
+                            }}
+                            title="Diagonal"
+                          >↘</button>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="settings-section" style={{ marginTop: '2rem' }}>
                     <label>{t('editor.bg_image')}</label>
@@ -635,31 +1065,36 @@ const Editor = () => {
                     opacity: el.opacity / 100,
                     zIndex: el.zIndex,
                     boxShadow: el.glow,
+                    filter: getShadowStyle(el),
                     overflow: 'visible',
                     background: el.type === 'shape' ? el.color : 'none',
                     padding: 0,
                   }}
                   onClick={(e) => { e.stopPropagation(); setSelectedElementId(el.id); }}
-                  drag={selectedElementId !== el.id || el.type !== 'text'}
+                  drag={!el.isLocked && (selectedElementId !== el.id || el.type !== 'text')}
                   dragMomentum={false}
                   onDragEnd={(_e, info) => {
                     updateElement(el.id, { x: el.x + info.offset.x, y: el.y + info.offset.y });
                   }}
                 >
+                  {el.isLocked && (
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.6)', padding: '4px', borderRadius: '4px', zIndex: 20, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </div>
+                  )}
                   {el.type === 'text' && (
                     <div
-                      contentEditable={selectedElementId === el.id}
+                      contentEditable={selectedElementId === el.id && !el.isLocked}
                       suppressContentEditableWarning
                       style={{
                         display: 'block',
                         width: '100%',
                         height: 'auto',
-                        minHeight: `${el.fontSize * (el.lineHeight || 1.2)}px`,
+                        minHeight: `${(el.fontSize || 16) * (el.lineHeight || 1.2)}px`,
                         color: el.color || '#ffffff',
                         fontFamily: el.fontFamily || 'Outfit',
                         fontSize: `${el.fontSize || 16}px`,
                         fontWeight: el.fontWeight || 400,
-                        fontStyle: el.fontStyle || 'normal',
                         textAlign: el.textAlign || 'left',
                         lineHeight: el.lineHeight || 1.2,
                         letterSpacing: `${el.letterSpacing || 0}px`,
@@ -671,7 +1106,7 @@ const Editor = () => {
                         border: 'none',
                         padding: '4px',
                         margin: 0,
-                        cursor: selectedElementId === el.id ? 'text' : 'move',
+                        cursor: el.isLocked ? 'not-allowed' : (selectedElementId === el.id ? 'text' : 'move'),
                         userSelect: selectedElementId === el.id ? 'text' : 'none',
                         boxSizing: 'border-box',
                       }}
@@ -712,12 +1147,12 @@ const Editor = () => {
                     onDragStart={(e) => e.preventDefault()}
                   />
                 )}
-                {selectedElementId === el.id && (
+                {selectedElementId === el.id && !el.isLocked && (
                   <div className="resize-overlay">
-                    <div className="resize-handle nw" />
-                    <div className="resize-handle ne" />
-                    <div className="resize-handle sw" />
-                    <div className="resize-handle se" />
+                    <div className="resize-handle nw" onMouseDown={(e) => handleResizeStart(e, el, 'nw')} />
+                    <div className="resize-handle ne" onMouseDown={(e) => handleResizeStart(e, el, 'ne')} />
+                    <div className="resize-handle sw" onMouseDown={(e) => handleResizeStart(e, el, 'sw')} />
+                    <div className="resize-handle se" onMouseDown={(e) => handleResizeStart(e, el, 'se')} />
                   </div>
                 )}
               </motion.div>
@@ -858,30 +1293,204 @@ const Editor = () => {
                 </>
               )}
 
-              {/* Layers */}
+              {/* Image Layout Controls */}
+              {selectedElement.type === 'image' && (
+                <div className="settings-section">
+                  <label>Ajuste de Imagem</label>
+                  <div className="settings-grid-2">
+                    <button className="btn-secondary text-xs" style={{ fontSize: '0.75rem', padding: '0.5rem' }} onClick={() => handleFillCanvas(selectedElement)}>Preencher</button>
+                    <button className="btn-secondary text-xs" style={{ fontSize: '0.75rem', padding: '0.5rem' }} onClick={() => handleFitToCanvas(selectedElement)}>Ajustar</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Organizar & Camadas */}
               <div className="settings-section">
-                <label>{t('editor.layers')}</label>
-                <div className="alignment-toolbar">
-                  <button onClick={() => updateElement(selectedElement.id, { zIndex: selectedElement.zIndex + 1 })} title={t('editor.bring_forward')}><ChevronUp size={16} /></button>
-                  <button onClick={() => updateElement(selectedElement.id, { zIndex: selectedElement.zIndex - 1 })} title={t('editor.send_backward')}><ChevronDown size={16} /></button>
+                <label>Organizar & Camadas</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="alignment-toolbar">
+                    <button 
+                      onClick={() => updateElement(selectedElement.id, { zIndex: selectedElement.zIndex + 1 })} 
+                      title="Subir Camada"
+                    >
+                      <ChevronUp size={16} /> <span style={{ fontSize: '0.75rem', marginLeft: '4px' }}>Subir</span>
+                    </button>
+                    <button 
+                      onClick={() => updateElement(selectedElement.id, { zIndex: selectedElement.zIndex - 1 })} 
+                      title="Descer Camada"
+                    >
+                      <ChevronDown size={16} /> <span style={{ fontSize: '0.75rem', marginLeft: '4px' }}>Descer</span>
+                    </button>
+                  </div>
+                  
+                  <div className="alignment-toolbar">
+                    <button 
+                      onClick={() => {
+                        const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex)) : 0;
+                        updateElement(selectedElement.id, { zIndex: maxZ + 1 });
+                      }} 
+                      title="Trazer para Frente"
+                    >
+                      <span style={{ fontSize: '0.75rem' }}>Trazer p/ Frente</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const minZ = Math.min(...elements.map(e => e.zIndex), 0);
+                        updateElement(selectedElement.id, { zIndex: minZ - 1 });
+                      }} 
+                      title="Enviar para Trás"
+                    >
+                      <span style={{ fontSize: '0.75rem' }}>Enviar p/ Trás</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button 
+                      className="btn-secondary" 
+                      style={{ fontSize: '0.75rem', padding: '0.5rem' }} 
+                      onClick={() => duplicateElement(selectedElement)}
+                    >
+                      Duplicar
+                    </button>
+                    <button 
+                      className="btn-secondary"
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        padding: '0.5rem',
+                        background: selectedElement.isLocked ? 'rgba(255, 45, 141, 0.15)' : '',
+                        borderColor: selectedElement.isLocked ? 'var(--primary)' : ''
+                      }} 
+                      onClick={() => updateElement(selectedElement.id, { isLocked: !selectedElement.isLocked })}
+                    >
+                      {selectedElement.isLocked ? 'Desbloquear' : 'Bloquear'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
+              {/* Sombra */}
               <div className="settings-section">
-                <label>{t('editor.item_color')}</label>
-                <ColorPicker 
-                  color={selectedElement.color || '#ffffff'} 
-                  onChange={(c) => {
-                    updateElement(selectedElement.id, { color: c });
-                    if (!c.includes('gradient')) addToHistory(c);
-                  }}
-                  brandColors={getBrandColorsArray(projectBranding)}
-                  history={colorHistory}
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <label style={{ margin: 0 }}>Sombra</label>
+                  <label className="switch" style={{ margin: 0 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!selectedElement.shadowEnabled} 
+                      onChange={(e) => updateElement(selectedElement.id, { shadowEnabled: e.target.checked })} 
+                    />
+                    <span className="slider round"></span>
+                  </label>
+                </div>
+
+                {selectedElement.shadowEnabled && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="label-xs" style={{ textTransform: 'none' }}>Predefinição</span>
+                      <button 
+                        className="btn-secondary" 
+                        style={{ padding: '2px 8px', fontSize: '0.7rem' }} 
+                        onClick={() => updateElement(selectedElement.id, {
+                          shadowColor: '#000000',
+                          shadowBlur: 20,
+                          shadowOffsetX: 0,
+                          shadowOffsetY: 8,
+                          shadowOpacity: 25
+                        })}
+                      >Sombra Suave</button>
+                    </div>
+
+                    <div className="input-group-slider">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Cor</span>
+                        <span>{selectedElement.shadowColor || '#000000'}</span>
+                      </div>
+                      <ColorPicker 
+                        color={selectedElement.shadowColor || '#000000'} 
+                        onChange={(c) => updateElement(selectedElement.id, { shadowColor: c })}
+                        brandColors={getBrandColorsArray(projectBranding)}
+                        history={colorHistory}
+                      />
+                    </div>
+
+                    <div className="input-group-slider">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Desfoque (Blur)</span>
+                        <span>{selectedElement.shadowBlur ?? 20}px</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={selectedElement.shadowBlur ?? 20} 
+                        onChange={(e) => updateElement(selectedElement.id, { shadowBlur: parseInt(e.target.value) })}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div className="input-group-slider">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Opacidade</span>
+                        <span>{selectedElement.shadowOpacity ?? 25}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={selectedElement.shadowOpacity ?? 25} 
+                        onChange={(e) => updateElement(selectedElement.id, { shadowOpacity: parseInt(e.target.value) })}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div className="settings-grid-2">
+                      <div className="input-group-slider">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '4px' }}>
+                          <span>Desloc. X ({selectedElement.shadowOffsetX ?? 0}px)</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="-50" 
+                          max="50" 
+                          value={selectedElement.shadowOffsetX ?? 0} 
+                          onChange={(e) => updateElement(selectedElement.id, { shadowOffsetX: parseInt(e.target.value) })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div className="input-group-slider">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '4px' }}>
+                          <span>Desloc. Y ({selectedElement.shadowOffsetY ?? 8}px)</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="-50" 
+                          max="50" 
+                          value={selectedElement.shadowOffsetY ?? 8} 
+                          onChange={(e) => updateElement(selectedElement.id, { shadowOffsetY: parseInt(e.target.value) })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {selectedElement.type !== 'image' && (
+                <div className="settings-section">
+                  <label>{t('editor.item_color')}</label>
+                  <ColorPicker 
+                    color={selectedElement.color || '#ffffff'} 
+                    onChange={(c) => {
+                      updateElement(selectedElement.id, { color: c });
+                      if (!c.includes('gradient')) addToHistory(c);
+                    }}
+                    brandColors={getBrandColorsArray(projectBranding)}
+                    history={colorHistory}
+                  />
+                </div>
+              )}
+
               {selectedElement.type === 'image' && (
-                <button className="btn-sparkle" onClick={handleRemoveBackground} disabled={isProcessing}>
+                <button className="btn-sparkle" style={{ width: '100%' }} onClick={handleRemoveBackground} disabled={isProcessing}>
                   <Sparkles size={18} /> {isProcessing ? t('common.processing') : t('editor.remove_bg')}
                 </button>
               )}
@@ -1596,6 +2205,59 @@ const Editor = () => {
           background: var(--input);
           padding: 0.4rem 0.75rem;
           border-radius: 8px;
+        }
+
+        /* Toggle Switch styling */
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 38px;
+          height: 20px;
+        }
+
+        .switch input { 
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider.round {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: var(--border);
+          transition: .4s;
+          border-radius: 34px;
+        }
+
+        .slider.round:before {
+          position: absolute;
+          content: "";
+          height: 14px;
+          width: 14px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: .4s;
+          border-radius: 50%;
+        }
+
+        input:checked + .slider.round {
+          background-color: var(--primary);
+        }
+
+        input:checked + .slider.round:before {
+          transform: translateX(18px);
+        }
+        
+        .resize-handle {
+          cursor: nwse-resize;
+        }
+        .resize-handle.ne, .resize-handle.sw {
+          cursor: nesw-resize;
         }
       `}</style>
     </div>
