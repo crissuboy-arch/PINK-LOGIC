@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ScheduledPost, SocialAccount, PublisherPlatform, PublishStatus } from '../types/publisher';
-import { publishPost } from '../lib/publishers';
+import { useCentralStore } from '../store/CentralStore';
+import { Post as PostStore } from '../store/types';
 
 interface PublisherContextType {
   scheduledPosts: ScheduledPost[];
@@ -19,7 +20,6 @@ interface PublisherContextType {
 
 const PublisherContext = createContext<PublisherContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_POSTS = 'pink_logic_scheduled_posts';
 const LOCAL_STORAGE_ACCOUNTS = 'pink_logic_social_accounts';
 
 const DEFAULT_ACCOUNTS: SocialAccount[] = [
@@ -31,136 +31,121 @@ const DEFAULT_ACCOUNTS: SocialAccount[] = [
   { id: 'acc-6', user_id: 'user-default', platform: 'Blog', account_name: 'Blog Interno', status: 'disconnected' },
 ];
 
+function mapToScheduledPost(p: PostStore): ScheduledPost {
+  let mappedStatus: PublishStatus = 'scheduled';
+  if (p.status === 'publicado') mappedStatus = 'published';
+  else if (p.status === 'falhou') mappedStatus = 'failed';
+  else if (p.status === 'rascunho') mappedStatus = 'draft';
+  else if (p.status === 'editando') mappedStatus = 'draft';
+
+  return {
+    id: p.id,
+    user_id: 'user-default',
+    project_id: p.projectId,
+    title: p.title,
+    caption: p.caption,
+    hashtags: p.hashtags ? p.hashtags.split(' ') : [],
+    media_url: p.mediaUrl,
+    platforms: p.platforms as PublisherPlatform[],
+    scheduled_at: p.scheduled_at,
+    timezone: 'America/Sao_Paulo',
+    status: mappedStatus,
+    error_message: p.error_message,
+  };
+}
+
 export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const {
+    posts: centralPosts,
+    activeProjectId,
+    createPost,
+    updatePost,
+    deletePost,
+  } = useCentralStore();
+
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load from localStorage
-  const loadData = useCallback(() => {
+  // Filter and map scheduled posts for active project
+  const scheduledPosts = useMemo(() => {
+    const projectPosts = centralPosts.filter(p => p.projectId === activeProjectId);
+    return projectPosts.map(mapToScheduledPost);
+  }, [centralPosts, activeProjectId]);
+
+  // Load accounts locally
+  useEffect(() => {
     try {
-      const savedPosts = localStorage.getItem(LOCAL_STORAGE_POSTS);
       const savedAccounts = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS);
-
-      if (savedPosts) {
-        try {
-          const parsed = JSON.parse(savedPosts);
-          if (Array.isArray(parsed)) {
-            setScheduledPosts(parsed);
-          } else if (parsed && typeof parsed === 'object') {
-            setScheduledPosts(Object.values(parsed));
-          } else {
-            setScheduledPosts([]);
-          }
-        } catch {
-          setScheduledPosts([]);
-        }
-      } else {
-        setScheduledPosts([]);
-      }
-
       if (savedAccounts) {
-        try {
-          const parsed = JSON.parse(savedAccounts);
-          if (Array.isArray(parsed)) {
-            setSocialAccounts(parsed);
-          } else if (parsed && typeof parsed === 'object') {
-            setSocialAccounts(Object.values(parsed));
-          } else {
-            setSocialAccounts(DEFAULT_ACCOUNTS);
-          }
-        } catch {
-          setSocialAccounts(DEFAULT_ACCOUNTS);
-        }
+        const parsed = JSON.parse(savedAccounts);
+        setSocialAccounts(Array.isArray(parsed) ? parsed : DEFAULT_ACCOUNTS);
       } else {
         setSocialAccounts(DEFAULT_ACCOUNTS);
         localStorage.setItem(LOCAL_STORAGE_ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
       }
-    } catch (e) {
-      console.error('[PublisherContext] Error loading data:', e);
+    } catch {
+      setSocialAccounts(DEFAULT_ACCOUNTS);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-
-    // Listen to background updates (e.g. from central publishPost function)
-    const handleStorageUpdate = () => {
-      loadData();
-    };
-    window.addEventListener('scheduled_posts_updated', handleStorageUpdate);
-    return () => {
-      window.removeEventListener('scheduled_posts_updated', handleStorageUpdate);
-    };
-  }, [loadData]);
-
-  // Save posts to localStorage helper
-  const savePosts = (posts: ScheduledPost[]) => {
-    setScheduledPosts(posts);
-    localStorage.setItem(LOCAL_STORAGE_POSTS, JSON.stringify(posts));
-    // Trigger window event so other context/listeners can sync
-    window.dispatchEvent(new Event('scheduled_posts_updated'));
-  };
-
-  // Save accounts to localStorage helper
   const saveAccounts = (accounts: SocialAccount[]) => {
     setSocialAccounts(accounts);
     localStorage.setItem(LOCAL_STORAGE_ACCOUNTS, JSON.stringify(accounts));
   };
 
-  // Actions
   const createScheduledPost = (
     postData: Omit<ScheduledPost, 'id' | 'user_id' | 'status' | 'created_at' | 'updated_at'>
   ): ScheduledPost => {
-    const newPost: ScheduledPost = {
+    const id = crypto.randomUUID();
+    
+    createPost({
+      projectId: activeProjectId || 'default-project-1',
+      campaignId: null,
+      title: postData.title,
+      caption: postData.caption,
+      hashtags: postData.hashtags.join(' '),
+      cta: null,
+      mediaUrl: postData.media_url || '',
+      scheduled_at: postData.scheduled_at,
+      platforms: postData.platforms,
+      status: 'agendado',
+      type: 'Post',
+      productId: null,
+    });
+
+    return {
       ...postData,
-      id: crypto.randomUUID(),
+      id,
       user_id: 'user-default',
-      status: 'scheduled', // Starts in scheduled status
+      project_id: activeProjectId,
+      status: 'scheduled',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
-    const updated = [newPost, ...scheduledPosts];
-    savePosts(updated);
-    return newPost;
   };
 
-  const deleteScheduledPost = (id: string) => {
-    const updated = scheduledPosts.filter((p) => p.id !== id);
-    savePosts(updated);
+  const deleteScheduledPost = async (id: string) => {
+    await deletePost(id);
   };
 
-  const updatePostStatus = (id: string, status: PublishStatus, errorMessage?: string | null) => {
-    const updated = scheduledPosts.map((p) => {
-      if (p.id === id) {
-        return {
-          ...p,
-          status,
-          error_message: errorMessage || null,
-          published_at: status === 'published' ? new Date().toISOString() : p.published_at,
-          updated_at: new Date().toISOString(),
-        };
-      }
-      return p;
+  const updatePostStatus = async (id: string, status: PublishStatus, errorMessage?: string | null) => {
+    let mappedStatus: PostStore['status'] = 'agendado';
+    if (status === 'published') mappedStatus = 'publicado';
+    else if (status === 'failed') mappedStatus = 'falhou';
+    else if (status === 'draft') mappedStatus = 'rascunho';
+
+    await updatePost(id, {
+      status: mappedStatus,
+      error_message: errorMessage || null,
     });
-    savePosts(updated);
   };
 
-  const updateScheduledPostDate = (id: string, newDate: Date) => {
-    const updated = scheduledPosts.map((p) => {
-      if (p.id === id) {
-        return {
-          ...p,
-          scheduled_at: newDate.toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      }
-      return p;
+  const updateScheduledPostDate = async (id: string, newDate: Date) => {
+    await updatePost(id, {
+      scheduled_at: newDate.toISOString(),
     });
-    savePosts(updated);
   };
 
   const connectAccount = (platform: PublisherPlatform, name: string) => {
@@ -184,14 +169,12 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const publishPostNow = async (id: string) => {
-    try {
-      await publishPost(id);
-    } catch (e) {
-      console.error('[PublisherContext] Error publishing post now:', e);
-    }
+    // Instant publication simulation
+    console.log(`[PublisherFacade] Publishing post instantly: ${id}`);
+    await updatePostStatus(id, 'published');
   };
 
-  // Background Scheduler Simulation: Checks every 8 seconds for posts that should be published
+  // Background scheduler simulation
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -199,7 +182,7 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (post.status === 'scheduled') {
           const scheduledTime = new Date(post.scheduled_at);
           if (scheduledTime <= now) {
-            console.log(`[Scheduler] Auto-publishing scheduled post: "${post.title}"`);
+            console.log(`[SchedulerFacade] Auto-publishing post: "${post.title}"`);
             publishPostNow(post.id);
           }
         }
@@ -236,3 +219,4 @@ export const usePublisher = () => {
   }
   return context;
 };
+export type { ScheduledPost, SocialAccount, PublisherPlatform, PublishStatus };

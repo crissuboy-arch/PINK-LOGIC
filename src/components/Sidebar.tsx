@@ -24,10 +24,16 @@ import {
   Send
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCentralStore } from '../store/CentralStore';
 
 const Sidebar = () => {
   const { t } = useLanguage();
   const [openMenus, setOpenMenus] = useState<string[]>(['gestao', 'criacao']);
+  
+  const { projects, activeProjectId, activeProject, setActiveProjectId, createProject } = useCentralStore();
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showNewProjModal, setShowNewProjModal] = useState(false);
+  const [newProjName, setNewProjName] = useState('');
 
   const toggleMenu = (menu: string) => {
     setOpenMenus(prev => 
@@ -84,6 +90,163 @@ const Sidebar = () => {
         </div>
         <span className="brand-font neon-text">Pink Logic</span>
       </div>
+
+      {/* Project Switcher Selector */}
+      <div className="project-switcher-wrap" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', position: 'relative' }}>
+        <button 
+          onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.6rem 0.85rem',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            color: 'white',
+            justifyContent: 'space-between',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            textAlign: 'left'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
+            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {activeProject ? activeProject.name : 'Selecionar Projeto...'}
+            </span>
+          </div>
+          <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />
+        </button>
+
+        {showProjectDropdown && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '1rem',
+            right: '1rem',
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            zIndex: 110,
+            marginTop: '4px',
+            overflow: 'hidden'
+          }}>
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              {projects.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setActiveProjectId(p.id);
+                    setShowProjectDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '0.6rem 1rem',
+                    color: p.id === activeProjectId ? 'var(--primary)' : 'white',
+                    background: p.id === activeProjectId ? 'rgba(255,45,141,0.05)' : 'none',
+                    fontSize: '0.8rem',
+                    fontWeight: p.id === activeProjectId ? 700 : 500,
+                    borderBottom: '1px solid rgba(255,255,255,0.01)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: p.id === activeProjectId ? 'var(--primary)' : 'rgba(255,255,255,0.2)' }} />
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                setShowNewProjModal(true);
+                setShowProjectDropdown(false);
+              }}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.6rem 1rem',
+                color: 'var(--primary)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                background: 'rgba(255,45,141,0.02)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                borderTop: '1px solid var(--border)'
+              }}
+            >
+              <Plus size={14} />
+              Criar Novo Projeto
+            </button>
+          </div>
+        )}
+      </div>
+
+      {showNewProjModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}>
+          <div className="card" style={{ maxWidth: '400px', width: '100%', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 className="brand-font" style={{ fontSize: '1.25rem', color: 'white', margin: 0 }}>Novo Projeto</h3>
+            <div className="form-group">
+              <label>Nome do Projeto</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                value={newProjName}
+                onChange={e => setNewProjName(e.target.value)}
+                placeholder="Ex: Ofensiva Criativa"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              <button 
+                className="btn-secondary" 
+                style={{ flex: 1, justifyContent: 'center' }} 
+                onClick={() => {
+                  setShowNewProjModal(false);
+                  setNewProjName('');
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-primary" 
+                style={{ flex: 1.5, justifyContent: 'center' }}
+                onClick={async () => {
+                  if (newProjName.trim()) {
+                    await createProject({
+                      name: newProjName.trim(),
+                      description: '',
+                      brandId: '',
+                      socialAccounts: ['Instagram'],
+                      email: '',
+                      timezone: 'America/Sao_Paulo',
+                      status: 'active'
+                    });
+                    setShowNewProjModal(false);
+                    setNewProjName('');
+                  }
+                }}
+              >
+                Criar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="sidebar-nav">
         {menuItems.map((item) => (

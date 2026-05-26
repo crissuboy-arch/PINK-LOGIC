@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, type ReactNode } from 'react'
-import { usePersistedState, STORAGE_KEYS } from '../memory/MemoryStore'
+import { useCentralStore } from '../store/CentralStore'
+import type { Brand } from '../store/types'
 
 export interface BrandColorPalette {
   primary: string
@@ -25,7 +26,7 @@ export interface BrandSchema {
   logo?: string
   visualStyle: string
   tone: string
-  colors: string[]
+  colors: string[] // hashtags mapped
 }
 
 interface BrandContextValue {
@@ -41,64 +42,137 @@ interface BrandContextValue {
 
 const BrandContext = createContext<BrandContextValue | null>(null)
 
-const defaultPalette: BrandColorPalette = {
-  primary: '#FF2D8D',
-  secondary: '#7B2D8E',
-  accent: '#FFD700',
-  background: '#0D0D12',
-  text: '#FFFFFF',
-}
-
-const defaultTypography: BrandTypography = {
-  heading: 'Inter',
-  body: 'Inter',
+export function mapToBrandSchema(b: Brand): BrandSchema {
+  return {
+    id: b.id,
+    projectId: b.projectId,
+    name: b.name,
+    palette: {
+      primary: b.colors.primary,
+      secondary: b.colors.secondary,
+      accent: b.colors.accent,
+      background: b.colors.background,
+      text: b.colors.text,
+    },
+    typography: {
+      heading: b.fonts.heading,
+      body: b.fonts.body,
+    },
+    logo: b.logo,
+    visualStyle: b.style,
+    tone: b.tone,
+    colors: b.hashtags || [],
+  };
 }
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [brands, setBrands, clearBrands] = usePersistedState<BrandSchema[]>(STORAGE_KEYS.BRANDING, [])
-  const [activeBrandId, setActiveBrandId] = usePersistedState<string | null>(STORAGE_KEYS.BRANDING + '.active', null)
+  const {
+    brands: centralBrands,
+    activeBrand: centralActiveBrand,
+    createBrand: centralCreateBrand,
+    updateBrand: centralUpdateBrand,
+    setActiveProjectId,
+  } = useCentralStore();
 
-  const activeBrand = activeBrandId ? brands.find(b => b.id === activeBrandId) ?? null : null
+  const mappedBrands = centralBrands.map(mapToBrandSchema);
+  const activeBrand = centralActiveBrand ? mapToBrandSchema(centralActiveBrand) : null;
 
   const setActiveBrand = useCallback((brand: BrandSchema | null) => {
-    setActiveBrandId(brand?.id ?? null)
-  }, [setActiveBrandId])
+    if (brand) {
+      setActiveProjectId(brand.projectId);
+    }
+  }, [setActiveProjectId]);
 
   const createBrand = useCallback((data: Partial<BrandSchema> & { projectId: string }): BrandSchema => {
-    const brand: BrandSchema = {
-      id: crypto.randomUUID(),
+    centralCreateBrand({
       projectId: data.projectId,
       name: data.name || 'Identidade Visual',
-      palette: data.palette ?? { ...defaultPalette },
-      typography: data.typography ?? { ...defaultTypography },
       logo: data.logo,
-      visualStyle: data.visualStyle || 'moderno e feminino',
-      tone: data.tone || 'profissional e acolhedor',
-      colors: data.colors ?? [defaultPalette.primary, defaultPalette.secondary, defaultPalette.accent],
-    }
-    setBrands(prev => [...prev, brand])
-    setActiveBrandId(brand.id)
-    return brand
-  }, [setBrands, setActiveBrandId])
+      colors: {
+        primary: data.palette?.primary || '#FF2D8D',
+        secondary: data.palette?.secondary || '#7B2D8E',
+        accent: data.palette?.accent || '#FFD700',
+        background: data.palette?.background || '#0D0D12',
+        text: data.palette?.text || '#FFFFFF',
+        glow: data.palette?.primary || '#FF2D8D',
+      },
+      fonts: {
+        heading: data.typography?.heading || 'Outfit',
+        body: data.typography?.body || 'Inter',
+      },
+      glow: data.palette?.primary || '#FF2D8D',
+      hashtags: data.colors || [],
+      cta: '',
+      tone: data.tone || '',
+      style: data.visualStyle || '',
+      overlays: [],
+    });
+
+    const tempId = crypto.randomUUID();
+    return {
+      id: tempId,
+      projectId: data.projectId,
+      name: data.name || 'Identidade Visual',
+      palette: data.palette ?? { primary: '#FF2D8D', secondary: '#7B2D8E', accent: '#FFD700', background: '#0D0D12', text: '#FFFFFF' },
+      typography: data.typography ?? { heading: 'Outfit', body: 'Inter' },
+      logo: data.logo,
+      visualStyle: data.visualStyle || '',
+      tone: data.tone || '',
+      colors: data.colors || [],
+    };
+  }, [centralCreateBrand]);
 
   const updateBrand = useCallback((id: string, data: Partial<BrandSchema>) => {
-    setBrands(prev => prev.map(b => (b.id === id ? { ...b, ...data } : b)))
-  }, [setBrands])
+    const updates: Partial<Brand> = {};
+    if (data.name) updates.name = data.name;
+    if (data.logo) updates.logo = data.logo;
+    if (data.visualStyle) updates.style = data.visualStyle;
+    if (data.tone) updates.tone = data.tone;
+    if (data.colors) updates.hashtags = data.colors;
+    
+    if (data.palette) {
+      updates.colors = {
+        primary: data.palette.primary || '#FF2D8D',
+        secondary: data.palette.secondary || '#7000FF',
+        accent: data.palette.accent || '#00E0FF',
+        background: data.palette.background || '#0D0D12',
+        text: data.palette.text || '#FFFFFF',
+        glow: data.palette.primary || '#FF2D8D',
+      };
+      updates.glow = data.palette.primary || '#FF2D8D';
+    }
 
-  const removeBrand = useCallback((id: string) => {
-    setBrands(prev => prev.filter(b => b.id !== id))
-    if (activeBrandId === id) setActiveBrandId(null)
-  }, [setBrands, activeBrandId, setActiveBrandId])
+    if (data.typography) {
+      updates.fonts = {
+        heading: data.typography.heading || 'Outfit',
+        body: data.typography.body || 'Inter',
+      };
+    }
+
+    centralUpdateBrand(id, updates);
+  }, [centralUpdateBrand]);
+
+  const removeBrand = useCallback((_id: string) => {
+    // Cascaded project deletion or ignore for safety
+  }, []);
 
   const getBrandByProject = useCallback((projectId: string) => {
-    return brands.find(b => b.projectId === projectId)
-  }, [brands])
+    const found = centralBrands.find(b => b.projectId === projectId);
+    return found ? mapToBrandSchema(found) : undefined;
+  }, [centralBrands]);
+
+  const clearBrands = useCallback(() => {}, []);
 
   return (
     <BrandContext.Provider value={{
-      brands, activeBrand, setActiveBrand,
-      createBrand, updateBrand, removeBrand,
-      getBrandByProject, clearBrands,
+      brands: mappedBrands,
+      activeBrand,
+      setActiveBrand,
+      createBrand,
+      updateBrand,
+      removeBrand,
+      getBrandByProject,
+      clearBrands,
     }}>
       {children}
     </BrandContext.Provider>

@@ -1,68 +1,114 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Plus, 
   Package, 
   Target, 
   MessageCircle, 
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Calendar as CalendarIcon,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useProducts } from '../../contexts/ProductContext';
-
-const STORAGE_KEY = 'pink_logic_campaigns';
-
-interface Campaign {
-  id: string;
-  name: string;
-  mainProduct: string;
-  secondaryProduct: string;
-  message: string;
-  status: 'active' | 'draft';
-}
+import { useCentralStore } from '../../store/CentralStore';
+import type { Campaign } from '../../store/types';
 
 const Campanhas = () => {
   const { t } = useLanguage();
   const { products: allProducts } = useProducts();
   const productOptions = useMemo(() => allProducts.map(p => p.name), [allProducts]);
+  
+  const {
+    campaigns: centralCampaigns,
+    activeProjectId,
+    createCampaign,
+    updateCampaign,
+    deleteCampaign,
+  } = useCentralStore();
+
+  const campaigns = useMemo(() => {
+    return centralCampaigns.filter(c => c.projectId === activeProjectId);
+  }, [centralCampaigns, activeProjectId]);
+
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (Array.isArray(parsed)) return parsed;
-      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Campaign[];
-      return [
-        { id: '1', name: 'Lançamento Ebook Fit', mainProduct: 'Ebook Receitas Fit', secondaryProduct: 'Guia de Treinos', message: 'Emagreça com saúde em 30 dias', status: 'active' },
-        { id: '2', name: 'Black Friday Social Media', mainProduct: 'Curso Social Media', secondaryProduct: 'Pack de Templates', message: 'O maior desconto do ano para sua carreira', status: 'draft' },
-      ];
-    } catch { return []; }
+  
+  const [form, setForm] = useState({
+    name: '',
+    mainProduct: '',
+    secondaryProduct: '',
+    message: '',
+    status: 'draft' as Campaign['status'],
+    goal: '',
+    cta: '',
+    startDate: '',
+    endDate: '',
   });
-  const [form, setForm] = useState({ name: '', mainProduct: '', secondaryProduct: '', message: '', status: 'draft' as Campaign['status'] });
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
-  }, [campaigns]);
+  const [showDropdownId, setShowDropdownId] = useState<string | null>(null);
 
   const openNew = () => {
     setEditId(null);
-    setForm({ name: '', mainProduct: '', secondaryProduct: '', message: '', status: 'draft' });
+    setForm({
+      name: '',
+      mainProduct: '',
+      secondaryProduct: '',
+      message: '',
+      status: 'draft',
+      goal: '',
+      cta: '',
+      startDate: new Date().toISOString().substring(0, 10),
+      endDate: '',
+    });
     setShowForm(true);
   };
 
   const openEdit = (c: Campaign) => {
     setEditId(c.id);
-    setForm({ name: c.name, mainProduct: c.mainProduct, secondaryProduct: c.secondaryProduct, message: c.message, status: c.status });
+    setForm({
+      name: c.name,
+      mainProduct: c.mainProduct,
+      secondaryProduct: c.secondaryProduct,
+      message: c.message,
+      status: c.status,
+      goal: c.goal || '',
+      cta: c.cta || '',
+      startDate: c.startDate ? c.startDate.substring(0, 10) : '',
+      endDate: c.endDate ? c.endDate.substring(0, 10) : '',
+    });
     setShowForm(true);
   };
 
-  const save = () => {
+  const handleSave = async () => {
     if (editId) {
-      setCampaigns(prev => prev.map(c => c.id === editId ? { ...c, ...form } : c));
+      await updateCampaign(editId, {
+        name: form.name,
+        mainProduct: form.mainProduct,
+        secondaryProduct: form.secondaryProduct,
+        message: form.message,
+        status: form.status,
+        goal: form.goal,
+        cta: form.cta,
+        startDate: form.startDate,
+        endDate: form.endDate || undefined,
+      });
     } else {
-      setCampaigns(prev => [...prev, { ...form, id: Math.random().toString(36).substr(2, 9) }]);
+      await createCampaign({
+        projectId: activeProjectId || 'default-project-1',
+        name: form.name,
+        mainProduct: form.mainProduct,
+        secondaryProduct: form.secondaryProduct,
+        message: form.message,
+        status: form.status,
+        goal: form.goal,
+        cta: form.cta,
+        startDate: form.startDate,
+        endDate: form.endDate || undefined,
+        linkedPostIds: [],
+      });
     }
     setShowForm(false);
     setEditId(null);
@@ -84,17 +130,51 @@ const Campanhas = () => {
 
       <div className="campanhas-grid">
         {campaigns.map(campaign => (
-          <div key={campaign.id} className="card campaign-card">
+          <div key={campaign.id} className="card campaign-card" style={{ position: 'relative' }}>
             <div className="campaign-header">
               <div className="campaign-info">
-                <div className={`status-badge ${campaign.status}`}>
+                <div className={`status-badge ${campaign.status}`} style={{
+                  display: 'inline-block',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: campaign.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                  color: campaign.status === 'active' ? '#10b981' : 'var(--text-secondary)'
+                }}>
                   {campaign.status === 'active' ? t('campaigns.status_active') : t('campaigns.status_draft')}
                 </div>
-                <h3>{campaign.name}</h3>
+                <h3 style={{ marginTop: '0.5rem', color: 'white', fontSize: '1.2rem' }}>{campaign.name}</h3>
               </div>
-              <button className="icon-btn-sm">
-                <MoreHorizontal size={18} />
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button className="icon-btn-sm" onClick={() => setShowDropdownId(showDropdownId === campaign.id ? null : campaign.id)}>
+                  <MoreHorizontal size={18} />
+                </button>
+                {showDropdownId === campaign.id && (
+                  <div className="dropdown-menu-box" style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
+                    zIndex: 10,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minWidth: '120px',
+                    overflow: 'hidden'
+                  }}>
+                    <button onClick={() => { openEdit(campaign); setShowDropdownId(null); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', fontSize: '0.8rem', color: 'white', borderBottom: '1px solid var(--border)', width: '100%', textAlign: 'left' }}>
+                      <Edit2 size={12} /> Editar
+                    </button>
+                    <button onClick={() => { deleteCampaign(campaign.id); setShowDropdownId(null); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', fontSize: '0.8rem', color: '#ef4444', width: '100%', textAlign: 'left' }}>
+                      <Trash2 size={12} /> Excluir
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="campaign-details">
@@ -112,17 +192,50 @@ const Campanhas = () => {
                   <span className="detail-value">{campaign.secondaryProduct || 'Nenhum'}</span>
                 </div>
               </div>
+              
+              {campaign.goal && (
+                <div className="detail-item">
+                  <Target size={16} style={{ color: 'var(--primary)' }} />
+                  <div className="detail-text">
+                    <span className="detail-label">Meta / Objetivo</span>
+                    <span className="detail-value">{campaign.goal}</span>
+                  </div>
+                </div>
+              )}
+
+              {campaign.startDate && (
+                <div className="detail-item">
+                  <CalendarIcon size={16} />
+                  <div className="detail-text">
+                    <span className="detail-label">Período</span>
+                    <span className="detail-value" style={{ fontSize: '0.8rem' }}>
+                      {new Date(campaign.startDate).toLocaleDateString()}
+                      {campaign.endDate ? ` a ${new Date(campaign.endDate).toLocaleDateString()}` : ' (Contínuo)'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="detail-item full-width">
                 <MessageCircle size={16} />
                 <div className="detail-text">
                   <span className="detail-label">{t('campaigns.message')}</span>
-                  <p className="detail-value">{campaign.message}</p>
+                  <p className="detail-value" style={{ fontWeight: 400, marginTop: '2px' }}>{campaign.message}</p>
                 </div>
               </div>
+
+              {campaign.cta && (
+                <div className="detail-item full-width" style={{ borderTop: '1px solid rgba(255,255,255,0.02)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                  <div className="detail-text">
+                    <span className="detail-label">Chamada para Ação (CTA)</span>
+                    <span className="detail-value" style={{ color: 'var(--primary)', fontStyle: 'italic' }}>"{campaign.cta}"</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="campaign-footer">
-                <button className="btn-secondary-sm" onClick={() => openEdit(campaign)}>{t('common.edit')}</button>
+              <button className="btn-secondary-sm" onClick={() => openEdit(campaign)}>{t('common.edit')}</button>
               <button className="btn-primary-sm">
                 <span>{t('campaigns.view_strategy')}</span>
                 <ChevronRight size={14} />
@@ -130,13 +243,18 @@ const Campanhas = () => {
             </div>
           </div>
         ))}
+        {campaigns.length === 0 && (
+          <div className="card" style={{ gridColumn: 'span 3', padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            Nenhuma campanha cadastrada para este projeto. Clique em "Nova Campanha" para começar.
+          </div>
+        )}
       </div>
 
       {showForm && (
         <div className="modal-overlay">
-          <div className="card modal-content">
+          <div className="card modal-content" style={{ maxWidth: '600px', width: '100%' }}>
             <h2 className="brand-font">{editId ? 'Editar Campanha' : t('campaigns.new_campaign')}</h2>
-            <form className="campaign-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <form className="campaign-form" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
               <div className="form-group">
                 <label>{t('campaigns.name')}</label>
                 <input type="text" className="input-field" placeholder={t('campaigns.name_placeholder')} required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
@@ -157,6 +275,29 @@ const Campanhas = () => {
                   </select>
                 </div>
               </div>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Meta / Objetivo</label>
+                  <input type="text" className="input-field" placeholder="Ex: 50 leads qualificados" value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>CTA Principal</label>
+                  <input type="text" className="input-field" placeholder="Ex: Compre com frete grátis" value={form.cta} onChange={e => setForm(f => ({ ...f, cta: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Data de Início</label>
+                  <input type="date" className="input-field" required value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Data de Término (Opcional)</label>
+                  <input type="date" className="input-field" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                </div>
+              </div>
+
               <div className="form-group">
                 <label>{t('campaigns.message')}</label>
                 <textarea className="input-field" rows={3} placeholder="Qual a mensagem principal da campanha?" required value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} />
@@ -166,6 +307,7 @@ const Campanhas = () => {
                 <select className="input-field" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Campaign['status'] }))}>
                   <option value="draft">Rascunho</option>
                   <option value="active">Ativa</option>
+                  <option value="completed">Concluída</option>
                 </select>
               </div>
               <div className="form-actions">
@@ -201,30 +343,6 @@ const Campanhas = () => {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-        }
-
-        .campaign-info h3 {
-          font-size: 1.25rem;
-          margin-top: 0.5rem;
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 0.2rem 0.6rem;
-          border-radius: 4px;
-          font-size: 0.7rem;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .status-badge.active {
-          background: rgba(16, 185, 129, 0.1);
-          color: #10b981;
-        }
-
-        .status-badge.draft {
-          background: rgba(255, 255, 255, 0.05);
-          color: var(--text-secondary);
         }
 
         .campaign-details {
@@ -308,12 +426,8 @@ const Campanhas = () => {
         }
 
         .modal-content {
-          width: 500px;
-          padding: 2rem;
-        }
-
-        .modal-content h2 {
-          margin-bottom: 2rem;
+          padding: 2.5rem;
+          border-radius: var(--radius-lg);
         }
 
         .campaign-form {

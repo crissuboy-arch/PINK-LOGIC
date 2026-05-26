@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useBrand } from '../providers/BrandProvider';
-import { useProject } from '../providers/ProjectProvider';
+import { useCentralStore } from '../store/CentralStore';
 
 const EDITOR_DATA_KEY = 'pinklogic.projects.editor'
 
@@ -64,7 +64,7 @@ export interface Slide {
     value: string;
     blur: number;
     brightness: number;
-    opacity: number;
+    opacity: 100 | number;
     color1?: string;
     color2?: string;
     direction?: 'tb' | 'lr' | 'diag';
@@ -132,10 +132,28 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [canvasFormat, setCanvasFormatState] = useState<CanvasFormat>(availableFormats[0]);
 
-  // Bridge to BrandProvider — activeBrandKit/brandKits are now managed externally
+  // Bridge to BrandProvider — activeBrandKit/brandKits are managed externally
   const { brands: brandKits, activeBrand: activeBrandKit, setActiveBrand: setActiveBrandKit } = useBrand();
-  const { createProject } = useProject();
+  const { projects: centralProjects, createProject: centralCreateProject, updateProject: centralUpdateProject } = useCentralStore();
   const projectRef = useRef<string | null>(null);
+
+  // Dynamic parameter loading on mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const projectId = params.get('id');
+      if (projectId) {
+        projectRef.current = projectId;
+        const loaded = loadEditorData(projectId);
+        if (loaded) {
+          if (loaded.slides) setSlides(loaded.slides);
+          if (loaded.canvasFormat) setCanvasFormatState(loaded.canvasFormat);
+        }
+      }
+    } catch (e) {
+      console.warn('[EditorContext] Failed to load param project:', e);
+    }
+  }, []);
 
   const setCanvasFormat = (formatId: string) => {
     const format = availableFormats.find(f => f.id === formatId);
@@ -198,14 +216,34 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSlides(slides.map((s, i) => i === currentSlideIndex ? { ...s, ...updates } : s));
   };
 
-  const saveProject = () => {
+  const saveProject = async () => {
     const projectId = projectRef.current || crypto.randomUUID();
-    const project = createProject({
-      id: projectId,
-      name: `Design ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-    });
-    projectRef.current = project.id;
-    saveEditorData(project.id, { slides, canvasFormat });
+    
+    // Save slides to local storage
+    saveEditorData(projectId, { slides, canvasFormat });
+
+    // Sync project entity to central store
+    const existing = centralProjects.find(p => p.id === projectId);
+    if (!existing) {
+      await centralCreateProject({
+        name: `Design ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+        description: 'Criado pelo editor visual',
+        brandId: '',
+        socialAccounts: ['Instagram'],
+        email: '',
+        timezone: 'America/Sao_Paulo',
+        status: 'active',
+      });
+    } else {
+      await centralUpdateProject(projectId, {
+        // Keep existing fields
+      });
+    }
+
+    projectRef.current = projectId;
+    
+    // Go back to editorial calendar
+    window.location.href = '/gestao/calendario';
   };
 
   return (

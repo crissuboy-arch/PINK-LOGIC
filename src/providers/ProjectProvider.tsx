@@ -1,24 +1,14 @@
 import { createContext, useContext, useCallback, type ReactNode } from 'react'
-import { usePersistedState, STORAGE_KEYS } from '../memory/MemoryStore'
+import { useCentralStore } from '../store/CentralStore'
+import type { Project, Brand } from '../store/types'
 import {
   type ProjectSchema,
   type ProjectBranding,
   type ProjectSettings,
   type ProjectMetadata,
-  defaultBranding,
-  defaultSettings,
-  defaultMetadata,
-  createSlug,
-  migrateProject,
-  SCHEMA_VERSION,
 } from '../types/ProjectSchema'
 
 export type { ProjectSchema, ProjectBranding, ProjectSettings, ProjectMetadata }
-
-interface ProjectState {
-  projects: ProjectSchema[]
-  currentProjectId: string | null
-}
 
 interface ProjectContextValue {
   projects: ProjectSchema[]
@@ -33,116 +23,168 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue | null>(null)
 
-const defaultState: ProjectState = {
-  projects: [],
-  currentProjectId: null,
-}
-
-function hydrateState(raw: unknown): ProjectState {
-  const state = raw as ProjectState | null
-  if (!state || !Array.isArray(state.projects)) return defaultState
+export function mapToProjectSchema(p: Project, b?: Brand | null): ProjectSchema {
+  const colors = b?.colors || {
+    primary: '#FF2D8D',
+    secondary: '#7000FF',
+    accent: '#00E0FF',
+    background: '#0D0D12',
+    text: '#FFFFFF',
+    glow: '#FF2D8D',
+  };
   return {
-    projects: state.projects.map(p => migrateProject(p as unknown as Record<string, unknown>)),
-    currentProjectId: state.currentProjectId ?? null,
-  }
+    id: p.id,
+    name: p.name,
+    slug: p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    createdAt: new Date(p.createdAt),
+    updatedAt: new Date(p.createdAt),
+    branding: {
+      palette: {
+        primary: colors.primary,
+        secondary: colors.secondary,
+        accent: colors.accent,
+        background: colors.background,
+        text: colors.text,
+      },
+      fonts: {
+        heading: b?.fonts.heading || 'Outfit',
+        body: b?.fonts.body || 'Inter',
+      },
+      tone: b?.tone || '',
+      visualStyle: b?.style || '',
+      logo: b?.logo,
+    },
+    content: { pieces: 0, formats: [] },
+    campaigns: [],
+    calendar: { events: 0 },
+    workflows: [],
+    automations: [],
+    assets: { images: [], logos: [], fonts: [], templates: [] },
+    settings: {
+      niche: '',
+      audience: '',
+      objective: p.description,
+      platform: p.socialAccounts.join(','),
+      timezone: p.timezone,
+      language: 'pt-BR',
+    },
+    metadata: {
+      version: 2,
+      createdBy: 'system',
+      tags: [],
+      notes: '',
+      status: p.status === 'active' ? 'active' : 'draft',
+    }
+  };
 }
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [state, setState, clearProjects] = usePersistedState<ProjectState>(
-    STORAGE_KEYS.PROJECTS,
-    defaultState,
-    hydrateState,
-  )
+  const {
+    projects: centralProjects,
+    brands: centralBrands,
+    activeProjectId,
+    activeProject,
+    activeBrand,
+    setActiveProjectId,
+    createProject: centralCreateProject,
+    updateProject: centralUpdateProject,
+    deleteProject: centralDeleteProject,
+  } = useCentralStore();
 
-  const currentProject = state.currentProjectId
-    ? state.projects.find(p => p.id === state.currentProjectId) ?? null
-    : null
+  const mappedProjects = centralProjects.map(p => {
+    const brand = centralBrands.find(b => b.projectId === p.id);
+    return mapToProjectSchema(p, brand);
+  });
+
+  const currentProject = activeProject ? mapToProjectSchema(activeProject, activeBrand) : null;
 
   const createProject = useCallback((data: Partial<ProjectSchema>): ProjectSchema => {
-    const now = new Date()
-    const name = data.name || 'Novo Projeto'
-    const project: ProjectSchema = {
-      id: data.id || crypto.randomUUID(),
+    const name = data.name || 'Novo Projeto';
+    const email = '';
+    const desc = data.settings?.objective || '';
+    
+    // Call centralized store creation which handles Projects & Brands creation
+    centralCreateProject({
       name,
-      slug: data.slug || createSlug(name),
-      createdAt: now,
-      updatedAt: now,
+      description: desc,
+      brandId: '',
+      socialAccounts: data.settings?.platform ? [data.settings.platform] : ['Instagram'],
+      email,
+      timezone: data.settings?.timezone || 'America/Sao_Paulo',
+      status: 'active'
+    });
 
+    // Mock direct sync return value
+    const tempId = crypto.randomUUID();
+    return {
+      id: tempId,
+      name,
+      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
       branding: {
         palette: {
-          primary: data.branding?.palette?.primary || defaultBranding.palette.primary,
-          secondary: data.branding?.palette?.secondary || defaultBranding.palette.secondary,
-          accent: data.branding?.palette?.accent || defaultBranding.palette.accent,
-          background: data.branding?.palette?.background || defaultBranding.palette.background,
-          text: data.branding?.palette?.text || defaultBranding.palette.text,
+          primary: data.branding?.palette?.primary || '#FF2D8D',
+          secondary: data.branding?.palette?.secondary || '#7B2D8E',
+          accent: data.branding?.palette?.accent || '#FFD700',
+          background: data.branding?.palette?.background || '#0D0D12',
+          text: data.branding?.palette?.text || '#FFFFFF',
         },
         fonts: {
-          heading: data.branding?.fonts?.heading || defaultBranding.fonts.heading,
-          body: data.branding?.fonts?.body || defaultBranding.fonts.body,
+          heading: data.branding?.fonts?.heading || 'Outfit',
+          body: data.branding?.fonts?.body || 'Inter',
         },
-        tone: data.branding?.tone ?? '',
-        visualStyle: data.branding?.visualStyle ?? '',
-        logo: data.branding?.logo,
+        tone: '',
+        visualStyle: '',
       },
-
-      content: data.content ?? { pieces: 0, formats: [] },
-      campaigns: data.campaigns ?? [],
-      calendar: data.calendar ?? { events: 0 },
-      workflows: data.workflows ?? [],
-      automations: data.automations ?? [],
-      assets: data.assets ?? { images: [], logos: [], fonts: [], templates: [] },
-
+      content: { pieces: 0, formats: [] },
+      campaigns: [],
+      calendar: { events: 0 },
+      workflows: [],
+      automations: [],
+      assets: { images: [], logos: [], fonts: [], templates: [] },
       settings: {
-        niche: data.settings?.niche ?? '',
-        audience: data.settings?.audience ?? '',
-        objective: data.settings?.objective ?? '',
-        platform: data.settings?.platform ?? 'instagram',
-        timezone: data.settings?.timezone ?? 'America/Sao_Paulo',
-        language: data.settings?.language ?? 'pt-BR',
+        niche: '',
+        audience: '',
+        objective: desc,
+        platform: data.settings?.platform || 'Instagram',
+        timezone: data.settings?.timezone || 'America/Sao_Paulo',
+        language: 'pt-BR',
       },
-
       metadata: {
-        version: SCHEMA_VERSION,
-        createdBy: data.metadata?.createdBy ?? 'system',
-        tags: data.metadata?.tags ?? [],
-        notes: data.metadata?.notes ?? '',
-        status: data.metadata?.status ?? 'draft',
-      },
-    }
-    setState(prev => ({
-      projects: [...prev.projects, project],
-      currentProjectId: project.id,
-    }))
-    return project
-  }, [setState])
+        version: 2,
+        createdBy: 'system',
+        tags: [],
+        notes: '',
+        status: 'draft',
+      }
+    };
+  }, [centralCreateProject]);
 
   const updateProject = useCallback((id: string, data: Partial<ProjectSchema>) => {
-    setState(prev => ({
-      projects: prev.projects.map(p =>
-        p.id === id ? { ...p, ...data, updatedAt: new Date() } : p
-      ),
-      currentProjectId: prev.currentProjectId,
-    }))
-  }, [setState])
+    const updates: Partial<Project> = {};
+    if (data.name) updates.name = data.name;
+    if (data.settings?.objective) updates.description = data.settings.objective;
+    if (data.settings?.timezone) updates.timezone = data.settings.timezone;
+    centralUpdateProject(id, updates);
+  }, [centralUpdateProject]);
 
   const removeProject = useCallback((id: string) => {
-    setState(prev => ({
-      projects: prev.projects.filter(p => p.id !== id),
-      currentProjectId: prev.currentProjectId === id ? null : prev.currentProjectId,
-    }))
-  }, [setState])
+    centralDeleteProject(id);
+  }, [centralDeleteProject]);
 
   const setCurrentProject = useCallback((id: string | null) => {
-    setState(prev => ({
-      ...prev,
-      currentProjectId: id,
-    }))
-  }, [setState])
+    setActiveProjectId(id);
+  }, [setActiveProjectId]);
+
+  const clearProjects = useCallback(() => {
+    // Clear handled by store or left as no-op for safety
+  }, []);
 
   return (
     <ProjectContext.Provider value={{
-      projects: state.projects,
-      currentProjectId: state.currentProjectId,
+      projects: mappedProjects,
+      currentProjectId: activeProjectId,
       currentProject,
       createProject,
       updateProject,

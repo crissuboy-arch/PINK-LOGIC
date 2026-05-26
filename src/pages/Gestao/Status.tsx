@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { 
   Image as ImageIcon, 
   Video, 
@@ -6,35 +7,59 @@ import {
   Clock, 
   AlertCircle,
   ExternalLink,
-  Filter
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown
 } from 'lucide-react';
 
-import { useGestao } from '../../contexts/GestaoContext';
+import { useCentralStore } from '../../store/CentralStore';
 import { useLanguage } from '../../contexts/LanguageContext';
+import type { Post } from '../../store/types';
 
 const Status = () => {
-  const { posts } = useGestao();
+  const { posts: centralPosts, activeProjectId } = useCentralStore();
   const { t, language } = useLanguage();
+
+  // local states for table features
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState('all');
   
-  const getStatusIcon = (status: string) => {
+  const [sortField, setSortField] = useState<string>('scheduled_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
+
+  // Filter posts by active project
+  const posts = useMemo(() => {
+    return centralPosts.filter(p => p.projectId === activeProjectId);
+  }, [centralPosts, activeProjectId]);
+
+  const getStatusIcon = (status: Post['status']) => {
     switch (status) {
-      case 'posted': return <CheckCircle2 size={16} className="text-success" />;
-      case 'pending': return <Clock size={16} className="text-muted" />;
-      case 'error': return <AlertCircle size={16} className="text-danger" />;
+      case 'publicado': return <CheckCircle2 size={16} className="text-success" />;
+      case 'agendado': return <Clock size={16} style={{ color: '#ff2d8d' }} />;
+      case 'falhou': return <AlertCircle size={16} className="text-danger" />;
+      case 'rascunho': return <Clock size={16} className="text-muted" />;
+      case 'editando': return <Clock size={16} style={{ color: '#00E0FF' }} />;
       default: return null;
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: Post['status']) => {
     switch (status) {
-      case 'posted': return t('status.labels.posted');
-      case 'pending': return t('status.labels.pending');
-      case 'error': return t('status.labels.error');
+      case 'publicado': return 'Publicado';
+      case 'agendado': return 'Agendado';
+      case 'falhou': return 'Falhou';
+      case 'rascunho': return 'Rascunho';
+      case 'editando': return 'Editando';
       default: return status;
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: Post['type']) => {
     switch (type) {
       case 'Post': return <ImageIcon size={16} />;
       case 'Stories': return <ImageIcon size={16} />;
@@ -46,11 +71,75 @@ const Status = () => {
   };
 
   const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
     const d = new Date(dateStr);
     return d.toLocaleString(language === 'pt' ? 'pt-BR' : language === 'en' ? 'en-US' : 'es-ES', { 
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
     });
   };
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
+
+  // 1. Filtering and Sorting logic
+  const filteredAndSortedPosts = useMemo(() => {
+    let result = posts.filter(p => {
+      // Search
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch = !query || 
+        p.title.toLowerCase().includes(query) ||
+        p.caption.toLowerCase().includes(query) ||
+        (p.productId && p.productId.toLowerCase().includes(query)) ||
+        p.platforms.some(plat => plat.toLowerCase().includes(query));
+
+      // Status Filter
+      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+
+      // Platform Filter
+      const matchesPlatform = platformFilter === 'all' || p.platforms.includes(platformFilter);
+
+      return matchesSearch && matchesStatus && matchesPlatform;
+    });
+
+    // Sorting
+    result.sort((a, b) => {
+      let aVal: any = a[sortField as keyof Post];
+      let bVal: any = b[sortField as keyof Post];
+
+      if (aVal === undefined || aVal === null) aVal = '';
+      if (bVal === undefined || bVal === null) bVal = '';
+
+      if (sortField === 'reach' || sortField === 'engagement') {
+        const parseMetric = (val: string) => {
+          if (val === '-') return 0;
+          if (val.endsWith('k')) return parseFloat(val) * 1000;
+          return parseFloat(val) || 0;
+        };
+        aVal = parseMetric(String(aVal));
+        bVal = parseMetric(String(bVal));
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [posts, searchQuery, statusFilter, platformFilter, sortField, sortDirection]);
+
+  // 2. Pagination calculation
+  const totalPages = Math.ceil(filteredAndSortedPosts.length / pageSize);
+  const paginatedPosts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedPosts.slice(startIndex, startIndex + pageSize);
+  }, [filteredAndSortedPosts, currentPage]);
 
   return (
     <div className="status-page">
@@ -59,41 +148,121 @@ const Status = () => {
           <h1 className="brand-font">{t('status.title')}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>{t('status.subtitle')}</p>
         </div>
-        
-        <button className="btn-secondary">
-          <Filter size={18} />
-          <span>{t('status.filter')}</span>
-        </button>
       </header>
+
+      <div className="status-toolbar" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '1rem', flex: 1, minWidth: '300px' }}>
+          <div className="search-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--input)', border: '1px solid var(--border)', borderRadius: '100px', padding: '0.5rem 1.25rem', flex: 1 }}>
+            <Search size={16} style={{ color: 'var(--text-secondary)' }} />
+            <input 
+              type="text" 
+              placeholder="Buscar posts por título, legenda ou produto..." 
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              style={{ background: 'none', border: 'none', outline: 'none', color: 'white', width: '100%', fontSize: '0.9rem' }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          {/* Status Filter */}
+          <select 
+            className="input-field" 
+            value={statusFilter}
+            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            style={{ width: '160px', padding: '0.5rem 1rem', borderRadius: '100px', fontSize: '0.85rem' }}
+          >
+            <option value="all">Todos os Status</option>
+            <option value="rascunho">Rascunho</option>
+            <option value="editando">Editando</option>
+            <option value="agendado">Agendado</option>
+            <option value="publicado">Publicado</option>
+            <option value="falhou">Falhou</option>
+          </select>
+
+          {/* Platform Filter */}
+          <select 
+            className="input-field" 
+            value={platformFilter}
+            onChange={e => { setPlatformFilter(e.target.value); setCurrentPage(1); }}
+            style={{ width: '160px', padding: '0.5rem 1rem', borderRadius: '100px', fontSize: '0.85rem' }}
+          >
+            <option value="all">Todas as Redes</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="X/Twitter">X/Twitter</option>
+            <option value="WordPress">WordPress</option>
+            <option value="Blog">Blog Próprio</option>
+          </select>
+        </div>
+      </div>
 
       <div className="card status-table-card">
         <table className="status-table">
           <thead>
             <tr>
-              <th>{t('status.table.date')}</th>
-              <th>{t('status.table.type')}</th>
-              <th>{t('status.table.product')}</th>
-              <th>{t('status.table.platform')}</th>
-              <th>{t('status.table.status')}</th>
-              <th>{t('status.table.reach')}</th>
-              <th>{t('status.table.engaj')}</th>
-              <th>{t('status.table.actions')}</th>
+              <th onClick={() => handleSort('scheduled_at')} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  Data {sortField === 'scheduled_at' && <ArrowUpDown size={12} />}
+                </div>
+              </th>
+              <th>Título</th>
+              <th>Formato</th>
+              <th>Rede Social</th>
+              <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  Status {sortField === 'status' && <ArrowUpDown size={12} />}
+                </div>
+              </th>
+              <th onClick={() => handleSort('reach')} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  Alcance {sortField === 'reach' && <ArrowUpDown size={12} />}
+                </div>
+              </th>
+              <th onClick={() => handleSort('engagement')} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  Engajamento {sortField === 'engagement' && <ArrowUpDown size={12} />}
+                </div>
+              </th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {(posts || []).map((row, index) => (
-              <tr key={index}>
-                <td className="date-cell">{formatDate(row.date)}</td>
+            {paginatedPosts.map((row) => (
+              <tr key={row.id}>
+                <td className="date-cell">{formatDate(row.scheduled_at)}</td>
+                <td className="product-name-cell" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {row.title}
+                </td>
                 <td>
                   <div className="type-cell">
                     {getTypeIcon(row.type)}
                     <span>{row.type}</span>
                   </div>
                 </td>
-                <td className="product-name-cell">{row.product}</td>
-                <td>{row.platform}</td>
                 <td>
-                  <div className={`status-pill ${row.status}`}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {row.platforms.map(plat => (
+                      <span key={plat} style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                        {plat}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td>
+                  <div className={`status-pill ${row.status}`} style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '100px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textTransform: 'capitalize',
+                    background: row.status === 'publicado' ? 'rgba(16, 185, 129, 0.1)' : row.status === 'falhou' ? 'rgba(239, 68, 68, 0.1)' : row.status === 'editando' ? 'rgba(0,224,255,0.1)' : 'rgba(255, 255, 255, 0.05)',
+                    color: row.status === 'publicado' ? '#10b981' : row.status === 'falhou' ? '#ef4444' : row.status === 'editando' ? '#00E0FF' : 'var(--text-secondary)'
+                  }}>
                     {getStatusIcon(row.status)}
                     <span>{getStatusLabel(row.status)}</span>
                   </div>
@@ -107,9 +276,43 @@ const Status = () => {
                 </td>
               </tr>
             ))}
+            {paginatedPosts.length === 0 && (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                  Nenhum post encontrado para os filtros selecionados.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong> ({filteredAndSortedPosts.length} posts filtrados)
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className="btn-secondary" 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '0.4rem 0.8rem', opacity: currentPage === 1 ? 0.4 : 1, pointerEvents: currentPage === 1 ? 'none' : 'auto' }}
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <button 
+              className="btn-secondary" 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{ padding: '0.4rem 0.8rem', opacity: currentPage === totalPages ? 0.4 : 1, pointerEvents: currentPage === totalPages ? 'none' : 'auto' }}
+            >
+              Próxima <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .status-page {
@@ -170,31 +373,6 @@ const Status = () => {
         .product-name-cell {
           font-weight: 600;
           color: white;
-        }
-
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.4rem 0.75rem;
-          border-radius: 100px;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-
-        .status-pill.posted {
-          background: rgba(16, 185, 129, 0.1);
-          color: #10b981;
-        }
-
-        .status-pill.pending {
-          background: rgba(255, 255, 255, 0.05);
-          color: var(--text-secondary);
-        }
-
-        .status-pill.error {
-          background: rgba(239, 68, 68, 0.1);
-          color: #ef4444;
         }
 
         .number-cell {

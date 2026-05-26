@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useContent } from '../providers/ContentProvider';
-import { usePublisher } from './PublisherContext';
+import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { useCentralStore } from '../store/CentralStore';
+import { Post as PostStore } from '../store/types';
 
 export interface Post {
   id: string;
@@ -42,176 +42,125 @@ interface GestaoContextType {
 
 const GestaoContext = createContext<GestaoContextType | undefined>(undefined);
 
+function mapToOldPost(p: PostStore): Post {
+  let mappedStatus: 'posted' | 'pending' | 'error' = 'pending';
+  if (p.status === 'publicado') mappedStatus = 'posted';
+  else if (p.status === 'falhou') mappedStatus = 'error';
+
+  return {
+    id: p.id,
+    title: p.title,
+    date: p.scheduled_at,
+    type: p.type,
+    product: p.productId || 'Produto',
+    status: mappedStatus,
+    platform: (p.platforms && p.platforms.length > 0 ? p.platforms[0] : 'Instagram') as any,
+    reach: p.reach || '-',
+    engagement: p.engagement || '-',
+  };
+}
+
 export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Bridge to ContentProvider — posts are synced with the new content system
-  const { createContent, removeContent, updateContent } = useContent();
-  const { scheduledPosts, deleteScheduledPost, updatePostStatus: updatePostStatusInPublisher, updateScheduledPostDate } = usePublisher();
+  const {
+    posts: centralPosts,
+    checklist: centralChecklist,
+    campaigns: centralCampaigns,
+    products: centralProducts,
+    activeProjectId,
+    createPost,
+    updatePost,
+    deletePost: centralDeletePost,
+    addChecklistItem,
+    toggleChecklistItem,
+    deleteChecklistItem,
+  } = useCentralStore();
 
-  const [posts, setPosts] = useState<Post[]>(() => {
-    try {
-      const saved = localStorage.getItem('pink_logic_posts');
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (Array.isArray(parsed)) return parsed;
-      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Post[];
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      {
-        id: '1',
-        title: 'Lançamento Ebook',
-        date: new Date(2026, 2, 26, 9, 0).toISOString(),
-        type: 'Post',
-        product: 'Ebook Fit',
-        platform: 'Instagram',
-        status: 'posted',
-        reach: '1.2k',
-        engagement: '154'
-      },
-      {
-        id: '2',
-        title: 'Dicas de Stories',
-        date: new Date(2026, 2, 26, 15, 0).toISOString(),
-        type: 'Stories',
-        product: 'Curso SM',
-        platform: 'Instagram',
-        status: 'pending',
-        reach: '-',
-        engagement: '-'
-      }
-    ];
-  });
+  // Filter posts and tasks by the active project
+  const projectPosts = useMemo(() => {
+    const filtered = centralPosts.filter(p => p.projectId === activeProjectId);
+    return filtered.map(mapToOldPost);
+  }, [centralPosts, activeProjectId]);
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    try {
-      const saved = localStorage.getItem('pink_logic_tasks');
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (Array.isArray(parsed)) return parsed;
-      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Task[];
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      { id: '1', text: 'Criar arte do post', completed: true },
-      { id: '2', text: 'Revisar legenda estratégica', completed: false },
-      { id: '3', text: 'Programar horário de pico', completed: false },
-    ];
-  });
+  const projectTasks = useMemo(() => {
+    const filtered = centralChecklist.filter(t => t.projectId === activeProjectId);
+    return filtered.map(t => ({
+      id: t.id,
+      text: t.text,
+      completed: t.completed,
+    }));
+  }, [centralChecklist, activeProjectId]);
 
-  useEffect(() => {
-    localStorage.setItem('pink_logic_posts', JSON.stringify(posts));
-  }, [posts]);
+  const addPost = async (post: Omit<Post, 'id' | 'reach' | 'engagement'>) => {
+    let mappedStatus: PostStore['status'] = 'agendado';
+    if (post.status === 'posted') mappedStatus = 'publicado';
+    else if (post.status === 'error') mappedStatus = 'falhou';
 
-  useEffect(() => {
-    localStorage.setItem('pink_logic_tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  const addPost = (post: Omit<Post, 'id' | 'reach' | 'engagement'>) => {
-    const newPost: Post = {
-      ...post,
-      id: Math.random().toString(36).substr(2, 9),
-      reach: '-',
-      engagement: '-'
-    };
-    setPosts(prev => [newPost, ...prev]);
-    // Sync with ContentProvider for calendar and content modules
-    createContent({
-      projectId: '',
-      title: newPost.title,
-      format: mapPostTypeToContentFormat(newPost.type),
-      content: '',
-      platform: newPost.platform,
+    await createPost({
+      projectId: activeProjectId || 'default-project-1',
+      campaignId: null,
+      title: post.title,
+      caption: '',
+      hashtags: '',
+      cta: null,
+      mediaUrl: '',
+      scheduled_at: post.date,
+      platforms: [post.platform],
+      status: mappedStatus,
+      type: post.type,
+      productId: post.product,
     });
   };
 
-  const deletePost = (id: string) => {
-    if ((scheduledPosts || []).some(p => p.id === id)) {
-      deleteScheduledPost(id);
-      return;
-    }
-    setPosts(prev => prev.filter(p => p.id !== id));
-    removeContent(id);
+  const deletePost = async (id: string) => {
+    await centralDeletePost(id);
   };
 
-  const updatePostStatus = (id: string, status: Post['status']) => {
-    if ((scheduledPosts || []).some(p => p.id === id)) {
-      const spStatus = status === 'posted' ? 'published' : status === 'error' ? 'failed' : 'scheduled';
-      updatePostStatusInPublisher(id, spStatus);
-      return;
-    }
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-    updateContent(id, { status: mapPostStatusToContentStatus(status) });
+  const updatePostStatus = async (id: string, status: Post['status']) => {
+    let mappedStatus: PostStore['status'] = 'agendado';
+    if (status === 'posted') mappedStatus = 'publicado';
+    else if (status === 'error') mappedStatus = 'falhou';
+    await updatePost(id, { status: mappedStatus });
   };
 
-  const updatePostDate = (id: string, newDate: Date) => {
-    if ((scheduledPosts || []).some(p => p.id === id)) {
-      updateScheduledPostDate(id, newDate);
-      return;
-    }
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, date: newDate.toISOString() } : p));
+  const updatePostDate = async (id: string, newDate: Date) => {
+    await updatePost(id, { scheduled_at: newDate.toISOString() });
   };
 
-  const addTask = (text: string) => {
-    const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
-      text,
-      completed: false
-    };
-    setTasks(prev => [...prev, newTask]);
+  const addTask = async (text: string) => {
+    await addChecklistItem(text);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const toggleTask = async (id: string) => {
+    await toggleChecklistItem(id);
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const deleteTask = async (id: string) => {
+    await deleteChecklistItem(id);
   };
 
-  // Convert ScheduledPosts to Gestao Post schema
-  const adaptedScheduledPosts = (scheduledPosts || []).map((sp): Post => {
-    let pType: Post['type'] = 'Post';
-    if (sp.media_type === 'video') pType = 'Video';
-
-    let platformMapped: Post['platform'] = 'Instagram';
-    const mainPlat = sp.platforms[0];
-    if (mainPlat === 'Instagram') platformMapped = 'Instagram';
-    else if (mainPlat === 'Facebook') platformMapped = 'Facebook';
-    // X, LinkedIn, etc., map to Instagram/Facebook or let it cast if it satisfies visual checks
-    else platformMapped = 'Instagram';
-
-    let statusMapped: Post['status'] = 'pending';
-    if (sp.status === 'published') statusMapped = 'posted';
-    else if (sp.status === 'failed') statusMapped = 'error';
+  // Compute metrics in real-time for active project
+  const metrics = useMemo(() => {
+    const totalP = projectPosts.length;
+    const pendingP = projectPosts.filter(p => p.status === 'pending').length;
+    const totalT = projectTasks.length;
+    const completedT = projectTasks.filter(t => t.completed).length;
+    const activeC = centralCampaigns.filter(c => c.projectId === activeProjectId && c.status === 'active').length;
+    const totalPr = centralProducts.filter(p => p.projectId === activeProjectId).length;
 
     return {
-      id: sp.id,
-      title: `${sp.title} (Agendado)`,
-      date: sp.scheduled_at,
-      type: pType,
-      product: 'Publicador',
-      status: statusMapped,
-      platform: platformMapped,
-      reach: '-',
-      engagement: '-'
+      totalPosts: totalP,
+      pendingPosts: pendingP,
+      completedTasks: completedT,
+      totalTasks: totalT,
+      activeCampaigns: activeC,
+      totalProducts: totalPr,
     };
-  });
-
-  const combinedPosts = [...posts, ...adaptedScheduledPosts];
-
-  const metrics = {
-    totalPosts: combinedPosts.length,
-    pendingPosts: combinedPosts.filter(p => p.status === 'pending').length,
-    completedTasks: tasks.filter(t => t.completed).length,
-    totalTasks: tasks.length,
-    activeCampaigns: 5,
-    totalProducts: 8
-  };
+  }, [projectPosts, projectTasks, centralCampaigns, centralProducts, activeProjectId]);
 
   return (
     <GestaoContext.Provider value={{
-      posts: combinedPosts,
-      tasks,
+      posts: projectPosts,
+      tasks: projectTasks,
       addPost,
       deletePost,
       updatePostStatus,
@@ -219,35 +168,15 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addTask,
       toggleTask,
       deleteTask,
-      metrics
+      metrics,
     }}>
       {children}
     </GestaoContext.Provider>
   );
 };
 
-function mapPostTypeToContentFormat(type: Post['type']): 'post' | 'story' | 'reel' | 'carousel' | 'copy' {
-  switch (type) {
-    case 'Post': return 'post';
-    case 'Stories': return 'story';
-    case 'Reels': return 'reel';
-    case 'Video': return 'reel';
-    case 'Copy': return 'copy';
-  }
-}
-
-function mapPostStatusToContentStatus(status: Post['status']): 'draft' | 'review' | 'approved' | 'published' {
-  switch (status) {
-    case 'posted': return 'published';
-    case 'pending': return 'draft';
-    case 'error': return 'draft';
-  }
-}
-
 export const useGestao = () => {
   const context = useContext(GestaoContext);
-  if (context === undefined) {
-    throw new Error('useGestao must be used within a GestaoProvider');
-  }
+  if (!context) throw new Error('useGestao must be used within GestaoProvider');
   return context;
 };

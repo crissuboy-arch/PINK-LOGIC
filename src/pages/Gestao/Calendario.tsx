@@ -15,6 +15,7 @@ import { useGestao, type Post } from '../../contexts/GestaoContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useProducts } from '../../contexts/ProductContext';
 import { usePublisher } from '../../contexts/PublisherContext';
+import { useCentralStore } from '../../store/CentralStore';
 
 interface CalendarEvent {
   id: string;
@@ -30,6 +31,7 @@ interface CalendarEvent {
 const Calendario = () => {
   const { posts, addPost, updatePostStatus, updatePostDate, deletePost, tasks, addTask, toggleTask, deleteTask } = useGestao();
   const { scheduledPosts, deleteScheduledPost, publishPostNow, updateScheduledPostDate } = usePublisher();
+  const { activeProjectId } = useCentralStore();
   const { t, language } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -420,20 +422,31 @@ const Calendario = () => {
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
                     <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditPost(null)}>Fechar</button>
                     {editPost.status !== 'posted' && (
-                      <button 
-                        className="btn-primary" 
-                        style={{ flex: 1.2, justifyContent: 'center', background: 'linear-gradient(135deg, #7000FF 0%, #FF2D8D 100%)' }} 
-                        onClick={async () => {
-                          try {
-                            await publishPostNow(editPost.id);
-                            setEditPost(null);
-                          } catch (e) {
-                            console.error(e);
-                          }
-                        }}
-                      >
-                        Publicar Agora
-                      </button>
+                      <>
+                        <button 
+                          className="btn-secondary" 
+                          style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '0.4rem' }} 
+                          onClick={() => {
+                            window.location.href = `/criacao/editor?id=${activeProjectId}`;
+                          }}
+                        >
+                          <ImageIcon size={14} /> Editar Arte
+                        </button>
+                        <button 
+                          className="btn-primary" 
+                          style={{ flex: 1.2, justifyContent: 'center', background: 'linear-gradient(135deg, #7000FF 0%, #FF2D8D 100%)' }} 
+                          onClick={async () => {
+                            try {
+                              await publishPostNow(editPost.id);
+                              setEditPost(null);
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                        >
+                          Publicar Agora
+                        </button>
+                      </>
                     )}
                     <button 
                       className="btn-danger" 
@@ -464,6 +477,15 @@ const Calendario = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
                     <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditPost(null)}>Fechar</button>
+                    <button 
+                      className="btn-secondary" 
+                      style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '0.4rem' }} 
+                      onClick={() => {
+                        window.location.href = `/criacao/editor?id=${activeProjectId}`;
+                      }}
+                    >
+                      <ImageIcon size={14} /> Editar Arte
+                    </button>
                     <button className="btn-danger" style={{ flex: 1, justifyContent: 'center' }} onClick={() => handleDeletePost(editPost.id)}>
                       <Trash2 size={16} /> Excluir
                     </button>
