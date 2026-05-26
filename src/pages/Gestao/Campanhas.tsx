@@ -31,7 +31,10 @@ const Campanhas = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Campaign[];
+      return [
         { id: '1', name: 'Lançamento Ebook Fit', mainProduct: 'Ebook Receitas Fit', secondaryProduct: 'Guia de Treinos', message: 'Emagreça com saúde em 30 dias', status: 'active' },
         { id: '2', name: 'Black Friday Social Media', mainProduct: 'Curso Social Media', secondaryProduct: 'Pack de Templates', message: 'O maior desconto do ano para sua carreira', status: 'draft' },
       ];

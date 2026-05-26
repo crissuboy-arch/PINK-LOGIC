@@ -27,7 +27,8 @@ const ProductContext = createContext<ProductContextType | undefined>(undefined);
 function loadProducts(): ProductItem[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) as ProductItem[] : []);
   } catch { return []; }
 }
 

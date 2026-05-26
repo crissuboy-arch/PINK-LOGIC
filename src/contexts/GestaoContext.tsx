@@ -48,8 +48,15 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { scheduledPosts, deleteScheduledPost, updatePostStatus: updatePostStatusInPublisher, updateScheduledPostDate } = usePublisher();
 
   const [posts, setPosts] = useState<Post[]>(() => {
-    const saved = localStorage.getItem('pink_logic_posts');
-    return saved ? JSON.parse(saved) : [
+    try {
+      const saved = localStorage.getItem('pink_logic_posts');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Post[];
+    } catch (e) {
+      console.error(e);
+    }
+    return [
       {
         id: '1',
         title: 'Lançamento Ebook',
@@ -76,8 +83,15 @@ export const GestaoProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('pink_logic_tasks');
-    return saved ? JSON.parse(saved) : [
+    try {
+      const saved = localStorage.getItem('pink_logic_tasks');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object') return Object.values(parsed) as Task[];
+    } catch (e) {
+      console.error(e);
+    }
+    return [
       { id: '1', text: 'Criar arte do post', completed: true },
       { id: '2', text: 'Revisar legenda estratégica', completed: false },
       { id: '3', text: 'Programar horário de pico', completed: false },
