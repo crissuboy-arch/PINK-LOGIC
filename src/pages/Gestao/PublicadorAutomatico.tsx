@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Send, 
   Calendar, 
@@ -116,6 +116,19 @@ const PublicadorAutomatico: React.FC = () => {
   // Local feedback messages
   const [successFeedback, setSuccessFeedback] = useState<string | null>(null);
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+
+  // Load temporary media sent from visual editor if present
+  useEffect(() => {
+    try {
+      const tempMedia = localStorage.getItem('pink_logic_temp_editor_media');
+      if (tempMedia) {
+        setMediaUrl(tempMedia);
+        localStorage.removeItem('pink_logic_temp_editor_media');
+      }
+    } catch (e) {
+      console.warn('[PublicadorAutomatico] Failed to read temp editor media:', e);
+    }
+  }, []);
 
   const togglePlatformSelection = (plat: PublisherPlatform) => {
     setSelectedPlatforms(prev => 

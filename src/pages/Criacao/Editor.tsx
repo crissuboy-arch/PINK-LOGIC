@@ -690,6 +690,255 @@ const Editor = () => {
     }
   };
 
+  const sendToPublisher = async () => {
+    setIsProcessing(true);
+    try {
+      const slide = slides[0];
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasFormat.width;
+      canvas.height = canvasFormat.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Draw Background
+      if (slide.background.type === 'color') {
+        ctx.fillStyle = slide.background.value;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (slide.background.type === 'gradient') {
+        const color1 = slide.background.color1 || '#FF2D8D';
+        const color2 = slide.background.color2 || '#7000FF';
+        const direction = slide.background.direction || 'tb';
+
+        let grad;
+        if (direction === 'lr') {
+          grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        } else if (direction === 'diag') {
+          grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        } else {
+          grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        }
+        grad.addColorStop(0, color1);
+        grad.addColorStop(1, color2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (slide.background.type === 'image') {
+        const img = new Image();
+        await new Promise((resolve) => {
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(null);
+          };
+          img.onerror = () => resolve(null);
+          if (slide.background.value.startsWith('http')) {
+            img.crossOrigin = 'anonymous';
+          }
+          img.src = slide.background.value;
+        });
+      }
+
+      // Draw Elements (Sorted by Z-Index)
+      const sortedElements = [...slide.elements].sort((a, b) => a.zIndex - b.zIndex);
+      for (const el of sortedElements) {
+        ctx.save();
+        ctx.globalAlpha = el.opacity / 100;
+        if (el.rotation) {
+          ctx.translate(el.x + el.width / 2, el.y + el.height / 2);
+          ctx.rotate((el.rotation * Math.PI) / 180);
+          ctx.translate(-(el.x + el.width / 2), -(el.y + el.height / 2));
+        }
+
+        if (el.type === 'shape') {
+          if (el.shadowEnabled) {
+            const opacity = el.shadowOpacity ?? 25;
+            const color = el.shadowColor ?? '#000000';
+            let r = 0, g = 0, b = 0;
+            if (color.startsWith('#')) {
+              const hex = color.replace('#', '');
+              if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+              } else if (hex.length === 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+              }
+            }
+            ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+            ctx.shadowBlur = el.shadowBlur ?? 20;
+            ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+            ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+          }
+
+          ctx.fillStyle = el.color || '#000';
+          if (el.content === 'circle') {
+            ctx.beginPath();
+            ctx.arc(el.x + el.width / 2, el.y + el.height / 2, el.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillRect(el.x, el.y, el.width, el.height);
+          }
+        } else if (el.type === 'text') {
+          if (el.shadowEnabled) {
+            const opacity = el.shadowOpacity ?? 25;
+            const color = el.shadowColor ?? '#000000';
+            let r = 0, g = 0, b = 0;
+            if (color.startsWith('#')) {
+              const hex = color.replace('#', '');
+              if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+              } else if (hex.length === 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+              }
+            }
+            ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+            ctx.shadowBlur = el.shadowBlur ?? 20;
+            ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+            ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+          }
+
+          ctx.fillStyle = el.color || '#fff';
+          ctx.font = `${el.fontWeight || 400} ${el.fontSize || 16}px ${el.fontFamily || 'Outfit'}`;
+          ctx.textBaseline = 'top';
+          ctx.textAlign = el.textAlign || 'center';
+          
+          const content = el.isUppercase ? el.content.toUpperCase() : el.content;
+          const lines = content.split('\n');
+          const lineHeight = (el.lineHeight || 1.2) * (el.fontSize || 16);
+          const letterSpacing = el.letterSpacing || 0;
+          
+          lines.forEach((line, index) => {
+            const y = el.y + (index * lineHeight);
+            
+            if (letterSpacing === 0) {
+              const x = el.textAlign === 'left' ? el.x : el.textAlign === 'right' ? el.x + el.width : el.x + el.width / 2;
+              ctx.fillText(line, x, y);
+            } else {
+              let currentX = el.x;
+              if (el.textAlign === 'center') {
+                const totalWidth = ctx.measureText(line).width + (line.length - 1) * letterSpacing;
+                currentX = el.x + (el.width - totalWidth) / 2;
+              } else if (el.textAlign === 'right') {
+                const totalWidth = ctx.measureText(line).width + (line.length - 1) * letterSpacing;
+                currentX = el.x + el.width - totalWidth;
+              }
+              
+              for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                ctx.fillText(char, currentX, y);
+                currentX += ctx.measureText(char).width + letterSpacing;
+              }
+            }
+          });
+        } else if (el.type === 'image') {
+          const img = new Image();
+          await new Promise((resolve) => {
+            img.onload = () => {
+              if (el.borderRadius && el.borderRadius > 0) {
+                const r = Math.min(el.borderRadius, el.width / 2, el.height / 2);
+                if (el.shadowEnabled) {
+                  ctx.save();
+                  const opacity = el.shadowOpacity ?? 25;
+                  const color = el.shadowColor ?? '#000000';
+                  let cr = 0, cg = 0, cb = 0;
+                  if (color.startsWith('#')) {
+                    const hex = color.replace('#', '');
+                    if (hex.length === 3) {
+                      cr = parseInt(hex[0] + hex[0], 16);
+                      cg = parseInt(hex[1] + hex[1], 16);
+                      cb = parseInt(hex[2] + hex[2], 16);
+                    } else if (hex.length === 6) {
+                      cr = parseInt(hex.substring(0, 2), 16);
+                      cg = parseInt(hex.substring(2, 4), 16);
+                      cb = parseInt(hex.substring(4, 6), 16);
+                    }
+                  }
+                  ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${opacity / 100})`;
+                  ctx.shadowBlur = el.shadowBlur ?? 20;
+                  ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+                  ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(el.x + r, el.y);
+                  ctx.lineTo(el.x + el.width - r, el.y);
+                  ctx.quadraticCurveTo(el.x + el.width, el.y, el.x + el.width, el.y + r);
+                  ctx.lineTo(el.x + el.width, el.y + el.height - r);
+                  ctx.quadraticCurveTo(el.x + el.width, el.y + el.height, el.x + el.width - r, el.y + el.height);
+                  ctx.lineTo(el.x + r, el.y + el.height);
+                  ctx.quadraticCurveTo(el.x, el.y + el.height, el.x, el.y + el.height - r);
+                  ctx.lineTo(el.x, el.y + r);
+                  ctx.quadraticCurveTo(el.x, el.y, el.x + r, el.y);
+                  ctx.closePath();
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fill();
+                  ctx.restore();
+                }
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(el.x + r, el.y);
+                ctx.lineTo(el.x + el.width - r, el.y);
+                ctx.quadraticCurveTo(el.x + el.width, el.y, el.x + el.width, el.y + r);
+                ctx.lineTo(el.x + el.width, el.y + el.height - r);
+                ctx.quadraticCurveTo(el.x + el.width, el.y + el.height, el.x + el.width - r, el.y + el.height);
+                ctx.lineTo(el.x + r, el.y + el.height);
+                ctx.quadraticCurveTo(el.x, el.y + el.height, el.x, el.y + el.height - r);
+                ctx.lineTo(el.x, el.y + r);
+                ctx.quadraticCurveTo(el.x, el.y, el.x + r, el.y);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(img, el.x, el.y, el.width, el.height);
+                ctx.restore();
+              } else {
+                if (el.shadowEnabled) {
+                  const opacity = el.shadowOpacity ?? 25;
+                  const color = el.shadowColor ?? '#000000';
+                  let cr = 0, cg = 0, cb = 0;
+                  if (color.startsWith('#')) {
+                    const hex = color.replace('#', '');
+                    if (hex.length === 3) {
+                      cr = parseInt(hex[0] + hex[0], 16);
+                      cg = parseInt(hex[1] + hex[1], 16);
+                      cb = parseInt(hex[2] + hex[2], 16);
+                    } else if (hex.length === 6) {
+                      cr = parseInt(hex.substring(0, 2), 16);
+                      cg = parseInt(hex.substring(2, 4), 16);
+                      cb = parseInt(hex.substring(4, 6), 16);
+                    }
+                  }
+                  ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${opacity / 100})`;
+                  ctx.shadowBlur = el.shadowBlur ?? 20;
+                  ctx.shadowOffsetX = el.shadowOffsetX ?? 0;
+                  ctx.shadowOffsetY = el.shadowOffsetY ?? 8;
+                }
+                ctx.drawImage(img, el.x, el.y, el.width, el.height);
+              }
+              resolve(null);
+            };
+            img.onerror = () => resolve(null);
+            if (el.content.startsWith('http')) {
+              img.crossOrigin = 'anonymous';
+            }
+            img.src = el.content;
+          });
+        }
+        ctx.restore();
+      }
+
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      localStorage.setItem('pink_logic_temp_editor_media', dataUrl);
+      window.location.href = '/publicador-automatico';
+    } catch (err) {
+      console.error('Failed to send design to publisher', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Formats are now coming from context as single source of truth
   const formats = availableFormats.map(f => ({
     ...f,
@@ -742,6 +991,10 @@ const Editor = () => {
             {canvasFormat.id === 'carousel' ? `Slide ${currentSlideIndex + 1} / ${slides.length}` : (formats.find(f => f.id === canvasFormat.id)?.name || '')}
           </div>
           <button className="btn-secondary" onClick={saveProject}><Save size={18} /> {t('common.save')}</button>
+          <button className="btn-secondary" onClick={sendToPublisher} disabled={isProcessing} title="Enviar arte para o composer do Publicador Automático">
+            <Sparkles size={18} />
+            <span>Agendar Publicação</span>
+          </button>
           <button className="btn-primary" onClick={handleExport} disabled={isProcessing}>
             <Download size={18} /> {slides.length > 1 ? t('editor.export_all') : t('common.export')}
           </button>
