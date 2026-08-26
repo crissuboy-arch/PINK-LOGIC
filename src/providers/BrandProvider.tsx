@@ -1,6 +1,6 @@
 import { createContext, useContext, useCallback, type ReactNode } from 'react'
 import { useCentralStore } from '../store/CentralStore'
-import type { Brand } from '../store/types'
+import type { Brand, BrandDNA } from '../store/types'
 
 export interface BrandColorPalette {
   primary: string
@@ -8,6 +8,7 @@ export interface BrandColorPalette {
   accent: string
   background: string
   text: string
+  surface?: string
 }
 
 export interface BrandTypography {
@@ -27,6 +28,14 @@ export interface BrandSchema {
   visualStyle: string
   tone: string
   colors: string[] // hashtags mapped
+  secondaryColors?: string[]
+  socialLinks?: {
+    instagram?: string
+    tiktok?: string
+    youtube?: string
+    facebook?: string
+  }
+  brandDNA?: BrandDNA
 }
 
 interface BrandContextValue {
@@ -53,6 +62,7 @@ export function mapToBrandSchema(b: Brand): BrandSchema {
       accent: b.colors.accent,
       background: b.colors.background,
       text: b.colors.text,
+      surface: b.colors.surface || (b.colors.background === '#0D0D12' || b.colors.background === '#0D0D0D' || b.colors.background.startsWith('#0') || b.colors.background.startsWith('#1') ? '#151515' : '#FFFFFF'),
     },
     typography: {
       heading: b.fonts.heading,
@@ -62,6 +72,9 @@ export function mapToBrandSchema(b: Brand): BrandSchema {
     visualStyle: b.style,
     tone: b.tone,
     colors: b.hashtags || [],
+    secondaryColors: b.secondaryColors || [],
+    socialLinks: b.socialLinks || { instagram: '', tiktok: '', youtube: '', facebook: '' },
+    brandDNA: b.brandDNA,
   };
 }
 
@@ -95,6 +108,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         background: data.palette?.background || '#0D0D12',
         text: data.palette?.text || '#FFFFFF',
         glow: data.palette?.primary || '#FF2D8D',
+        surface: data.palette?.surface || '#151515',
       },
       fonts: {
         heading: data.typography?.heading || 'Outfit',
@@ -106,6 +120,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       tone: data.tone || '',
       style: data.visualStyle || '',
       overlays: [],
+      secondaryColors: data.secondaryColors || [],
+      socialLinks: data.socialLinks || { instagram: '', tiktok: '', youtube: '', facebook: '' },
+      brandDNA: data.brandDNA,
     });
 
     const tempId = crypto.randomUUID();
@@ -113,22 +130,28 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       id: tempId,
       projectId: data.projectId,
       name: data.name || 'Identidade Visual',
-      palette: data.palette ?? { primary: '#FF2D8D', secondary: '#7B2D8E', accent: '#FFD700', background: '#0D0D12', text: '#FFFFFF' },
+      palette: data.palette ?? { primary: '#FF2D8D', secondary: '#7B2D8E', accent: '#FFD700', background: '#0D0D12', text: '#FFFFFF', surface: '#151515' },
       typography: data.typography ?? { heading: 'Outfit', body: 'Inter' },
       logo: data.logo,
       visualStyle: data.visualStyle || '',
       tone: data.tone || '',
       colors: data.colors || [],
+      secondaryColors: data.secondaryColors || [],
+      socialLinks: data.socialLinks || { instagram: '', tiktok: '', youtube: '', facebook: '' },
+      brandDNA: data.brandDNA,
     };
   }, [centralCreateBrand]);
 
   const updateBrand = useCallback((id: string, data: Partial<BrandSchema>) => {
     const updates: Partial<Brand> = {};
     if (data.name) updates.name = data.name;
-    if (data.logo) updates.logo = data.logo;
+    if (data.logo !== undefined) updates.logo = data.logo;
     if (data.visualStyle) updates.style = data.visualStyle;
     if (data.tone) updates.tone = data.tone;
     if (data.colors) updates.hashtags = data.colors;
+    if (data.secondaryColors) updates.secondaryColors = data.secondaryColors;
+    if (data.socialLinks) updates.socialLinks = data.socialLinks;
+    if (data.brandDNA) updates.brandDNA = data.brandDNA;
     
     if (data.palette) {
       updates.colors = {
@@ -138,6 +161,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         background: data.palette.background || '#0D0D12',
         text: data.palette.text || '#FFFFFF',
         glow: data.palette.primary || '#FF2D8D',
+        surface: data.palette.surface || '#151515',
       };
       updates.glow = data.palette.primary || '#FF2D8D';
     }

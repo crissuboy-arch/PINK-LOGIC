@@ -1,34 +1,35 @@
 import type { Project, Brand, Campaign, Post, ChecklistItem, Product } from '../store/types';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 // Repository interfaces (Supabase-ready)
 export interface IProjectRepository {
-  getAll(): Promise<Project[]>;
-  saveAll(projects: Project[]): Promise<void>;
+  getProjects(): Promise<Project[]>;
+  saveProjects(projects: Project[]): Promise<void>;
 }
 
 export interface IBrandRepository {
-  getAll(): Promise<Brand[]>;
-  saveAll(brands: Brand[]): Promise<void>;
+  getBrands(): Promise<Brand[]>;
+  saveBrands(brands: Brand[]): Promise<void>;
 }
 
 export interface ICampaignRepository {
-  getAll(): Promise<Campaign[]>;
-  saveAll(campaigns: Campaign[]): Promise<void>;
+  getCampaigns(): Promise<Campaign[]>;
+  saveCampaigns(campaigns: Campaign[]): Promise<void>;
 }
 
 export interface IPostRepository {
-  getAll(): Promise<Post[]>;
-  saveAll(posts: Post[]): Promise<void>;
+  getPosts(): Promise<Post[]>;
+  savePosts(posts: Post[]): Promise<void>;
 }
 
 export interface IProductRepository {
-  getAll(): Promise<Product[]>;
-  saveAll(products: Product[]): Promise<void>;
+  getProducts(): Promise<Product[]>;
+  saveProducts(products: Product[]): Promise<void>;
 }
 
 export interface IChecklistRepository {
-  getAll(): Promise<ChecklistItem[]>;
-  saveAll(items: ChecklistItem[]): Promise<void>;
+  getChecklist(): Promise<ChecklistItem[]>;
+  saveChecklist(items: ChecklistItem[]): Promise<void>;
 }
 
 // Helper to safely parse localStorage keys
@@ -46,8 +47,8 @@ function getLocalStorageItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-// LocalStorage Mock Adapters implementation
-export class LocalStorageRepositoryAdapter implements
+// LocalStorage & Supabase Hybrid Adapter implementation
+export class HybridRepositoryAdapter implements
   IProjectRepository,
   IBrandRepository,
   ICampaignRepository,
@@ -55,21 +56,41 @@ export class LocalStorageRepositoryAdapter implements
   IProductRepository,
   IChecklistRepository
 {
-  async getAll(): Promise<any[]> {
-    throw new Error('Use individual entities to query the LocalStorage adapter.');
-  }
-  async saveAll(): Promise<void> {
-    throw new Error('Use individual entities to save the LocalStorage adapter.');
-  }
-
   // Projects
   async getProjects(): Promise<Project[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description || '',
+            brandId: `brand-${p.id}`,
+            socialAccounts: p.social_accounts || [],
+            email: p.email || '',
+            timezone: p.timezone || 'America/Sao_Paulo',
+            status: p.status || 'active',
+            createdAt: p.created_at,
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar projetos, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_projects';
     const defaults: Project[] = [
       {
         id: 'default-project-1',
-        name: 'Pink Logic SaaS',
-        description: 'Projeto padrão do Pink Logic',
+        name: 'PinkLogic SaaS',
+        description: 'Projeto padrão do PinkLogic',
         brandId: 'default-brand-1',
         socialAccounts: ['Instagram', 'LinkedIn', 'X/Twitter'],
         email: 'contato@pinklogic.com',
@@ -113,11 +134,60 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async saveProjects(projects: Project[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = projects.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          social_accounts: p.socialAccounts,
+          email: p.email,
+          timezone: p.timezone,
+          status: p.status,
+          created_at: p.createdAt,
+        }));
+        
+        const { error } = await supabase.from('projects').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar projetos:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_projects', JSON.stringify(projects));
   }
 
-  // Brands
+  // Brands (Brand Kit)
   async getBrands(): Promise<Brand[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('brands')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((b: any) => ({
+            id: b.id,
+            projectId: b.project_id,
+            name: b.name,
+            colors: b.colors,
+            fonts: b.fonts,
+            glow: b.glow || '',
+            hashtags: b.hashtags || [],
+            cta: b.cta || '',
+            tone: b.tone || '',
+            style: b.style || '',
+            overlays: b.overlays || [],
+            logo: b.logo || undefined,
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar brand kits, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_brands';
     const defaults: Brand[] = [
       {
@@ -138,7 +208,7 @@ export class LocalStorageRepositoryAdapter implements
         },
         glow: '#FF2D8D',
         hashtags: ['#pinklogic', '#saas', '#marketing'],
-        cta: 'Transforme suas redes com o Pink Logic',
+        cta: 'Transforme suas redes com o PinkLogic',
         tone: 'Profissional, moderno e acolhedor',
         style: 'Tecnológico neon',
         overlays: [],
@@ -191,11 +261,63 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async saveBrands(brands: Brand[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = brands.map(b => ({
+          id: b.id,
+          project_id: b.projectId,
+          name: b.name,
+          colors: b.colors,
+          fonts: b.fonts,
+          glow: b.glow,
+          hashtags: b.hashtags,
+          cta: b.cta,
+          tone: b.tone,
+          style: b.style,
+          overlays: b.overlays,
+          logo: b.logo || null,
+        }));
+        
+        const { error } = await supabase.from('brands').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar brand kits:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_brands', JSON.stringify(brands));
   }
 
   // Campaigns
   async getCampaigns(): Promise<Campaign[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('campaigns')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((c: any) => ({
+            id: c.id,
+            projectId: c.project_id,
+            name: c.name,
+            mainProduct: c.main_product || '',
+            secondaryProduct: c.secondary_product || '',
+            message: c.message || '',
+            status: c.status || 'draft',
+            goal: c.goal || '',
+            cta: c.cta || '',
+            startDate: c.start_date || '',
+            linkedPostIds: c.linked_post_ids || [],
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar campanhas, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_campaigns';
     const defaults: Campaign[] = [
       {
@@ -214,7 +336,6 @@ export class LocalStorageRepositoryAdapter implements
     ];
     let list = getLocalStorageItem<Campaign[]>(key, []);
     if (list.length === 0) {
-      // Migrate v1 campaigns
       try {
         const v1Key = 'pink_logic_campaigns';
         const v1Raw = localStorage.getItem(v1Key);
@@ -247,11 +368,66 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async saveCampaigns(campaigns: Campaign[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = campaigns.map(c => ({
+          id: c.id,
+          project_id: c.projectId,
+          name: c.name,
+          main_product: c.mainProduct,
+          secondary_product: c.secondaryProduct,
+          message: c.message,
+          status: c.status,
+          goal: c.goal,
+          cta: c.cta,
+          start_date: c.startDate || null,
+          linked_post_ids: c.linkedPostIds || [],
+        }));
+        
+        const { error } = await supabase.from('campaigns').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar campanhas:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_campaigns', JSON.stringify(campaigns));
   }
 
-  // Posts
+  // Posts (Scheduled Posts)
   async getPosts(): Promise<Post[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('scheduled_posts')
+          .select('*')
+          .order('scheduled_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((p: any) => ({
+            id: p.id,
+            projectId: p.project_id,
+            campaignId: p.campaign_id,
+            productId: p.product_id,
+            title: p.title || '',
+            caption: p.caption || '',
+            hashtags: p.hashtags ? (Array.isArray(p.hashtags) ? p.hashtags.join(' ') : p.hashtags) : '',
+            cta: p.cta || '',
+            mediaUrl: p.media_url || '',
+            scheduled_at: p.scheduled_at,
+            platforms: p.platforms || [],
+            status: p.status || 'rascunho',
+            type: p.type || 'Post',
+            reach: p.reach || '-',
+            engagement: p.engagement || '-',
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar posts, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_posts';
     const defaults: Post[] = [
       {
@@ -291,7 +467,6 @@ export class LocalStorageRepositoryAdapter implements
     ];
     let list = getLocalStorageItem<Post[]>(key, []);
     if (list.length === 0) {
-      // Migrate v1 posts and scheduled posts
       try {
         const v1PostsRaw = localStorage.getItem('pink_logic_posts');
         const v1SchedRaw = localStorage.getItem('pink_logic_scheduled_posts');
@@ -361,11 +536,64 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async savePosts(posts: Post[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = posts.map(p => ({
+          id: p.id,
+          project_id: p.projectId,
+          campaign_id: p.campaignId,
+          product_id: p.productId,
+          title: p.title,
+          caption: p.caption,
+          hashtags: p.hashtags ? p.hashtags.split(' ').filter(Boolean) : [],
+          cta: p.cta,
+          media_url: p.mediaUrl,
+          platforms: p.platforms,
+          scheduled_at: p.scheduled_at,
+          status: p.status,
+          type: p.type,
+          reach: p.reach,
+          engagement: p.engagement,
+        }));
+        
+        const { error } = await supabase.from('scheduled_posts').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar posts:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_posts', JSON.stringify(posts));
   }
 
   // Products
   async getProducts(): Promise<Product[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((p: any) => ({
+            id: p.id,
+            projectId: p.project_id,
+            name: p.name,
+            category: p.category || '',
+            link: p.link || '',
+            platform: p.platform || '',
+            price: p.price || '',
+            type: p.type || '',
+            model: p.model || '',
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar produtos, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_products';
     const defaults: Product[] = [
       {
@@ -393,7 +621,6 @@ export class LocalStorageRepositoryAdapter implements
     ];
     let list = getLocalStorageItem<Product[]>(key, []);
     if (list.length === 0) {
-      // Migrate v1 products
       try {
         const v1Raw = localStorage.getItem('pink_logic_products');
         if (v1Raw) {
@@ -423,11 +650,54 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async saveProducts(products: Product[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = products.map(p => ({
+          id: p.id,
+          project_id: p.projectId,
+          name: p.name,
+          category: p.category,
+          link: p.link,
+          platform: p.platform,
+          price: p.price,
+          type: p.type,
+          model: p.model,
+        }));
+        
+        const { error } = await supabase.from('products').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar produtos:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_products', JSON.stringify(products));
   }
 
   // Checklist
   async getChecklist(): Promise<ChecklistItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('checklist_items')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          return data.map((c: any) => ({
+            id: c.id,
+            projectId: c.project_id,
+            text: c.text,
+            completed: c.completed,
+            responsible: c.responsible || 'Social Media',
+          }));
+        }
+      } catch (err) {
+        console.warn('[Supabase] Falha ao carregar checklist, tentando local:', err);
+      }
+    }
+
     const key = 'pink_logic_v2_checklist';
     const defaults: ChecklistItem[] = [
       { id: 'default-item-1', projectId: 'default-project-1', text: 'Criar arte do post de lançamento', completed: true, responsible: 'Design' },
@@ -436,7 +706,6 @@ export class LocalStorageRepositoryAdapter implements
     ];
     let list = getLocalStorageItem<ChecklistItem[]>(key, []);
     if (list.length === 0) {
-      // Migrate v1 tasks
       try {
         const v1Raw = localStorage.getItem('pink_logic_tasks');
         if (v1Raw) {
@@ -462,9 +731,25 @@ export class LocalStorageRepositoryAdapter implements
   }
 
   async saveChecklist(items: ChecklistItem[]): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = items.map(c => ({
+          id: c.id,
+          project_id: c.projectId,
+          text: c.text,
+          completed: c.completed,
+          responsible: c.responsible || 'Social Media',
+        }));
+        
+        const { error } = await supabase.from('checklist_items').upsert(rows);
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Supabase] Falha ao salvar tarefas:', err);
+      }
+    }
     localStorage.setItem('pink_logic_v2_checklist', JSON.stringify(items));
   }
 }
 
 // Default export of the active repository service
-export const apiService = new LocalStorageRepositoryAdapter();
+export const apiService = new HybridRepositoryAdapter();

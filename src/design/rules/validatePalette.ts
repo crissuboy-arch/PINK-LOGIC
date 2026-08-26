@@ -150,7 +150,7 @@ export const validatePaletteRules: VisualRule[] = [
     id: 'colors-too-similar',
     name: 'Cores muito similares entre si',
     category: 'color',
-    severity: 'warning',
+    severity: 'minor',
     evaluate(input: RuleInput): DesignIssue | null {
       if (!input.palette) return null
       const colors = Object.values(input.palette).filter(isHex)

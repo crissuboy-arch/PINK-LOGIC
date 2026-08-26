@@ -1,60 +1,119 @@
+import { useState } from 'react';
 import { Bell, Search, User, Plus } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 import AIStatusBadge from './AIStatusBadge';
+import PremiumLogo from './PremiumLogo';
+import { authService } from '../services/authService';
 
 const Header = () => {
   const { language, setLanguage, t } = useLanguage();
+  const navigate = useNavigate();
+  const [searchValue, setSearchValue] = useState('');
+  
+  const currentUser = authService.getCurrentUser();
+  const userName = currentUser ? currentUser.name : 'Usuário Pink';
+  const userRole = currentUser ? currentUser.role : 'Premium Plan';
+
+  const handleLogout = () => {
+    if (window.confirm('Deseja realmente sair da plataforma PinkLogic?')) {
+      authService.logout();
+      navigate('/login');
+    }
+  };
+
+  const handleNotificationsClick = () => {
+    alert('Central de Notificações: Você não possui novas notificações no momento.');
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchValue.trim()) {
+      alert(`Pesquisa global: A busca por "${searchValue}" estará disponível na versão final integrada ao banco de dados.`);
+      setSearchValue('');
+    }
+  };
 
   return (
-    <header className="header">
-      <div className="header-search">
-        <Search size={18} />
-        <input type="text" placeholder={t('dashboard.search') || "Buscar..."} />
+    <header className="header glass-navbar">
+      <div className="header-logo" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', marginRight: '2.5rem', padding: '0 0.5rem', transform: 'scale(1.25)', transformOrigin: 'left center' }}>
+        <PremiumLogo />
       </div>
 
+      {/* Search Input Container */}
+      <div className="header-search">
+        <Search size={16} className="search-icon" />
+        <input 
+          type="text" 
+          placeholder={t('dashboard.search') || "Buscar na plataforma..."} 
+          className="search-input"
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+        />
+      </div>
+
+      {/* Right side actions */}
       <div className="header-actions">
-        <AIStatusBadge />
+        {/* Status IA */}
+        <div className="status-badge-container" data-tooltip="Status da Inteligência Artificial">
+          <AIStatusBadge />
+        </div>
+
+        {/* Language Switcher */}
         <div className="language-switcher">
           <button 
             className={`lang-btn ${language === 'pt' ? 'active' : ''}`} 
             onClick={() => setLanguage('pt')}
-            title="Português"
+            data-tooltip="Português (BR)"
           >
             🇧🇷
           </button>
           <button 
             className={`lang-btn ${language === 'en' ? 'active' : ''}`} 
             onClick={() => setLanguage('en')}
-            title="English"
+            data-tooltip="English (US)"
           >
             🇺🇸
           </button>
           <button 
             className={`lang-btn ${language === 'es' ? 'active' : ''}`} 
             onClick={() => setLanguage('es')}
-            title="Español"
+            data-tooltip="Español"
           >
             🇪🇸
           </button>
         </div>
 
-        <button className="btn-primary">
-          <Plus size={18} />
-          <span>{t('common.generate')}</span>
+        {/* Quick Action Button */}
+        <button className="btn-primary header-gen-btn" onClick={() => navigate('/criacao/editor')}>
+          <Plus size={16} />
+          <span>{t('common.generate') || 'Gerar Arte'}</span>
         </button>
         
-        <button className="icon-btn">
-          <Bell size={20} />
-          <div className="notification-dot"></div>
+        {/* Notifications Icon with Ping Animation */}
+        <button 
+          className="icon-btn-sm notification-trigger" 
+          data-tooltip="Central de Notificações"
+          onClick={handleNotificationsClick}
+        >
+          <Bell size={18} />
+          <div className="notification-dot-ping"></div>
+          <div className="notification-dot-solid"></div>
         </button>
 
-        <div className="user-profile">
-          <div className="avatar">
-            <User size={20} />
+        {/* User Profile info */}
+        <div 
+          className="user-profile" 
+          onClick={handleLogout} 
+          style={{ cursor: 'pointer' }}
+          title="Clique para sair da plataforma"
+        >
+          <div className="avatar-wrapper">
+            <User size={18} />
           </div>
           <div className="user-info">
-            <span className="user-name">{t('common.user_name') || 'Usuário Pink'}</span>
-            <span className="user-role">{t('common.user_role') || 'Premium'}</span>
+            <span className="user-name">{userName}</span>
+            <span className="user-role">{userRole}</span>
           </div>
         </div>
       </div>
@@ -62,9 +121,6 @@ const Header = () => {
       <style>{`
         .header {
           height: var(--header-height);
-          background: rgba(13, 13, 18, 0.8);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid var(--border);
           padding: 0 2rem;
           display: flex;
           align-items: center;
@@ -72,131 +128,187 @@ const Header = () => {
           position: sticky;
           top: 0;
           z-index: 90;
+          transition: background-color 0.2s, border-color 0.2s;
         }
 
         .header-search {
-          background: var(--input);
+          background: rgba(255, 255, 255, 0.02);
           border: 1px solid var(--border);
-          border-radius: 100px;
-          padding: 0.6rem 1.25rem;
+          border-radius: var(--radius-pill);
+          padding: 0.5rem 1rem;
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          width: 400px;
-          color: var(--text-secondary);
+          gap: 0.65rem;
+          width: 320px;
+          transition: var(--transition);
         }
 
-        .header-search input {
+        .header-search:hover {
+          border-color: var(--border-hover);
+          background: rgba(255, 255, 255, 0.04);
+        }
+
+        .header-search:focus-within {
+          border-color: var(--primary);
+          background: var(--input-focus);
+          box-shadow: 0 0 12px rgba(255, 47, 191, 0.08);
+        }
+
+        .search-icon {
+          color: var(--text-secondary);
+          flex-shrink: 0;
+          transition: var(--transition);
+        }
+
+        .header-search:focus-within .search-icon {
+          color: var(--primary);
+        }
+
+        .search-input {
           background: none;
           border: none;
           outline: none;
-          color: white;
+          color: var(--text-primary);
           width: 100%;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
+          font-family: inherit;
+        }
+
+        .search-input::placeholder {
+          color: var(--text-muted);
         }
 
         .header-actions {
           display: flex;
           align-items: center;
-          gap: 1.5rem;
+          gap: 1rem;
         }
 
-        .icon-btn {
-          width: 42px;
-          height: 42px;
-          border-radius: 12px;
-          background: var(--input);
-          border: 1px solid var(--border);
-          color: var(--text-secondary);
+        .status-badge-container {
           display: flex;
           align-items: center;
-          justify-content: center;
+        }
+
+        .notification-trigger {
           position: relative;
-          transition: var(--transition);
+          cursor: pointer;
         }
 
-        .icon-btn:hover {
-          color: white;
-          background: var(--border);
-        }
-
-        .notification-dot {
-          width: 8px;
-          height: 8px;
+        .notification-dot-solid {
+          width: 6px;
+          height: 6px;
           background: var(--primary);
           border-radius: 50%;
           position: absolute;
-          top: 10px;
-          right: 10px;
-          border: 2px solid var(--input);
+          top: 6px;
+          right: 6px;
+          box-shadow: 0 0 6px var(--primary);
+        }
+
+        .notification-dot-ping {
+          width: 6px;
+          height: 6px;
+          background: var(--primary);
+          border-radius: 50%;
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          animation: ping-scale 1.8s infinite cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes ping-scale {
+          0% { transform: scale(1); opacity: 0.8; }
+          60% { transform: scale(2.8); opacity: 0; }
+          100% { transform: scale(2.8); opacity: 0; }
         }
 
         .user-profile {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding-left: 1.5rem;
+          gap: 0.65rem;
+          padding-left: 1rem;
           border-left: 1px solid var(--border);
+          height: 32px;
         }
 
-        .avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
+        .avatar-wrapper {
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-md);
           background: var(--gradient);
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
+          box-shadow: var(--shadow-sm);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
+          transition: var(--transition);
+        }
+
+        .user-profile:hover .avatar-wrapper {
+          transform: scale(1.05);
+          box-shadow: 0 0 10px rgba(255, 47, 191, 0.2);
         }
 
         .user-info {
           display: flex;
           flex-direction: column;
+          line-height: 1.2;
         }
 
         .user-name {
-          font-size: 0.9rem;
-          font-weight: 600;
+          font-size: 0.825rem;
+          font-weight: var(--font-weight-semibold);
+          color: var(--text-primary);
         }
 
         .user-role {
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           color: var(--text-secondary);
         }
 
         .language-switcher {
           display: flex;
-          gap: 0.5rem;
-          background: var(--input);
-          padding: 0.25rem;
-          border-radius: 12px;
+          gap: 0.25rem;
+          background: rgba(255, 255, 255, 0.02);
+          padding: 0.2rem;
+          border-radius: var(--radius-md);
           border: 1px solid var(--border);
         }
 
         .lang-btn {
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 8px;
-          font-size: 1.2rem;
+          border-radius: var(--radius-sm);
+          font-size: 1rem;
           transition: var(--transition);
-          opacity: 0.5;
+          opacity: 0.65;
           background: none;
           border: none;
+          cursor: pointer;
         }
 
         .lang-btn:hover {
           opacity: 1;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(255, 255, 255, 0.08);
         }
 
         .lang-btn.active {
           opacity: 1;
-          background: rgba(255, 45, 141, 0.1);
-          color: var(--primary);
+          background: rgba(255, 47, 191, 0.2);
+          box-shadow: 0 0 10px rgba(255, 47, 191, 0.2);
+          border: 1px solid var(--primary);
+        }
+
+        .header-gen-btn {
+          padding: 0.5rem 1rem !important;
+          border-radius: var(--radius-md) !important;
+          font-size: 0.8rem !important;
+          height: 32px;
         }
       `}</style>
     </header>

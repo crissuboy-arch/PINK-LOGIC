@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useCentralStore } from '../store/CentralStore';
-import { Post as PostStore } from '../store/types';
+import type { Post as PostStore } from '../store/types';
 
 export interface Post {
   id: string;

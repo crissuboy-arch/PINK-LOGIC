@@ -1,20 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useBrand } from '../providers/BrandProvider';
 import { useCentralStore } from '../store/CentralStore';
+import { TEMPLATES_DATA } from '../templates_data';
 
 const EDITOR_DATA_KEY = 'pinklogic.projects.editor'
 
-function saveEditorData(projectId: string, data: { slides: Slide[]; canvasFormat: CanvasFormat }) {
+function saveEditorData(projectId: string, data: { slides: Slide[]; canvasFormat: CanvasFormat; slideCount?: number }) {
   try {
     const all = JSON.parse(localStorage.getItem(EDITOR_DATA_KEY) || '{}')
-    all[projectId] = { slides: data.slides, canvasFormat: data.canvasFormat, updatedAt: new Date().toISOString() }
+    all[projectId] = { 
+      slides: data.slides, 
+      canvasFormat: data.canvasFormat, 
+      slideCount: data.slideCount, 
+      updatedAt: new Date().toISOString() 
+    }
     localStorage.setItem(EDITOR_DATA_KEY, JSON.stringify(all))
   } catch (e) {
     console.warn('[EditorContext] Failed to save editor data:', e)
   }
 }
 
-export function loadEditorData(projectId: string): { slides: Slide[]; canvasFormat: CanvasFormat } | null {
+export function loadEditorData(projectId: string): { slides: Slide[]; canvasFormat: CanvasFormat; slideCount?: number } | null {
   try {
     const all = JSON.parse(localStorage.getItem(EDITOR_DATA_KEY) || '{}')
     return all[projectId] || null
@@ -54,6 +60,22 @@ export interface EditorElement {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  isHidden?: boolean;
+  objectFit?: 'cover' | 'contain';
+  backgroundStyle?: string;
+  backdropFilter?: string;
+  borderStyle?: string;
+  borderWidth?: number;
+  borderColor?: string;
+  borderEnabled?: boolean;
+  textGlowEnabled?: boolean;
+  textGlowColor?: string;
+  textGlowBlur?: number;
+  textStrokeColor?: string;
+  textStrokeWidth?: number;
+  textGradientEnabled?: boolean;
+  textGradientColor1?: string;
+  textGradientColor2?: string;
 }
 
 export interface Slide {
@@ -68,6 +90,8 @@ export interface Slide {
     color1?: string;
     color2?: string;
     direction?: 'tb' | 'lr' | 'diag';
+    overlayType?: string;
+    overlayOpacity?: number;
   };
 }
 
@@ -95,15 +119,17 @@ interface EditorContextType {
   setActiveBrandKit: (kit: ReturnType<typeof useBrand>['activeBrand']) => void;
 
   saveProject: () => void;
+  slideCount: number;
+  setSlideCount: (count: number) => void;
 
   // Slide helpers
   addSlide: () => void;
   duplicateSlide: (index: number) => void;
   removeSlide: (index: number) => void;
   reorderSlides: (startIndex: number, endIndex: number) => void;
+  updateCurrentSlide: (updates: Partial<Slide>) => void;
   colorHistory: string[];
   addToHistory: (color: string) => void;
-  updateCurrentSlide: (updates: Partial<Slide>) => void;
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined);
@@ -111,10 +137,84 @@ const EditorContext = createContext<EditorContextType | undefined>(undefined);
 export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [slides, setSlides] = useState<Slide[]>([{
     id: 'slide-1',
-    elements: [],
+    elements: [
+      {
+        id: 'el-1',
+        type: 'text',
+        content: 'PinkLogic',
+        x: 140,
+        y: 180,
+        width: 800,
+        height: 120,
+        rotation: 0,
+        opacity: 100,
+        zIndex: 2,
+        fontSize: 72,
+        color: '#FF2D9B',
+        fontFamily: 'Outfit',
+        fontWeight: 800,
+        textAlign: 'center',
+        lineHeight: 1.1,
+        letterSpacing: 0,
+        isUppercase: false
+      },
+      {
+        id: 'el-2',
+        type: 'text',
+        content: 'A revolução visual com inteligência artificial para o seu negócio.',
+        x: 190,
+        y: 320,
+        width: 700,
+        height: 100,
+        rotation: 0,
+        opacity: 80,
+        zIndex: 3,
+        fontSize: 24,
+        color: '#ffffff',
+        fontFamily: 'Inter',
+        fontWeight: 400,
+        textAlign: 'center',
+        lineHeight: 1.4,
+        letterSpacing: 0,
+        isUppercase: false
+      },
+      {
+        id: 'el-3',
+        type: 'shape',
+        content: 'square',
+        x: 390,
+        y: 720,
+        width: 300,
+        height: 60,
+        rotation: 0,
+        opacity: 100,
+        zIndex: 1,
+        color: '#FF2D9B',
+        borderRadius: 30
+      },
+      {
+        id: 'el-4',
+        type: 'text',
+        content: 'QUERO COMEÇAR AGORA',
+        x: 390,
+        y: 738,
+        width: 300,
+        height: 30,
+        rotation: 0,
+        opacity: 100,
+        zIndex: 2,
+        fontSize: 14,
+        color: '#ffffff',
+        fontFamily: 'Inter',
+        fontWeight: 700,
+        textAlign: 'center',
+        letterSpacing: 2,
+        isUppercase: true
+      }
+    ],
     background: {
       type: 'color',
-      value: '#0d0d12',
+      value: '#0D0D0D',
       blur: 0,
       brightness: 100,
       opacity: 100
@@ -131,6 +231,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ];
 
   const [canvasFormat, setCanvasFormatState] = useState<CanvasFormat>(availableFormats[0]);
+  const [slideCount, setSlideCount] = useState<number>(5);
 
   // Bridge to BrandProvider — activeBrandKit/brandKits are managed externally
   const { brands: brandKits, activeBrand: activeBrandKit, setActiveBrand: setActiveBrandKit } = useBrand();
@@ -148,6 +249,65 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (loaded) {
           if (loaded.slides) setSlides(loaded.slides);
           if (loaded.canvasFormat) setCanvasFormatState(loaded.canvasFormat);
+          if (loaded.slideCount) setSlideCount(loaded.slideCount);
+        }
+      } else {
+        const templateParam = params.get('template');
+        if (templateParam) {
+          let editorTplKey = 'dark-infoproduto';
+          const lowerParam = templateParam.toLowerCase();
+          if (lowerParam.includes('beauty') || lowerParam.includes('clinica')) {
+            editorTplKey = 'beauty-premium';
+          } else if (lowerParam.includes('tech') || lowerParam.includes('neon-tech')) {
+            editorTplKey = 'tech-neon';
+          } else if (lowerParam.includes('black') || lowerParam.includes('friday')) {
+            editorTplKey = 'black-friday';
+          } else if (lowerParam.includes('drop') || lowerParam.includes('dropshipping')) {
+            editorTplKey = 'dropshipping-dark';
+          } else if (lowerParam.includes('ebook')) {
+            editorTplKey = 'ebook-premium';
+          } else if (lowerParam.includes('lux') || lowerParam.includes('luxury') || lowerParam.includes('feminino')) {
+            editorTplKey = 'luxury-gold';
+          } else if (lowerParam.includes('minimal')) {
+            editorTplKey = 'minimal-clean';
+          } else if (lowerParam.includes('story')) {
+            editorTplKey = 'story-neon';
+          }
+
+          const baseTpl = (TEMPLATES_DATA as any)[editorTplKey];
+          if (baseTpl) {
+            const bg = { ...baseTpl.background };
+            const bgParam = params.get('bg');
+            if (bgParam) {
+              bg.type = 'color';
+              bg.value = decodeURIComponent(bgParam);
+            }
+
+            let elements = JSON.parse(JSON.stringify(baseTpl.elements || []));
+            const titleParam = params.get('title');
+            const subtitleParam = params.get('subtitle');
+            const ctaParam = params.get('cta');
+
+            elements = elements.map((el: any) => {
+              const lowerId = el.id.toLowerCase();
+              if (lowerId.includes('title') || lowerId.includes('headline')) {
+                if (titleParam) el.content = decodeURIComponent(titleParam);
+              } else if (lowerId.includes('desc') || lowerId.includes('sub') || lowerId.includes('subtitle')) {
+                if (subtitleParam) el.content = decodeURIComponent(subtitleParam);
+              } else if (lowerId.includes('btn') || lowerId.includes('button') || lowerId.includes('cta')) {
+                if (el.type === 'text') {
+                  if (ctaParam) el.content = decodeURIComponent(ctaParam);
+                }
+              }
+              return el;
+            });
+
+            setSlides([{
+              id: 'slide-1',
+              elements,
+              background: bg
+            }]);
+          }
         }
       }
     } catch (e) {
@@ -220,7 +380,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const projectId = projectRef.current || crypto.randomUUID();
     
     // Save slides to local storage
-    saveEditorData(projectId, { slides, canvasFormat });
+    saveEditorData(projectId, { slides, canvasFormat, slideCount });
 
     // Sync project entity to central store
     const existing = centralProjects.find(p => p.id === projectId);
@@ -255,6 +415,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       availableFormats,
       brandKits, activeBrandKit, setActiveBrandKit,
       saveProject,
+      slideCount, setSlideCount,
       colorHistory, addToHistory,
       addSlide, duplicateSlide, removeSlide, reorderSlides, updateCurrentSlide
     }}>

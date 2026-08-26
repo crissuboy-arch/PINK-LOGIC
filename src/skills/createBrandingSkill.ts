@@ -1,6 +1,6 @@
 /**
  * Cria ou atualiza a identidade visual de um projeto.
- * Respeita a regra: Pink Logic não sobrescreve a paleta do projeto.
+ * Respeita a regra: PinkLogic não sobrescreve a paleta do projeto.
  */
 export interface BrandingSkillInput {
   projectId: string
@@ -25,7 +25,7 @@ export interface BrandingSkillOutput {
 }
 
 const RULES = [
-  'Pink Logic platform colors are never overwritten by project branding',
+  'PinkLogic platform colors are never overwritten by project branding',
   'Each project must have its own isolated palette',
   'Primary color must contrast with background',
   'Fonts must be from allowed families',

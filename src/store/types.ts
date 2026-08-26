@@ -18,6 +18,26 @@ export interface BrandColorPalette {
   background: string;
   text: string;
   glow: string;
+  surface?: string;
+}
+
+export interface BrandDNA {
+  logo?: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+  };
+  typography: {
+    heading: string;
+    body: string;
+  };
+  glowStyle: string;
+  aesthetic: string;
+  tone: string;
 }
 
 export interface Brand {
@@ -37,6 +57,14 @@ export interface Brand {
   style: string;
   avatar?: string;
   overlays: string[];
+  secondaryColors?: string[];
+  socialLinks?: {
+    instagram?: string;
+    tiktok?: string;
+    youtube?: string;
+    facebook?: string;
+  };
+  brandDNA?: BrandDNA;
 }
 
 export interface Campaign {

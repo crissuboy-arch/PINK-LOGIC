@@ -26,15 +26,17 @@ function analyzeColors(records: DesignMemoryRecord[]): DetectedPattern[] {
       colorFreq.set(key, (colorFreq.get(key) ?? 0) + 1)
     }
   }
-  const sorted: ColorTuple[] = [...colorFreq.entries()].sort((a, b) => b[1] - a[1])
+  const sorted: ColorTuple[] = [...colorFreq.entries()]
+    .map(([hex, count]) => ({ hex, count }))
+    .sort((a, b) => b.count - a.count)
   if (sorted.length > 0) {
     const top = sorted.slice(0, 3)
     patterns.push({
       id: uid(), type: 'color-tendency', label: 'Cores mais usadas',
-      description: `Cores recorrentes: ${top.map(([h, c]) => `${h} (${c}x)`).join(', ')}`,
-      confidence: Math.min(90, top[0][1] * 15),
-      evidence: top.map(([h]) => `Cor ${h} usada em ${colorFreq.get(h)} designs`),
-      value: top[0][0],
+      description: `Cores recorrentes: ${top.map((item) => `${item.hex} (${item.count}x)`).join(', ')}`,
+      confidence: Math.min(90, top[0].count * 15),
+      evidence: top.map((item) => `Cor ${item.hex} usada em ${colorFreq.get(item.hex)} designs`),
+      value: top[0].hex,
     })
   }
   return patterns
@@ -46,7 +48,9 @@ function analyzeStyles(records: DesignMemoryRecord[]): DetectedPattern[] {
   for (const r of records) {
     if (r.style) styleFreq.set(r.style, (styleFreq.get(r.style) ?? 0) + 1)
   }
-  const sorted: StyleTuple[] = [...styleFreq.entries()].sort((a, b) => b[1] - a[1])
+  const sorted: StyleTuple[] = [...styleFreq.entries()]
+    .map(([style, count]) => ({ style, count }))
+    .sort((a, b) => b.count - a.count)
   if (sorted.length > 0) {
     const top = sorted[0]
     patterns.push({
@@ -66,7 +70,9 @@ function analyzeTones(records: DesignMemoryRecord[]): DetectedPattern[] {
   for (const r of records) {
     if (r.tone) toneFreq.set(r.tone, (toneFreq.get(r.tone) ?? 0) + 1)
   }
-  const sorted: ToneTuple[] = [...toneFreq.entries()].sort((a, b) => b[1] - a[1])
+  const sorted: ToneTuple[] = [...toneFreq.entries()]
+    .map(([tone, count]) => ({ tone, count }))
+    .sort((a, b) => b.count - a.count)
   if (sorted.length > 0) {
     patterns.push({
       id: uid(), type: 'tone-preference', label: 'Tom de voz preferido',

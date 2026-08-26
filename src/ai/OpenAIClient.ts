@@ -33,12 +33,12 @@ export class OpenAIClient {
 
   constructor(config: OpenAIConfig = {}) {
     this.config = {
-      model: 'gpt-4o-mini',
-      maxTokens: 2048,
-      temperature: 0.7,
-      timeout: 30000,
-      retryCount: 3,
-      ...config,
+      model: config.model || 'gpt-4o-mini',
+      maxTokens: config.maxTokens || 2048,
+      temperature: config.temperature ?? 0.7,
+      timeout: config.timeout || 30000,
+      retryCount: config.retryCount ?? 3,
+      apiKey: config.apiKey || '',
     }
     this.logs = []
   }

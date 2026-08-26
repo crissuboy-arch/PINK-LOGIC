@@ -185,7 +185,7 @@ export default function AgentDashboard() {
             <Server size={26} style={{ color: 'var(--primary)' }} />
             Sistema de Agentes
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.2rem' }}>Centro de comando da infraestrutura agentic do Pink Logic OS</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.2rem' }}>Centro de comando da infraestrutura agentic do <span className="notranslate" translate="no">PinkLogic</span> OS</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}><Activity size={14} style={{ color: '#10b981' }} />Online</span>

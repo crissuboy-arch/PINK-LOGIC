@@ -26,7 +26,7 @@ export class OpenDesignEngine {
     }
 
     const interpreted = this.brandInterpreter.interpret(brand)
-    const projectTheme = createProjectTheme(interpreted)
+    const projectTheme = createProjectTheme(brand)
     const merged = resolveTheme(pinkLogicTheme, projectTheme)
 
     const ruleResults = this.visualRules.evaluate(brand)

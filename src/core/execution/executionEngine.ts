@@ -108,7 +108,7 @@ export async function runExecution(intent: ResolvedIntent, route: TaskRoute): Pr
       execution.steps[i].finishedAt = nowISO()
       execution.steps[i].duration = result.duration
       execution.steps[i].output = result.output
-      if (!result.logs) result.logs.forEach((msg) => log(executionId, step.id, step.agentId ?? 'system', agentName, 'info', msg))
+      if (result.logs) result.logs.forEach((msg: string) => log(executionId, step.id, step.agentId ?? 'system', agentName, 'info', msg))
     } else {
       execution.steps[i].status = 'failed'
       execution.steps[i].finishedAt = nowISO()

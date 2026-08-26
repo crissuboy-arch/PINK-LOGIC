@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ScheduledPost, SocialAccount, PublisherPlatform, PublishStatus } from '../types/publisher';
 import { useCentralStore } from '../store/CentralStore';
-import { Post as PostStore } from '../store/types';
+import type { Post as PostStore } from '../store/types';
 
 interface PublisherContextType {
   scheduledPosts: ScheduledPost[];
@@ -24,10 +24,10 @@ const LOCAL_STORAGE_ACCOUNTS = 'pink_logic_social_accounts';
 
 const DEFAULT_ACCOUNTS: SocialAccount[] = [
   { id: 'acc-1', user_id: 'user-default', platform: 'Instagram', account_name: 'pinklogic_ig', status: 'disconnected' },
-  { id: 'acc-2', user_id: 'user-default', platform: 'Facebook', account_name: 'Pink Logic Page', status: 'disconnected' },
-  { id: 'acc-3', user_id: 'user-default', platform: 'LinkedIn', account_name: 'Pink Logic Corporation', status: 'disconnected' },
+  { id: 'acc-2', user_id: 'user-default', platform: 'Facebook', account_name: 'PinkLogic Page', status: 'disconnected' },
+  { id: 'acc-3', user_id: 'user-default', platform: 'LinkedIn', account_name: 'PinkLogic Corporation', status: 'disconnected' },
   { id: 'acc-4', user_id: 'user-default', platform: 'X/Twitter', account_name: '@pinklogic_ai', status: 'disconnected' },
-  { id: 'acc-5', user_id: 'user-default', platform: 'WordPress', account_name: 'Pink Logic Editorial', status: 'disconnected' },
+  { id: 'acc-5', user_id: 'user-default', platform: 'WordPress', account_name: 'PinkLogic Editorial', status: 'disconnected' },
   { id: 'acc-6', user_id: 'user-default', platform: 'Blog', account_name: 'Blog Interno', status: 'disconnected' },
 ];
 

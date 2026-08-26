@@ -107,26 +107,61 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     if (activeBrand) {
       const root = document.documentElement;
-      root.style.setProperty('--primary', activeBrand.colors.primary);
-      root.style.setProperty('--secondary', activeBrand.colors.secondary);
-      root.style.setProperty('--background', activeBrand.colors.background);
-      root.style.setProperty('--text-primary', activeBrand.colors.text);
-      root.style.setProperty('--gradient', `linear-gradient(135deg, ${activeBrand.colors.primary} 0%, ${activeBrand.colors.secondary} 100%)`);
-      root.style.setProperty('--glow', activeBrand.glow || activeBrand.colors.primary);
+      const primary = activeBrand.colors.primary;
+      const secondary = activeBrand.colors.secondary;
+      const accent = activeBrand.colors.accent || secondary;
+      const background = activeBrand.colors.background;
+      const text = activeBrand.colors.text || '#FFFFFF';
       
+      // Calculate surface color if not saved
+      const isBgDark = background === '#0D0D12' || background === '#0D0D0D' || background.startsWith('#0') || background.startsWith('#1');
+      const surface = activeBrand.colors.surface || (isBgDark ? '#15151F' : '#FFFFFF');
+
+      root.style.setProperty('--primary', primary);
+      root.style.setProperty('--secondary', secondary);
+      root.style.setProperty('--accent', accent);
+      root.style.setProperty('--background', background);
+      root.style.setProperty('--card', surface);
+      root.style.setProperty('--text-primary', text);
+      root.style.setProperty('--gradient', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
+      root.style.setProperty('--glow', activeBrand.glow || primary);
+      
+      // Inject glows and borders
+      root.style.setProperty('--glow-pink', `${primary}33`);
+      root.style.setProperty('--glow-purple', `${secondary}26`);
+      root.style.setProperty('--shadow-glow-pink', `0 0 30px ${primary}33`);
+      root.style.setProperty('--shadow-glow-purple', `0 0 30px ${secondary}26`);
+      root.style.setProperty('--border-focus', `${primary}66`);
+
+      // Fonts synchronization
+      if (activeBrand.fonts?.heading) {
+        root.style.setProperty('--font-heading', `'${activeBrand.fonts.heading}', sans-serif`);
+      }
+      if (activeBrand.fonts?.body) {
+        root.style.setProperty('--font-body', `'${activeBrand.fonts.body}', sans-serif`);
+      }
+
       // Inject some pl tokens for back-compat
-      root.style.setProperty('--pl-brand-primary', activeBrand.colors.primary);
-      root.style.setProperty('--pl-brand-secondary', activeBrand.colors.secondary);
-      root.style.setProperty('--pl-brand-accent', activeBrand.colors.accent);
+      root.style.setProperty('--pl-brand-primary', primary);
+      root.style.setProperty('--pl-brand-secondary', secondary);
+      root.style.setProperty('--pl-brand-accent', accent);
     } else {
       // Fallback defaults
       const root = document.documentElement;
-      root.style.setProperty('--primary', '#FF2D8D');
-      root.style.setProperty('--secondary', '#B026FF');
-      root.style.setProperty('--background', '#0D0D12');
+      root.style.setProperty('--primary', '#FF2D9B');
+      root.style.setProperty('--secondary', '#FF4DB2');
+      root.style.setProperty('--accent', '#00E5FF');
+      root.style.setProperty('--background', '#0D0D0D');
+      root.style.setProperty('--card', '#151515');
       root.style.setProperty('--text-primary', '#FFFFFF');
-      root.style.setProperty('--gradient', 'linear-gradient(135deg, #FF2D8D 0%, #B026FF 100%)');
-      root.style.setProperty('--glow', '#FF2D8D');
+      root.style.setProperty('--gradient', 'linear-gradient(135deg, #FF2D9B 0%, #FF4DB2 100%)');
+      root.style.setProperty('--glow', '#FF2D9B');
+      root.style.setProperty('--glow-pink', 'rgba(255, 45, 155, 0.2)');
+      root.style.setProperty('--glow-purple', 'rgba(255, 77, 178, 0.15)');
+      root.style.setProperty('--shadow-glow-pink', '0 0 30px rgba(255, 45, 155, 0.2)');
+      root.style.setProperty('--shadow-glow-purple', '0 0 30px rgba(255, 77, 178, 0.15)');
+      root.style.setProperty('--font-heading', "'Plus Jakarta Sans', sans-serif");
+      root.style.setProperty('--font-body', "'Inter', sans-serif");
     }
   }, [activeBrand]);
 
@@ -160,7 +195,7 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
       },
       glow: '#FF2D8D',
       hashtags: [],
-      cta: 'Acesse o Pink Logic',
+      cta: 'Acesse o PinkLogic',
       tone: 'profissional',
       style: 'moderno',
       overlays: [],

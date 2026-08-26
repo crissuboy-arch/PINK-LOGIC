@@ -54,9 +54,23 @@ const MeusProjetos = () => {
     return project.branding?.palette?.background || project.background?.value || '#1a1a24';
   };
 
-  const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [activeTab, setActiveTab] = useState<'all' | 'designs' | 'campaigns'>('all');
+
+  const filteredProjects = projects.filter(p => {
+    const objective = p.settings?.objective || '';
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          objective.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    if (activeTab === 'designs') {
+      return !p.name.toLowerCase().includes('campanha') && !objective.toLowerCase().includes('campanha');
+    }
+    if (activeTab === 'campaigns') {
+      return p.name.toLowerCase().includes('campanha') || objective.toLowerCase().includes('campanha') || p.name.toLowerCase().includes('ofensiva');
+    }
+    return true;
+  });
 
   return (
     <div className="projects-page">
@@ -82,9 +96,24 @@ const MeusProjetos = () => {
           />
         </div>
         <div className="filter-tabs">
-          <button className="active">{t('projects.filter_all')}</button>
-          <button>{t('projects.filter_designs')}</button>
-          <button>{t('projects.filter_campaigns')}</button>
+          <button 
+            className={activeTab === 'all' ? 'active' : ''} 
+            onClick={() => setActiveTab('all')}
+          >
+            {t('projects.filter_all')}
+          </button>
+          <button 
+            className={activeTab === 'designs' ? 'active' : ''} 
+            onClick={() => setActiveTab('designs')}
+          >
+            {t('projects.filter_designs')}
+          </button>
+          <button 
+            className={activeTab === 'campaigns' ? 'active' : ''} 
+            onClick={() => setActiveTab('campaigns')}
+          >
+            {t('projects.filter_campaigns')}
+          </button>
         </div>
       </div>
 

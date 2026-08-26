@@ -1,6 +1,6 @@
 # Arquitetura - Publicador Automático (Automatic Publisher)
 
-Este documento descreve a arquitetura, estrutura de arquivos, esquema de banco de dados e fluxo de execução do módulo **Publicador Automático** integrado ao Pink Logic.
+Este documento descreve a arquitetura, estrutura de arquivos, esquema de banco de dados e fluxo de execução do módulo **Publicador Automático** integrado ao PinkLogic.
 
 ---
 
@@ -23,11 +23,11 @@ Este documento descreve a arquitetura, estrutura de arquivos, esquema de banco d
   - [`src/contexts/PublisherContext.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/contexts/PublisherContext.tsx): Provedor de estado que gerencia contas, fila de postagem, persistência local e simulação de agendamento em background (polling loop).
 - **Interface Gráfica**:
   - [`src/pages/Gestao/PublicadorAutomatico.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/pages/Gestao/PublicadorAutomatico.tsx): Rota `/publicador-automatico`. Contém o Composer, plataforma de preview interativo multicanal, seletor de agendamento, gerenciador de contas conectadas e tabela da fila de posts.
-
+ 
 ### Arquivos Modificados
 - [`src/App.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/App.tsx): Importação e wrapping do `PublisherProvider`, e adição da rota `/publicador-automatico`.
 - [`src/components/Sidebar.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/components/Sidebar.tsx): Adição do link do Publicador Automático no menu lateral sob a seção "Gestão".
-- [`src/contexts/GestaoContext.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/contexts/GestaoContext.tsx): Adaptação e mesclagem de posts agendados no estado global de posts para integração transparente com o **Calendário** editorial e o painel de **Status** do Pink Logic.
+- [`src/contexts/GestaoContext.tsx`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/contexts/GestaoContext.tsx): Adaptação e mesclagem de posts agendados no estado global de posts para integração transparente com o **Calendário** editorial e o painel de **Status** do PinkLogic.
 - [`src/translations/index.ts`](file:///c:/Users/Evand/Documents/PINK%20LOGIC/src/translations/index.ts): Inclusão da tradução da chave `sidebar.publicador` nos idiomas `pt`, `en` e `es`.
 
 ---

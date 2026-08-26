@@ -1,18 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Sparkles } from 'lucide-react';
+import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { authService } from '../../services/authService';
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For now, simulate login and redirect to dashboard
-    navigate('/');
+    setError(null);
+    const result = await authService.login(email, password);
+    if (result.success) {
+      navigate('/');
+    } else {
+      setError(result.error || 'Erro ao autenticar.');
+    }
   };
 
   return (
@@ -31,13 +39,28 @@ const Login = () => {
               boxShadow: isHovered ? "0 0 50px rgba(255, 45, 141, 0.4)" : "0 0 30px rgba(255, 45, 141, 0.2)"
             }}
           >
-            <img src="/logo.png" alt="Pink Logic" className="login-logo-img" />
+            <img src="/logo.png" alt="PinkLogic" className="login-logo-img" />
           </motion.div>
-          <h1>Boas-vindas ao Pink Logic</h1>
+          <h1>Boas-vindas ao <span className="notranslate" translate="no">PinkLogic</span></h1>
           <p>Acesse sua central estratégica de design e dados</p>
         </div>
 
         <form onSubmit={handleLogin} className="login-form">
+          {error && (
+            <div className="login-error-message" style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: '8px',
+              padding: '0.75rem',
+              color: '#ef4444',
+              fontSize: '0.825rem',
+              textAlign: 'center',
+              fontWeight: 500
+            }}>
+              {error}
+            </div>
+          )}
+
           <div className="input-field">
             <Mail size={18} />
             <input 
@@ -52,12 +75,32 @@ const Login = () => {
           <div className="input-field">
             <Lock size={18} />
             <input 
-              type="password" 
+              type={showPassword ? "text" : "password"} 
               placeholder="Senha" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required 
             />
+            <button 
+              type="button" 
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                background: 'none',
+                border: 'none',
+                outline: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
           <button 
@@ -72,7 +115,10 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="login-footer">
+        <div className="login-footer" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: '#a1a1b5', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px' }}>
+            🔑 Demo: <strong style={{ color: 'white' }}>admin@pinklogic.com</strong> | Senha: <strong style={{ color: 'white' }}>pinklogic123</strong>
+          </p>
           <p>Não tem uma conta? <span className="text-primary cursor-pointer">Comece agora</span></p>
         </div>
       </motion.div>
@@ -120,11 +166,11 @@ const Login = () => {
         }
 
         .login-logo-wrapper {
-          width: 120px;
-          height: 120px;
+          width: 220px;
+          height: 60px;
           margin: 0 auto 1.5rem;
-          border-radius: 24px;
-          padding: 10px;
+          border-radius: 12px;
+          padding: 8px 16px;
           background: #000;
           display: flex;
           align-items: center;

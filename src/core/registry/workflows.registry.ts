@@ -5,7 +5,7 @@ export interface WorkflowStep {
   id: string
   order: number
   name: string
-  description: string
+  description?: string
   agentId?: string
   skillId?: string
   input?: Record<string, unknown>

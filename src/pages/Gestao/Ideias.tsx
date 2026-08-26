@@ -14,8 +14,7 @@ import {
 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useProducts } from '../../contexts/ProductContext';
-
-const STORAGE_KEY = 'pink_logic_ideas';
+import { useCentralStore } from '../../store/CentralStore';
 
 interface Idea {
   id: number;
@@ -28,13 +27,12 @@ interface Idea {
 
 const Ideias = () => {
   const { t } = useLanguage();
+  const { activeProjectId, activeBrand } = useCentralStore();
+  
   const [selectedProduct, setSelectedProduct] = useState('');
   const [filterProduct, setFilterProduct] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [ideas, setIdeas] = useState<Idea[]>(() => {
-    try { const saved = localStorage.getItem(STORAGE_KEY); return saved ? JSON.parse(saved) : []; }
-    catch { return []; }
-  });
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [showManualForm, setShowManualForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [manualIdea, setManualIdea] = useState({ title: '', description: '', category: 'Conteúdo', product: '' });
@@ -42,9 +40,17 @@ const Ideias = () => {
   const { products: allProducts } = useProducts();
   const products = useMemo(() => allProducts.map(p => ({ id: p.id, name: p.name })), [allProducts]);
 
+  const getStorageKey = () => `pink_logic_ideas_${activeProjectId || 'default'}`;
+
+  // Load project-scoped ideas
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ideas));
-  }, [ideas]);
+    try {
+      const saved = localStorage.getItem(getStorageKey());
+      setIdeas(saved ? JSON.parse(saved) : []);
+    } catch {
+      setIdeas([]);
+    }
+  }, [activeProjectId]);
 
   const filteredIdeas = ideas.filter(idea =>
     !filterProduct || idea.product === filterProduct
@@ -52,12 +58,15 @@ const Ideias = () => {
 
   const addManualIdea = () => {
     if (!manualIdea.title.trim() || !manualIdea.description.trim()) return;
+    let updated;
     if (editId) {
-      setIdeas(prev => prev.map(i => i.id === editId ? { ...i, ...manualIdea } : i));
+      updated = ideas.map(i => i.id === editId ? { ...i, ...manualIdea } : i);
       setEditId(null);
     } else {
-      setIdeas(prev => [...prev, { id: Date.now(), ...manualIdea, saved: false }]);
+      updated = [...ideas, { id: Date.now(), ...manualIdea, saved: false }];
     }
+    setIdeas(updated);
+    localStorage.setItem(getStorageKey(), JSON.stringify(updated));
     setManualIdea({ title: '', description: '', category: 'Conteúdo', product: '' });
     setShowManualForm(false);
   };
@@ -69,7 +78,9 @@ const Ideias = () => {
   };
 
   const deleteIdea = (id: number) => {
-    setIdeas(prev => prev.filter(i => i.id !== id));
+    const updated = ideas.filter(i => i.id !== id);
+    setIdeas(updated);
+    localStorage.setItem(getStorageKey(), JSON.stringify(updated));
   };
 
   const generateIdeas = () => {
@@ -77,18 +88,48 @@ const Ideias = () => {
     setIsGenerating(true);
     setTimeout(() => {
       const productName = products.find(p => p.id === selectedProduct)?.name || '';
+      const brandName = activeBrand?.name || 'Sua Marca';
+      const brandTone = activeBrand?.tone || 'Profissional';
+      const brandHashtags = activeBrand?.hashtags?.join(' ') || '';
+      const brandCta = activeBrand?.cta || 'Saiba mais no link do perfil!';
+
       const newIdeas: Idea[] = [
-        { id: Date.now() + 1, title: '3 Erros que te impedem de crescer', description: 'Um post carrossel mostrando os erros comuns do seu público e como resolvê-los.', category: 'Conteúdo', product: selectedProduct, saved: false },
-        { id: Date.now() + 2, title: 'Bastidores da criação', description: `Mostre como você prepara ${productName} e a dedicação por trás dele nos Stories.`, category: 'Conteúdo', product: selectedProduct, saved: false },
-        { id: Date.now() + 3, title: 'Depoimento transformador', description: 'Compartilhe um print de um cliente satisfeito e conte a história dele.', category: 'Marketing', product: selectedProduct, saved: false },
+        { 
+          id: Date.now() + 1, 
+          title: `3 Segredos sobre ${productName}`, 
+          description: `Um carrossel de alto impacto em tom ${brandTone} mostrando como resolver as principais dores do seu cliente ideal. Finalize com as tags: ${brandHashtags}`, 
+          category: 'Conteúdo', 
+          product: selectedProduct, 
+          saved: false 
+        },
+        { 
+          id: Date.now() + 2, 
+          title: `Bastidores de ${brandName}`, 
+          description: `Grave um Reels dinâmico com a preparação e dedicação investidas em ${productName}. Mostre que o valor está nos detalhes!`, 
+          category: 'Estratégia', 
+          product: selectedProduct, 
+          saved: false 
+        },
+        { 
+          id: Date.now() + 3, 
+          title: `Por que escolher ${productName}?`, 
+          description: `Post institucional comparativo. Use o tom de comunicação da marca (${brandTone}) e chame o público com o CTA: "${brandCta}"`, 
+          category: 'Marketing', 
+          product: selectedProduct, 
+          saved: false 
+        },
       ];
-      setIdeas(prev => [...newIdeas, ...prev]);
+      const updated = [...newIdeas, ...ideas];
+      setIdeas(updated);
+      localStorage.setItem(getStorageKey(), JSON.stringify(updated));
       setIsGenerating(false);
     }, 1500);
   };
 
   const toggleSave = (id: number) => {
-    setIdeas(ideas.map(idea => idea.id === id ? { ...idea, saved: !idea.saved } : idea));
+    const updated = ideas.map(idea => idea.id === id ? { ...idea, saved: !idea.saved } : idea);
+    setIdeas(updated);
+    localStorage.setItem(getStorageKey(), JSON.stringify(updated));
   };
 
   const generatedCount = ideas.length;
@@ -117,6 +158,20 @@ const Ideias = () => {
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
+
+            {activeBrand && (
+              <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.7rem', color: '#A1A1B5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Brand Kit Ativo</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{activeBrand.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#A1A1B5' }}>Tom:</span>
+                  <span style={{ fontSize: '0.7rem', background: 'rgba(255,47,191,0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>
+                    {activeBrand.tone || 'Profissional'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <button className="btn-primary w-full" onClick={generateIdeas}
               disabled={!selectedProduct || isGenerating}
               style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}>

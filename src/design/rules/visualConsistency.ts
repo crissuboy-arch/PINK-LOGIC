@@ -35,7 +35,7 @@ function paletteDistance(colors1: Record<string, string>, colors2: Record<string
 export const visualConsistencyRules: VisualRule[] = [
   {
     id: 'branding-distance',
-    name: 'Branding distante do padrão Pink Logic',
+    name: 'Branding distante do padrão PinkLogic',
     category: 'consistency',
     severity: 'info',
     evaluate(input: RuleInput): DesignIssue | null {
@@ -45,8 +45,8 @@ export const visualConsistencyRules: VisualRule[] = [
         return {
           id: uid(), type: 'suggestion', category: 'consistency', severity: 'info',
           title: 'Branding muito distante do padrão',
-          description: `Paleta difere muito do padrão Pink Logic (distância média ${avgDist.toFixed(0)}). Pode quebrar consistência visual do ecossistema.`,
-          fix: 'Manter ao menos uma cor do Pink Logic (primary #FF2D8D ou accent #FFD700) para coesão visual',
+          description: `Paleta difere muito do padrão PinkLogic (distância média ${avgDist.toFixed(0)}). Pode quebrar consistência visual do ecossistema.`,
+          fix: 'Manter ao menos uma cor do PinkLogic (primary #FF2D8D ou accent #FFD700) para coesão visual',
           rule: 'branding-distance',
         }
       }

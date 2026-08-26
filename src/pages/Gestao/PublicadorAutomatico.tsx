@@ -516,7 +516,7 @@ const PublicadorAutomatico: React.FC = () => {
                     <div className="tw-header">
                       <div className="tw-avatar"></div>
                       <div className="tw-meta">
-                        <span className="tw-name">Pink Logic AI</span>
+                        <span className="tw-name notranslate" translate="no">PinkLogic AI</span>
                         <span className="tw-handle">@pinklogic_ai</span>
                       </div>
                     </div>
@@ -530,7 +530,7 @@ const PublicadorAutomatico: React.FC = () => {
                           <img src={mediaUrl} alt="Post image" className="tw-image" />
                         </div>
                       )}
-                      <div className="tw-timestamp">21:45 · 25 de mai de 2026 · <span style={{ color: 'var(--primary)' }}>Pink Logic</span></div>
+                      <div className="tw-timestamp">21:45 · 25 de mai de 2026 · <span className="notranslate" translate="no" style={{ color: 'var(--primary)' }}>PinkLogic</span></div>
                       <div className="tw-actions">
                         <span>💬 12</span>
                         <span>🔁 34</span>
@@ -547,7 +547,7 @@ const PublicadorAutomatico: React.FC = () => {
                     <div className="li-header">
                       <div className="li-avatar"></div>
                       <div className="li-meta">
-                        <span className="li-name">Pink Logic Corporation</span>
+                        <span className="li-name notranslate" translate="no">PinkLogic Corporation</span>
                         <span className="li-sub">1.423 seguidores • Promovido</span>
                       </div>
                     </div>

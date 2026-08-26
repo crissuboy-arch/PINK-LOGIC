@@ -19,7 +19,7 @@ export const brandingAgent = createAgent({
 
     await delay(60 + Math.random() * 40)
 
-    const output: Record<string, unknown> = {
+    const output = {
       palette: { primary: '#FF2D8D', secondary: '#7B2D8E', accent: '#FFD700', background: '#0D0D12', text: '#FFFFFF' },
       fonts: { heading: 'Outfit', body: 'Inter' },
       tone: input.context?.tone ?? 'profissional e acolhedor',

@@ -8,10 +8,10 @@ export interface DesignToken {
 }
 
 export const pinkLogicTokens: Record<string, DesignToken> = {
-  // Platform identity — Pink Logic owns these. Projects never override them.
-  'color.primary':     { name: 'color.primary',     value: '#FF2D8D', category: 'color', description: 'Pink Logic brand pink' },
-  'color.secondary':   { name: 'color.secondary',   value: '#7B2D8E', category: 'color', description: 'Pink Logic purple' },
-  'color.accent':      { name: 'color.accent',      value: '#FFD700', category: 'color', description: 'Pink Logic gold' },
+  // Platform identity — PinkLogic owns these. Projects never override them.
+  'color.primary':     { name: 'color.primary',     value: '#FF2D8D', category: 'color', description: 'PinkLogic brand pink' },
+  'color.secondary':   { name: 'color.secondary',   value: '#7B2D8E', category: 'color', description: 'PinkLogic purple' },
+  'color.accent':      { name: 'color.accent',      value: '#FFD700', category: 'color', description: 'PinkLogic gold' },
   'color.background':  { name: 'color.background',  value: '#0D0D12', category: 'color', description: 'Dark background' },
   'color.surface':     { name: 'color.surface',     value: '#1A1A24', category: 'color', description: 'Card/surface background' },
   'color.text':        { name: 'color.text',        value: '#FFFFFF', category: 'color', description: 'Primary text' },

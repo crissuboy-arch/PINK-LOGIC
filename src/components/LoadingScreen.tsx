@@ -20,7 +20,7 @@ const LoadingScreen = () => {
           ease: "easeInOut"
         }}
       >
-        <img src="/icon.png" alt="Loading..." className="loading-icon" />
+        <img src="/logo.png" alt="Loading..." className="loading-icon" />
       </motion.div>
       <motion.p
         initial={{ opacity: 0 }}
@@ -44,11 +44,11 @@ const LoadingScreen = () => {
         }
 
         .loading-logo-wrap {
-          width: 80px;
-          height: 80px;
+          width: 160px;
+          height: 50px;
           background: #000;
-          border-radius: 20px;
-          padding: 12px;
+          border-radius: 12px;
+          padding: 8px 16px;
           display: flex;
           align-items: center;
           justify-content: center;

@@ -9,9 +9,9 @@ export interface SystemToken {
 }
 
 export const systemTokens: Record<string, SystemToken> = {
-  'color.primary':     { name: 'color.primary',     value: '#FF2D8D', category: 'color', description: 'Pink Logic brand pink', protected: true },
-  'color.secondary':   { name: 'color.secondary',   value: '#B026FF', category: 'color', description: 'Pink Logic purple', protected: true },
-  'color.accent':      { name: 'color.accent',      value: '#FFD700', category: 'color', description: 'Pink Logic gold', protected: true },
+  'color.primary':     { name: 'color.primary',     value: '#FF2D8D', category: 'color', description: 'PinkLogic brand pink', protected: true },
+  'color.secondary':   { name: 'color.secondary',   value: '#B026FF', category: 'color', description: 'PinkLogic purple', protected: true },
+  'color.accent':      { name: 'color.accent',      value: '#FFD700', category: 'color', description: 'PinkLogic gold', protected: true },
   'color.background':  { name: 'color.background',  value: '#0D0D12', category: 'color', description: 'Dark background', protected: true },
   'color.surface':     { name: 'color.surface',     value: '#15151F', category: 'color', description: 'Card/surface background', protected: true },
   'color.text':        { name: 'color.text',        value: '#FFFFFF', category: 'color', description: 'Primary text', protected: true },

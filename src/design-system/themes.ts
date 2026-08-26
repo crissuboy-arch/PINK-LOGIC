@@ -10,7 +10,7 @@ export interface Theme {
 
 export const pinkLogicTheme: Theme = {
   id: 'pink-logic',
-  name: 'Pink Logic',
+  name: 'PinkLogic',
   isPlatform: true,
   tokens: Object.fromEntries(
     Object.entries(pinkLogicTokens).map(([k, t]) => [k, t.value])

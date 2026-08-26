@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useCentralStore } from '../store/CentralStore';
-import { Product as ProductItem } from '../store/types';
+import type { Product as ProductItem } from '../store/types';
 
 interface ProductContextType {
   products: ProductItem[];

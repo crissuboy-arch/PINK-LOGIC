@@ -8,7 +8,13 @@ import Campanhas from './pages/Gestao/Campanhas';
 import Produtos from './pages/Gestao/Produtos';
 import Status from './pages/Gestao/Status';
 import Editor from './pages/Criacao/Editor';
-import { StoryCreator, CopyGenerator, LogoMaker, StrategicVision, StickerStudio } from './pages/Criacao/SubPages';
+import { StoryCreator, CopyGenerator, StrategicVision, StickerStudio, HubModels } from './pages/Criacao/SubPages';
+import LogoStudioIA from './pages/Criacao/LogoStudioIA';
+import BrandKitPro from './pages/Criacao/BrandKitPro';
+import MockupStudio from './pages/Criacao/MockupStudio';
+import QRCodeStudio from './pages/Criacao/QRCodeStudio';
+import BrandManual from './pages/Criacao/BrandManual';
+import TemplatesPremium from './pages/Criacao/TemplatesPremium';
 import Estrategia from './pages/Estrategia';
 import { MeusProjetos } from './pages/Biblioteca/SubPages';
 import Login from './pages/Auth/Login';
@@ -43,11 +49,18 @@ function App() {
                     <Route path="publicador-automatico" element={<PublicadorAutomatico />} />
                     
                     <Route path="criacao/editor" element={<Editor />} />
+                    <Route path="criacao/carrossel" element={<Editor isCarouselOnly={true} />} />
+                    <Route path="criacao/templates" element={<TemplatesPremium />} />
+                    <Route path="criacao/brandkit" element={<BrandKitPro />} />
                     <Route path="criacao/story" element={<StoryCreator />} />
                     <Route path="criacao/copy" element={<CopyGenerator />} />
-                    <Route path="criacao/logo" element={<LogoMaker />} />
+                    <Route path="criacao/logo" element={<LogoStudioIA />} />
+                    <Route path="criacao/mockups" element={<MockupStudio />} />
+                    <Route path="criacao/qrcode" element={<QRCodeStudio />} />
+                    <Route path="criacao/manual" element={<BrandManual />} />
                     <Route path="criacao/vision" element={<StrategicVision />} />
                     <Route path="criacao/stickers" element={<StickerStudio />} />
+                    <Route path="criacao/models" element={<HubModels />} />
                     
                     <Route path="estrategia" element={<Estrategia />} />
                     <Route path="biblioteca" element={<MeusProjetos />} />
