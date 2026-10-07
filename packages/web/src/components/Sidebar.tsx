@@ -40,9 +40,10 @@ import { useCentralStore } from '../store/CentralStore';
 interface SidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  mobileOpen?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobileOpen = false }) => {
   const { t } = useLanguage();
   const [openMenus, setOpenMenus] = useState<string[]>(['criacao', 'assets', 'automacao', 'inteligencia']);
   
@@ -131,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
   ];
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       {/* Brand Header */}
       <div className="sidebar-logo" style={{ padding: isCollapsed ? '1rem 0' : '1.5rem', display: 'flex', justifyContent: 'center', transition: 'var(--transition)' }}>
         <PremiumLogo compact={isCollapsed} sizeMultiplier={isCollapsed ? 0.95 : 1.15} />

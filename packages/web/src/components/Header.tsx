@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Bell, Search, User, Plus } from 'lucide-react';
+import { Bell, Search, User, Plus, Menu } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import AIStatusBadge from './AIStatusBadge';
 import PremiumLogo from './PremiumLogo';
 import { authService } from '../services/authService';
 
-const Header = () => {
+const Header = ({ onOpenMenu }: { onOpenMenu?: () => void }) => {
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
@@ -35,6 +35,10 @@ const Header = () => {
 
   return (
     <header className="header glass-navbar">
+      {/* Mobile: abre a sidebar como gaveta */}
+      <button className="icon-btn-sm header-menu-btn" onClick={onOpenMenu} aria-label="Abrir menu">
+        <Menu size={20} />
+      </button>
       <div className="header-logo" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', marginRight: '2.5rem', padding: '0 0.5rem', transform: 'scale(1.25)', transformOrigin: 'left center' }}>
         <PremiumLogo />
       </div>
@@ -309,6 +313,51 @@ const Header = () => {
           border-radius: var(--radius-md) !important;
           font-size: 0.8rem !important;
           height: 32px;
+        }
+
+        .header-menu-btn {
+          display: none;
+        }
+
+        /* Mobile: header compacto, sem overflow horizontal */
+        @media (max-width: 768px) {
+          .header {
+            padding: 0 0.75rem;
+            gap: 0.5rem;
+          }
+          .header-menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+          }
+          .header-logo {
+            transform: none !important;
+            margin-right: 0 !important;
+            padding: 0 !important;
+            min-width: 0;
+            overflow: hidden;
+            flex: 1;
+          }
+          .header-search,
+          .status-badge-container,
+          .language-switcher,
+          .user-info,
+          .header-gen-btn span {
+            display: none !important;
+          }
+          .header-actions {
+            gap: 0.5rem;
+            flex-shrink: 0;
+          }
+          .header-gen-btn {
+            width: 44px;
+            height: 44px !important;
+            padding: 0 !important;
+            justify-content: center;
+          }
         }
       `}</style>
     </header>

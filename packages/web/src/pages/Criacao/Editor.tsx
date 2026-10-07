@@ -20,7 +20,9 @@ import {
   ChevronUp,
   ChevronDown,
   Maximize2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  MoreHorizontal,
+  SlidersHorizontal
 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { TEMPLATES_DATA } from '../../templates_data';
@@ -32,6 +34,7 @@ import { ColorPicker } from '../../components/Editor/ColorPicker';
 import type { EditorElement, Slide } from '../../contexts/EditorContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCentralStore } from '../../store/CentralStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const getGradientCss = (color1: string, color2: string, direction: 'tb' | 'lr' | 'diag') => {
   const dirMap = {
@@ -136,8 +139,41 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
   const elements = currentSlide.elements;
   const background = currentSlide.background;
 
-  const [activeTab, setActiveTab] = useState<'elements' | 'text' | 'uploads' | 'background' | 'brand' | 'templates' | 'layers' | 'mockups'>('templates');
+  type EditorTab = 'elements' | 'text' | 'uploads' | 'background' | 'brand' | 'templates' | 'layers' | 'mockups';
+  const [activeTab, setActiveTab] = useState<EditorTab>('templates');
+
+  // Mobile (≤768px): ferramentas e propriedades abrem em bottom sheets sobre o canvas.
+  const isMobile = useIsMobile();
+  const [mobileToolOpen, setMobileToolOpen] = useState(false);
+  const [mobilePropsOpen, setMobilePropsOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+
+  const selectTab = (tab: EditorTab) => {
+    if (isMobile && activeTab === tab && mobileToolOpen) {
+      setMobileToolOpen(false);
+      return;
+    }
+    setActiveTab(tab);
+    if (isMobile) {
+      setMobilePropsOpen(false);
+      setMobileToolOpen(true);
+    }
+  };
+
+  const toggleMobileProps = () => {
+    setMobileToolOpen(false);
+    setMobilePropsOpen(open => !open);
+  };
+
   const [zoom, setZoom] = useState(0.8);
+
+  // Mobile: alças de redimensionar com ~32px reais na tela (o canvas é escalado pelo zoom).
+  const touchHandle = Math.round(32 / Math.max(zoom, 0.05));
+  const corner = (v: 'top' | 'bottom', h: 'left' | 'right') =>
+    ({ width: touchHandle, height: touchHandle, [v]: -touchHandle / 2, [h]: -touchHandle / 2 });
+  const mobileResizeHandles = isMobile
+    ? { topLeft: corner('top', 'left'), topRight: corner('top', 'right'), bottomLeft: corner('bottom', 'left'), bottomRight: corner('bottom', 'right') }
+    : undefined;
   const [isProcessing, setIsProcessing] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const designApplied = useRef(false);
@@ -243,9 +279,16 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     const fitToScreen = () => {
       const workspace = document.querySelector('.editor-workspace') as HTMLElement;
       if (workspace) {
-        // Safe area margins: 80px horizontal, 180px vertical (to account for header and slide strip)
-        const safeWidth = workspace.clientWidth - 80;
-        const safeHeight = workspace.clientHeight - 180;
+        // Safe area margins: 80px horizontal, 180px vertical (to account for header and slide strip).
+        // Mobile: margens mínimas para o canvas ocupar a tela (só desconta a faixa de slides, se houver).
+        const mobile = window.matchMedia('(max-width: 768px)').matches;
+        const slideBar = document.querySelector('.slide-manager-bar') as HTMLElement | null;
+        const cs = getComputedStyle(workspace);
+        const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        const safeWidth = workspace.clientWidth - (mobile ? padX : 80);
+        // No mobile o padding inferior reserva o espaço do bottom sheet aberto
+        const safeHeight = workspace.clientHeight - (mobile ? padY + 8 + (slideBar?.offsetHeight || 0) : 180);
         
         if (safeWidth > 0 && safeHeight > 0) {
           const scaleX = safeWidth / canvasFormat.width;
@@ -269,13 +312,24 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
       window.removeEventListener('resize', fitToScreen);
       clearTimeout(timer);
     };
-  }, [canvasFormat]);
+  }, [canvasFormat, mobileToolOpen, mobilePropsOpen]);
 
   const [showFormatModal, setShowFormatModal] = useState(!isCarouselOnly);
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiInputs, setAiInputs] = useState({ niche: '', topic: '', tone: 'motivational' });
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
+
+  // Mobile: selecionar um elemento abre as propriedades; desselecionar fecha.
+  useEffect(() => {
+    if (!isMobile) return;
+    if (selectedElementId) {
+      setMobileToolOpen(false);
+      setMobilePropsOpen(true);
+    } else {
+      setMobilePropsOpen(false);
+    }
+  }, [selectedElementId, isMobile]);
 
   const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [activeFontCategory, setActiveFontCategory] = useState<'all' | 'Luxo' | 'Minimalista' | 'Bold' | 'Escrita' | 'favoritas' | 'recentes'>('all');
@@ -2382,7 +2436,7 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
   }));
 
   return (
-    <div className="editor-layout">
+    <div className={`editor-layout ${isMobile && (mobileToolOpen || mobilePropsOpen) ? 'mobile-sheet-open' : ''}`}>
       {/* Top Header */}
       <div className="editor-header">
         <div className="editor-header-left">
@@ -2423,6 +2477,19 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
             <Sparkles size={18} />
             <span>Gerar Post</span>
           </button>
+          {/* Mobile: as ações extras ficam num menu "⋯"; no desktop o wrapper é transparente (display: contents) */}
+          <button
+            className="icon-btn editor-more-btn"
+            onClick={() => setMobileActionsOpen(open => !open)}
+            aria-label="Mais ações"
+            aria-expanded={mobileActionsOpen}
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          {isMobile && mobileActionsOpen && (
+            <div className="editor-more-backdrop" onClick={() => setMobileActionsOpen(false)} />
+          )}
+          <div className={`editor-header-more ${mobileActionsOpen ? 'open' : ''}`} onClick={() => setMobileActionsOpen(false)}>
           <div className="slide-counter">
             {canvasFormat.id === 'carousel' ? `Slide ${currentSlideIndex + 1} de ${slides.length}` : (formats.find(f => f.id === canvasFormat.id)?.name || '')}
           </div>
@@ -2458,24 +2525,33 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
               )}
             </>
           )}
+          </div>
         </div>
       </div>
 
       <div className="editor-body">
         {/* Left Toolbar */}
-        <div className="editor-left-panel">
+        <div className={`editor-left-panel ${mobileToolOpen ? 'sheet-open' : ''}`}>
           <div className="panel-tabs">
-            <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => setActiveTab('templates')}><Sparkles size={20} /><span>Templates</span></button>
-            <button className={activeTab === 'elements' ? 'active' : ''} onClick={() => setActiveTab('elements')}><Square size={20} /><span>{t('editor.elements')}</span></button>
-            <button className={activeTab === 'text' ? 'active' : ''} onClick={() => setActiveTab('text')}><Type size={20} /><span>{t('editor.text')}</span></button>
-            <button className={activeTab === 'uploads' ? 'active' : ''} onClick={() => setActiveTab('uploads')}><Upload size={20} /><span>{t('editor.uploads')}</span></button>
-            <button className={activeTab === 'background' ? 'active' : ''} onClick={() => setActiveTab('background')}><Palette size={20} /><span>Fundo</span></button>
-            <button className={activeTab === 'brand' ? 'active' : ''} onClick={() => setActiveTab('brand')}><Sparkles size={20} /><span>Brand Kit</span></button>
-            <button className={activeTab === 'layers' ? 'active' : ''} onClick={() => setActiveTab('layers')}><Layers size={20} /><span>Camadas</span></button>
-            <button className={activeTab === 'mockups' ? 'active' : ''} onClick={() => setActiveTab('mockups')}><Maximize2 size={20} /><span>Mockups</span></button>
+            <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => selectTab('templates')}><Sparkles size={20} /><span>Templates</span></button>
+            <button className={activeTab === 'elements' ? 'active' : ''} onClick={() => selectTab('elements')}><Square size={20} /><span>{t('editor.elements')}</span></button>
+            <button className={activeTab === 'text' ? 'active' : ''} onClick={() => selectTab('text')}><Type size={20} /><span>{t('editor.text')}</span></button>
+            <button className={activeTab === 'uploads' ? 'active' : ''} onClick={() => selectTab('uploads')}><Upload size={20} /><span>{t('editor.uploads')}</span></button>
+            <button className={activeTab === 'background' ? 'active' : ''} onClick={() => selectTab('background')}><Palette size={20} /><span>Fundo</span></button>
+            <button className={activeTab === 'brand' ? 'active' : ''} onClick={() => selectTab('brand')}><Sparkles size={20} /><span>Brand Kit</span></button>
+            <button className={activeTab === 'layers' ? 'active' : ''} onClick={() => selectTab('layers')}><Layers size={20} /><span>Camadas</span></button>
+            <button className={activeTab === 'mockups' ? 'active' : ''} onClick={() => selectTab('mockups')}><Maximize2 size={20} /><span>Mockups</span></button>
+            {/* Mobile: acesso às propriedades (painel direito) a partir da barra inferior */}
+            <button className={`mobile-only ${mobilePropsOpen ? 'active' : ''}`} onClick={toggleMobileProps}><SlidersHorizontal size={20} /><span>Ajustes</span></button>
           </div>
 
           <div className="panel-content">
+            <div className="mobile-sheet-header">
+              <span className="mobile-sheet-grip" />
+              <button className="mobile-sheet-close" onClick={() => setMobileToolOpen(false)} aria-label="Fechar painel">
+                <X size={20} />
+              </button>
+            </div>
             <AnimatePresence mode="wait">
               {activeTab === 'templates' && (
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} key="templates" className="tab-pane">
@@ -3995,6 +4071,8 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
                 height: `${canvasFormat.height}px`,
                 transform: `scale(${zoom})`,
                 transformOrigin: 'center center',
+                // Mobile: alças visuais com tamanho legível ao toque, independente do zoom
+                ['--handle-scale' as any]: isMobile ? 1.8 / Math.max(zoom, 0.05) : 1,
                 position: 'absolute',
                 background: 'white',
                 overflow: 'hidden',
@@ -4195,6 +4273,7 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
                   }}
                   position={{ x: el.x, y: el.y }}
                   scale={zoom}
+                  resizeHandleStyles={mobileResizeHandles}
                   disableDragging={el.isLocked}
                   enableResizing={
                     !el.isLocked && selectedElementId === el.id
@@ -4419,7 +4498,13 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
         </div>
 
         {/* Right Panel: Settings */}
-        <div className="editor-right-panel">
+        <div className={`editor-right-panel ${mobilePropsOpen ? 'sheet-open' : ''}`}>
+          <div className="mobile-sheet-header">
+            <span className="mobile-sheet-grip" />
+            <button className="mobile-sheet-close" onClick={() => setMobilePropsOpen(false)} aria-label="Fechar propriedades">
+              <X size={20} />
+            </button>
+          </div>
           {selectedElement ? (
             <div className="settings-pane">
               <div className="settings-panel-header">
@@ -6002,6 +6087,265 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
         }
         .resize-handle.ne, .resize-handle.sw {
           cursor: nesw-resize;
+        }
+
+        /* ───────────── Mobile (≤768px): canvas no centro, ferramentas em barra inferior + bottom sheets ───────────── */
+        .mobile-only,
+        .mobile-sheet-header,
+        .editor-more-btn {
+          display: none;
+        }
+
+        .editor-header-more {
+          display: contents;
+        }
+
+        @media (max-width: 768px) {
+          .editor-layout {
+            --editor-tabbar-h: calc(64px + env(safe-area-inset-bottom, 0px));
+            height: auto;
+            bottom: var(--editor-tabbar-h);
+          }
+
+          /* Header do editor: compacto, sem overflow */
+          .editor-header {
+            height: 56px;
+            padding: 0 0.5rem;
+            gap: 0.4rem;
+          }
+          .editor-header-left,
+          .editor-header-right {
+            gap: 0.4rem;
+            min-width: 0;
+          }
+          .editor-header-left {
+            flex: 1;
+          }
+          .editor-header-left .icon-btn {
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+          }
+          .format-selector {
+            min-width: 0;
+            flex: 1;
+          }
+          .format-selector select {
+            width: 100%;
+            max-width: 160px;
+            min-height: 40px;
+            font-size: 0.75rem;
+            padding-left: 0.6rem;
+            text-overflow: ellipsis;
+          }
+          .zoom-controls {
+            gap: 0.1rem;
+            padding: 0.1rem 0.2rem;
+          }
+          .zoom-controls span {
+            font-size: 0.7rem;
+            min-width: 34px;
+            text-align: center;
+          }
+          .zoom-controls button {
+            width: 34px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+          }
+          .btn-ai-magic {
+            width: 40px;
+            height: 40px;
+            padding: 0 !important;
+            justify-content: center;
+          }
+          .btn-ai-magic span {
+            display: none;
+          }
+          .editor-more-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+          }
+          .editor-header-more {
+            display: none;
+          }
+          .editor-header-more.open {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+            position: fixed;
+            top: calc(var(--header-height) + 60px);
+            right: 0.5rem;
+            width: min(320px, calc(100vw - 1rem));
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 0.75rem;
+            background: #101016;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+            z-index: 1400;
+          }
+          .editor-header-more.open button {
+            width: 100%;
+            min-height: 44px;
+            justify-content: flex-start;
+          }
+          .editor-header-more .slide-counter {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            padding: 0 0.25rem;
+          }
+          .editor-more-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1350;
+          }
+
+          /* Canvas é o elemento principal */
+          .editor-workspace {
+            padding: 12px !important;
+          }
+          /* Sheet aberto: o canvas encolhe para o espaço livre acima dele (continua visível) */
+          .editor-layout.mobile-sheet-open .editor-workspace {
+            padding-bottom: calc(50vh + 12px) !important;
+          }
+          .property-bar {
+            display: none !important;
+          }
+          .slide-manager-bar {
+            height: 84px;
+            padding: 0.5rem 0.75rem;
+          }
+          .canvas-container .resize-handle {
+            transform: scale(var(--handle-scale, 1));
+          }
+
+          /* Ferramentas: barra inferior fixa */
+          .editor-left-panel {
+            width: 0;
+            border: none;
+          }
+          .panel-tabs {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: auto;
+            height: var(--editor-tabbar-h);
+            padding: 0 4px env(safe-area-inset-bottom, 0px);
+            flex-direction: row;
+            align-items: center;
+            gap: 0;
+            overflow-x: auto;
+            border-right: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: #09090D;
+            z-index: 1200;
+            scrollbar-width: none;
+          }
+          .panel-tabs::-webkit-scrollbar {
+            display: none;
+          }
+          .panel-tabs button {
+            flex: 0 0 auto;
+            min-width: 64px;
+            min-height: 56px;
+            padding: 6px 4px;
+            font-size: 0.62rem;
+            justify-content: center;
+          }
+          .panel-tabs button.mobile-only {
+            display: flex;
+          }
+
+          /* Conteúdo das ferramentas e propriedades: bottom sheets sobre o canvas */
+          .panel-content,
+          .editor-right-panel {
+            display: none;
+          }
+          .editor-left-panel.sheet-open .panel-content,
+          .editor-right-panel.sheet-open {
+            display: block;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: var(--editor-tabbar-h);
+            width: auto;
+            max-height: 50vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 1rem 1.25rem;
+            background: #0D0D12;
+            border: none;
+            border-top: 1px solid rgba(255, 47, 191, 0.25);
+            border-radius: 18px 18px 0 0;
+            box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.6);
+            z-index: 1150;
+          }
+          .editor-right-panel.sheet-open {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            z-index: 1160;
+          }
+          .mobile-sheet-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            min-height: 48px;
+            margin: 0 -1rem;
+            padding: 0 1rem;
+            background: #0D0D12;
+          }
+          .mobile-sheet-grip {
+            width: 40px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.25);
+          }
+          .mobile-sheet-close {
+            position: absolute;
+            right: 0.5rem;
+            top: 2px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            cursor: pointer;
+          }
+
+          /* Modais do editor */
+          .format-modal-overlay {
+            padding: 1rem;
+          }
+          .format-modal {
+            padding: 1.5rem 1rem;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+          }
+          .format-modal h2 {
+            font-size: 1.35rem;
+          }
+          .format-options-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+          }
         }
       `}</style>
     </div>

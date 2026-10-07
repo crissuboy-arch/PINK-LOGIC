@@ -216,6 +216,45 @@ button {
   width: 100%;
 }
 
+/* Mobile: sidebar vira gaveta off-canvas; o conteúdo usa a largura toda */
+@media (max-width: 768px) {
+  :root {
+    --header-height: 60px;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    min-width: 0;
+  }
+
+  .page-container {
+    padding: var(--space-md, 1rem);
+  }
+
+  .sidebar {
+    width: min(300px, 85vw) !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    z-index: 1300 !important;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Recolher não se aplica à gaveta mobile */
+  .sidebar .collapse-toggle-btn {
+    display: none !important;
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1250;
+  }
+}
+
 /* Component: Cards */
 .card {
   background: var(--card);

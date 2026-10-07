@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { authService } from '../services/authService';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const Layout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMobile = useIsMobile();
+  // Mobile: a sidebar vira gaveta (off-canvas) aberta pelo botão de menu do header.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname, isMobile]);
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
 
   useEffect(() => {
@@ -45,9 +54,16 @@ const Layout = () => {
 
   return (
     <div className="app-container" style={{ '--sidebar-width': sidebarWidth } as any}>
-      <Sidebar isCollapsed={isCollapsed} onToggleCollapse={toggleCollapse} />
+      <Sidebar
+        isCollapsed={isMobile ? false : isCollapsed}
+        onToggleCollapse={toggleCollapse}
+        mobileOpen={mobileNavOpen}
+      />
+      {isMobile && mobileNavOpen && (
+        <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} />
+      )}
       <main className="main-content" style={{ transition: 'margin-left 0.2s cubic-bezier(0.16, 1, 0.3, 1)', marginLeft: 'var(--sidebar-width)' }}>
-        <Header />
+        <Header onOpenMenu={() => setMobileNavOpen(true)} />
         <div className="page-container">
           <Outlet />
         </div>
