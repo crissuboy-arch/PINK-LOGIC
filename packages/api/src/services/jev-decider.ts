@@ -9,7 +9,8 @@
  */
 import { DecideRequest, DecideResult } from "@pink-logic/shared";
 
-const JEV_API_URL = process.env.JEV_API_URL || "https://api.typesafe.ai/v1/decide";
+// API System One da TypeSafe (o antigo /v1/decide devolve 404).
+const JEV_API_URL = process.env.JEV_API_URL || "https://api.typesafe.ai/v1/systemone";
 const JEV_API_KEY = process.env.JEV_API_KEY || "";
 const JEV_MODEL = process.env.JEV_MODEL || "jev-latest";
 
@@ -36,8 +37,15 @@ export async function decide(req: DecideRequest): Promise<DecideResult> {
       state: req.context,
       questions: {
         decision: req.options
-          ? { type: "choice", options: req.options }
-          : { type: "boolean" },
+          ? {
+              type: "choice",
+              instructions: `Ação "${req.action}": qual opção se aplica ao conteúdo?`,
+              criteria: Object.fromEntries(req.options.map((o) => [o, null])),
+            }
+          : {
+              type: "noul",
+              instructions: `Ação "${req.action}": o conteúdo deve ser aprovado?`,
+            },
       },
     }),
   });
@@ -55,16 +63,23 @@ export async function decide(req: DecideRequest): Promise<DecideResult> {
   }
 
   const data = (await res.json()) as any;
-  const q = data.questions?.decision ?? data.decision ?? {};
-  const confidence = typeof q.confidence === "number" ? q.confidence : 0;
-  const value = q.value ?? false;
+  const a = data.answers?.decision ?? {};
 
-  return {
-    value,
-    confidence,
-    passed: confidence >= req.threshold,
-    provider: "jev",
-  };
+  if (a.type === "noul" && typeof a.noul === "number") {
+    // noul = probabilidade de "sim". Só passa com "sim" confiante:
+    // um "não" confiante nunca aprova automaticamente.
+    const value = a.noul >= 0.5;
+    const confidence = value ? a.noul : 1 - a.noul;
+    return { value, confidence, passed: value && confidence >= req.threshold, provider: "jev" };
+  }
+
+  if (a.type === "choice" && typeof a.choice === "string") {
+    const confidence = typeof a.confidence === "number" ? a.confidence : 0;
+    return { value: a.choice, confidence, passed: confidence >= req.threshold, provider: "jev" };
+  }
+
+  // Resposta fora do schema System One: seguro por omissão → revisão humana.
+  return { value: false, confidence: 0, passed: false, provider: "manual", error: "Jev: resposta sem answers.decision válido" };
 }
 
 /**
