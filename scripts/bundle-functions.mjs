@@ -41,9 +41,9 @@ for (const f of files) {
     target: "node22",
     outfile,
     logLevel: "warning",
-    // nativas: ficam como import, resolvidas de node_modules no runtime.
+    // nativas/wasm: ficam como import, resolvidas de node_modules no runtime.
     // @vercel/node é só tipos (apagado na compilação) — external por segurança.
-    external: ["@resvg/resvg-js", "@resvg/resvg-js-*", "@vercel/node"],
+    external: ["@resvg/resvg-js", "@resvg/resvg-js-*", "harfbuzzjs", "@vercel/node"],
   });
 }
 console.log("ok —", files.length, "functions em api/");
