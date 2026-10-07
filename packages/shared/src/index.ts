@@ -28,7 +28,9 @@ export const BrandSchema = z.object({
 export type Brand = z.infer<typeof BrandSchema>;
 
 // ─── Geração ──────────────────────────────────────────────
-export const GenerateModuleSchema = z.enum(["logo", "qrcode", "sticker", "story", "copy"]);
+export const GenerateModuleSchema = z.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel"]);
+export const CarouselStyleSchema = z.enum(["maestro", "clean", "bold"]);
+export type CarouselStyle = z.infer<typeof CarouselStyleSchema>;
 export type GenerateModule = z.infer<typeof GenerateModuleSchema>;
 
 export const GenerateRequestSchema = z.object({

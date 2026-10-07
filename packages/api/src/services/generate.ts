@@ -7,6 +7,7 @@
  */
 import { GenerateModule } from "@pink-logic/shared";
 import { generateText, aisaReady } from "./aisa.js";
+import { buildCarouselPrompt, type CarouselStyle } from "./carousel-styles.js";
 
 export async function generate(module: GenerateModule, prompt: string, options: Record<string, unknown> = {}) {
   switch (module) {
@@ -37,6 +38,15 @@ export async function generate(module: GenerateModule, prompt: string, options: 
       const err: any = new Error("Story server-side ainda não implementado — usa o web (canvas no browser)");
       err.status = 501;
       throw err;
+    }
+    case "carousel": {
+      // Estilo via Pollinations (grátis). Texto longo em PT pode sair com
+      // gralhas — para texto pixel-perfect, usar overlay HTML no futuro.
+      const style = (options.style as CarouselStyle) || "maestro";
+      const slideNumber = options.slideNumber as string | undefined;
+      const fullPrompt = buildCarouselPrompt(style, prompt, slideNumber);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?nologo=true&width=1080&height=1080`;
+      return { module, imageUrl, metadata: { provider: "pollinations", style } };
     }
   }
 }
