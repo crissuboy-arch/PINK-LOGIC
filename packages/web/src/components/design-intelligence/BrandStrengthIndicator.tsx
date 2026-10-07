@@ -41,10 +41,10 @@ export default function BrandStrengthIndicator({ profile, score }: { profile: Br
         <StatBar label="Luxo" value={profile.luxuryLevel} color="#FFD700" />
         <StatBar label="Modernidade" value={profile.modernity} color="#3b82f6" />
         <StatBar label="Minimalismo" value={profile.minimalism} color="#10b981" />
-        <StatBar label="Vibração" value={profile.vibrancy} color="#FF2D8D" />
+        <StatBar label="Vibração" value={profile.vibrancy} color="var(--primary)" />
         <StatBar label="Calor Humano" value={profile.warmth} color="#f97316" />
         <StatBar label="Formalidade" value={profile.formality} color="#6b7280" />
-        <StatBar label="Descontração" value={profile.playfulness} color="#B026FF" />
+        <StatBar label="Descontração" value={profile.playfulness} color="var(--secondary)" />
       </div>
 
       <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>

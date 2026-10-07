@@ -18,9 +18,7 @@ const ModulePlaceholder = ({ title, hint }: { title: string; hint?: string }) =>
 export const StoryCreator = () => (
   <ModulePlaceholder title="Criador de Histórias" hint="Geração de stories em PNG — será ligado ao POST /api/generate." />
 );
-export const CopyGenerator = () => (
-  <ModulePlaceholder title="Gerador de Copy" hint="Copy real via AIsa — o mock de templates foi removido." />
-);
+export { default as CopyGenerator } from './CopyGenerator';
 export const StrategicVision = () => (
   <ModulePlaceholder title="Visão Estratégica" hint="Análise de nicho — será ligado à coleta AIsa + Jev." />
 );

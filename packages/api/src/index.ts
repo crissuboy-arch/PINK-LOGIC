@@ -8,7 +8,7 @@ import cors from "cors";
 import { router } from "./routes/index.js";
 
 const app = express();
-const PORT = Number(process.env.API_PORT || 3001);
+const PORT = Number(process.env.API_PORT || 3002);
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));

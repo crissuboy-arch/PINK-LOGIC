@@ -28,6 +28,13 @@ const LogoStudioIA: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState(activeBrand?.palette.primary || '#FF2D8D');
   const [secondaryColor, setSecondaryColor] = useState(activeBrand?.palette.secondary || '#7B4DFF');
   const [layout, setLayout] = useState<'vertical' | 'horizontal' | 'icon-only'>('vertical');
+  // Segue a marca ativa quando ela muda.
+  useEffect(() => {
+    if (activeBrand?.palette.primary) setPrimaryColor(activeBrand.palette.primary);
+    if (activeBrand?.palette.secondary) setSecondaryColor(activeBrand.palette.secondary);
+    if (activeBrand?.name) setBrandName(activeBrand.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBrand?.id, activeBrand?.palette.primary, activeBrand?.palette.secondary]);
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [isApplying, setIsApplying] = useState(false);

@@ -94,6 +94,7 @@ export const DecideResultSchema = z.object({
   confidence: z.number().min(0).max(1),
   passed: z.boolean(), // confidence >= threshold
   provider: z.string(), // "jev" | "manual" (sem chave)
+  error: z.string().optional(), // motivo quando caiu para revisão manual
 });
 export type DecideResult = z.infer<typeof DecideResultSchema>;
 

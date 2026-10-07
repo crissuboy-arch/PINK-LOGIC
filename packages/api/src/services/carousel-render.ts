@@ -8,14 +8,20 @@
  *
  * A IA NÃO escreve texto — só direção de arte. O texto é sempre exato.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FONTS_DIR = join(__dirname, "..", "fonts");
+// Tenta vários locais: dist (build), src (dev) e raiz do monorepo (Vercel).
+const FONTS_DIR =
+  [
+    join(__dirname, "..", "fonts"),
+    join(process.cwd(), "packages", "api", "dist", "fonts"),
+    join(process.cwd(), "packages", "api", "src", "fonts"),
+  ].find((d) => existsSync(join(d, "PermanentMarker-Regular.ttf"))) ?? join(__dirname, "..", "fonts");
 
 let fontsCache: { name: string; data: Buffer; weight: 400; style: "normal" }[] | null = null;
 

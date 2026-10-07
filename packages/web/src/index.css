@@ -42,22 +42,22 @@
   /* Borders */
   --border: #2A2A2A;
   --border-hover: #3A3A3A;
-  --border-focus: rgba(255, 45, 155, 0.4);
+  --border-focus: color-mix(in srgb, var(--primary) 40%, transparent);
   
   /* Gradients */
-  --gradient: linear-gradient(135deg, #FF2D9B 0%, #BF5AF2 100%);
-  --gradient-hover: linear-gradient(135deg, #FF5CBA 0%, #D47BFF 100%);
+  --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  --gradient-hover: linear-gradient(135deg, color-mix(in srgb, var(--primary) 80%, white) 0%, color-mix(in srgb, var(--secondary) 80%, white) 100%);
   --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%);
   --gradient-dark: linear-gradient(180deg, #1A1A1A 0%, #0D0D0D 100%);
   
   /* Glow & Shadows System */
-  --glow-pink: rgba(255, 45, 155, 0.4);
-  --glow-purple: rgba(191, 90, 242, 0.3);
+  --glow-pink: color-mix(in srgb, var(--primary) 40%, transparent);
+  --glow-purple: color-mix(in srgb, var(--secondary) 30%, transparent);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
-  --shadow-glow-pink: 0 0 20px rgba(255, 45, 155, 0.4);
-  --shadow-glow-purple: 0 0 20px rgba(191, 90, 242, 0.3);
+  --shadow-glow-pink: 0 0 20px color-mix(in srgb, var(--primary) 40%, transparent);
+  --shadow-glow-purple: 0 0 20px color-mix(in srgb, var(--secondary) 30%, transparent);
 
   /* Radius Tokens */
   --radius-none: 0px;
@@ -554,7 +554,7 @@ select optgroup {
 select option:checked,
 .select-field option:checked,
 .input-field option:checked {
-  background-color: #FF2D9B !important;
+  background-color: var(--primary) !important;
   color: #FFFFFF !important;
 }
 
@@ -568,7 +568,7 @@ select option:checked,
 .dropdown-menu {
   background: #111827 !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 45, 141, 0.1) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px color-mix(in srgb, var(--primary) 10%, transparent) !important;
   color: #FFFFFF !important;
 }
 
@@ -587,8 +587,8 @@ select option:checked,
 .dropdown-menu-box button:hover,
 .dropdown-menu-item:hover,
 .context-menu-item:hover {
-  background: rgba(255, 45, 141, 0.15) !important;
-  color: #FF2D9B !important;
+  background: color-mix(in srgb, var(--primary) 15%, transparent) !important;
+  color: var(--primary) !important;
 }
 
 /* Active / Selected Item highlighting */
@@ -596,7 +596,7 @@ select option:checked,
 .dropdown-content button.active,
 .dropdown-menu-item.active,
 .context-menu-item.active {
-  background: #FF2D9B !important;
+  background: var(--primary) !important;
   color: #FFFFFF !important;
 }
 

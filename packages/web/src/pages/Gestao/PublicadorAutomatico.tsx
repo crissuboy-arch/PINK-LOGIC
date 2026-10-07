@@ -56,12 +56,12 @@ const PLATFORMS_CONFIG: Record<PublisherPlatform, {
   border: string;
   icon: React.ComponentType<any>;
 }> = {
-  Instagram: { name: 'Instagram', color: '#FF2D8D', bg: 'rgba(255, 45, 141, 0.08)', border: 'rgba(255, 45, 141, 0.3)', icon: InstagramIcon },
+  Instagram: { name: 'Instagram', color: 'var(--primary)', bg: 'color-mix(in srgb, var(--primary) 8%, transparent)', border: 'color-mix(in srgb, var(--primary) 30%, transparent)', icon: InstagramIcon },
   Facebook: { name: 'Facebook', color: '#1877F2', bg: 'rgba(24, 119, 242, 0.08)', border: 'rgba(24, 119, 242, 0.3)', icon: FacebookIcon },
   LinkedIn: { name: 'LinkedIn', color: '#0A66C2', bg: 'rgba(10, 102, 194, 0.08)', border: 'rgba(10, 102, 194, 0.3)', icon: LinkedinIcon },
   'X/Twitter': { name: 'X / Twitter', color: '#FFFFFF', bg: 'rgba(255, 255, 255, 0.05)', border: 'rgba(255, 255, 255, 0.2)', icon: TwitterIcon },
   WordPress: { name: 'WordPress', color: '#21759B', bg: 'rgba(33, 117, 155, 0.08)', border: 'rgba(33, 117, 155, 0.3)', icon: Globe },
-  Blog: { name: 'Blog Interno', color: '#B026FF', bg: 'rgba(176, 38, 255, 0.08)', border: 'rgba(176, 38, 255, 0.3)', icon: FileText }
+  Blog: { name: 'Blog Interno', color: 'var(--secondary)', bg: 'rgba(176, 38, 255, 0.08)', border: 'rgba(176, 38, 255, 0.3)', icon: FileText }
 };
 
 const TIMEZONES = [
@@ -838,7 +838,7 @@ const PublicadorAutomatico: React.FC = () => {
 
         .image-thumbs img.thumb.active {
           border-color: var(--primary);
-          box-shadow: 0 0 10px rgba(255, 45, 141, 0.4);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 40%, transparent);
         }
 
         .clear-img-btn {
@@ -888,7 +888,7 @@ const PublicadorAutomatico: React.FC = () => {
 
         .platform-select-card.selected {
           border-color: var(--primary);
-          background: rgba(255, 45, 141, 0.04);
+          background: color-mix(in srgb, var(--primary) 4%, transparent);
         }
 
         .card-icon-wrap {
@@ -917,7 +917,7 @@ const PublicadorAutomatico: React.FC = () => {
 
         .check-icon {
           color: var(--primary);
-          background: rgba(255, 45, 141, 0.1);
+          background: color-mix(in srgb, var(--primary) 10%, transparent);
           border-radius: 50%;
           padding: 1px;
         }
@@ -1232,7 +1232,7 @@ const PublicadorAutomatico: React.FC = () => {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background: rgba(255, 45, 141, 0.4);
+          background: color-mix(in srgb, var(--primary) 40%, transparent);
         }
 
         .tw-meta {
@@ -1306,7 +1306,7 @@ const PublicadorAutomatico: React.FC = () => {
           width: 36px;
           height: 36px;
           border-radius: 4px;
-          background: #B026FF;
+          background: var(--secondary);
         }
 
         .li-meta {

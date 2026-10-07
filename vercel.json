@@ -4,10 +4,16 @@
   "framework": "vite",
   "installCommand": "npm install",
   "outputDirectory": "packages/web/dist",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60,
+      "includeFiles": "packages/api/dist/{fonts,prompts}/**"
+    }
+  },
   "rewrites": [
     {
-      "destination": "/index.html",
-      "source": "/((?!api/).*)"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }

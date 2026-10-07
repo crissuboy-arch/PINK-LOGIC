@@ -23,7 +23,9 @@ export async function decide(req: DecideRequest): Promise<DecideResult> {
     };
   }
 
-  const res = await fetch(JEV_API_URL, {
+  let res: Response;
+  try {
+    res = await fetch(JEV_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -39,9 +41,17 @@ export async function decide(req: DecideRequest): Promise<DecideResult> {
       },
     }),
   });
+  } catch (e: any) {
+    // Falha de rede: seguro por omissão → revisão humana.
+    return { value: false, confidence: 0, passed: false, provider: "manual", error: `Jev inacessível: ${e?.message}` };
+  }
 
   if (!res.ok) {
-    throw new Error(`Jev falhou: HTTP ${res.status}`);
+    // Chave/endpoint/formato inválido: não derruba a API; força revisão humana
+    // e devolve o motivo para diagnóstico.
+    let detail = "";
+    try { detail = (await res.text()).slice(0, 300); } catch { /* ignora */ }
+    return { value: false, confidence: 0, passed: false, provider: "manual", error: `Jev HTTP ${res.status} ${detail}` };
   }
 
   const data = (await res.json()) as any;

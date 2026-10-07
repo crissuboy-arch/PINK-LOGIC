@@ -46,7 +46,7 @@ const Sparkline = ({ points, color }: { points: number[]; color: string }) => {
         strokeLinecap="round"
         strokeLinejoin="round"
         points={pointsStr}
-        style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}
+        style={{ filter: `drop-shadow(0 0 5px color-mix(in srgb, ${color} 50%, transparent))` }}
       />
     </svg>
   );
@@ -94,8 +94,8 @@ const Dashboard = () => {
     if (!onboardingName.trim()) return;
     
     const palette = {
-      primary: '#FF2D9B',
-      secondary: '#BF5AF2',
+      primary: 'var(--primary)',
+      secondary: 'var(--secondary)',
       accent: onboardingStyle === 'Luxo' ? '#D4AF37' : onboardingStyle === 'Cyber' ? '#00E0FF' : '#FFD60A',
       background: '#0D0D0D',
       text: '#FFFFFF'
@@ -144,13 +144,13 @@ const Dashboard = () => {
           <div className="sparkline-header">
             <span className="sparkline-label">Campanhas ativas</span>
             <div className="sparkline-icon-wrap" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-              <Megaphone size={14} style={{ color: '#FF2D9B' }} />
+              <Megaphone size={14} style={{ color: 'var(--primary)' }} />
             </div>
           </div>
           <div className="sparkline-body">
             <span className="sparkline-value">23</span>
             <div className="sparkline-chart">
-              <Sparkline points={[12, 14, 13, 17, 19, 18, 23]} color="#FF2D9B" />
+              <Sparkline points={[12, 14, 13, 17, 19, 18, 23]} color="var(--primary)" />
             </div>
           </div>
           <span className="sparkline-change text-pink">+12% desde ontem</span>
@@ -212,13 +212,13 @@ const Dashboard = () => {
           <div className="sparkline-header">
             <span className="sparkline-label">Conversões</span>
             <div className="sparkline-icon-wrap" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-              <Zap size={14} style={{ color: '#FF2D9B' }} />
+              <Zap size={14} style={{ color: 'var(--primary)' }} />
             </div>
           </div>
           <div className="sparkline-body">
             <span className="sparkline-value">167</span>
             <div className="sparkline-chart">
-              <Sparkline points={[95, 115, 110, 130, 155, 145, 167]} color="#FF2D9B" />
+              <Sparkline points={[95, 115, 110, 130, 155, 145, 167]} color="var(--primary)" />
             </div>
           </div>
           <span className="sparkline-change text-pink">+15% desde ontem</span>
@@ -245,7 +245,7 @@ const Dashboard = () => {
               <div className="activity-row">
                 <span className="activity-time">10:24</span>
                 <div className="agent-badge-circle" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-                  <Palette size={12} style={{ color: '#FF2D9B' }} />
+                  <Palette size={12} style={{ color: 'var(--primary)' }} />
                 </div>
                 <div className="activity-desc">
                   <span className="agent-name">Agente Designer</span>
@@ -281,7 +281,7 @@ const Dashboard = () => {
               <div className="activity-row">
                 <span className="activity-time">10:05</span>
                 <div className="agent-badge-circle" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-                  <Bot size={12} style={{ color: '#FF2D9B' }} />
+                  <Bot size={12} style={{ color: 'var(--primary)' }} />
                 </div>
                 <div className="activity-desc">
                   <span className="agent-name">Agente de Conteúdo</span>
@@ -327,7 +327,7 @@ const Dashboard = () => {
                   <circle 
                     cx="75" cy="75" r="50" 
                     fill="transparent" 
-                    stroke="#FF2D9B" 
+                    stroke="var(--primary)" 
                     strokeWidth="14" 
                     strokeDasharray="163.36 150.8" 
                     strokeDashoffset="0" 
@@ -404,7 +404,7 @@ const Dashboard = () => {
             {/* Donut Footer */}
             <div className="best-campaign-bar">
               <div className="best-campaign-label-wrapper">
-                <Award size={14} style={{ color: '#FF2D9B' }} />
+                <Award size={14} style={{ color: 'var(--primary)' }} />
                 <span className="best-campaign-label">Melhor campanha</span>
               </div>
               <span className="best-campaign-name">Promo Black Pink</span>
@@ -507,7 +507,7 @@ const Dashboard = () => {
               <div className="exec-agent-row">
                 <div className="exec-agent-header">
                   <div className="agent-avatar-mini" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-                    <Palette size={14} style={{ color: '#FF2D9B' }} />
+                    <Palette size={14} style={{ color: 'var(--primary)' }} />
                   </div>
                   <div className="agent-meta">
                     <span className="agent-row-name">Designer Pro</span>
@@ -516,7 +516,7 @@ const Dashboard = () => {
                   <span className="agent-progress-val">75%</span>
                 </div>
                 <div className="agent-progressbar-bg">
-                  <div className="agent-progressbar-fill" style={{ width: '75%', background: 'linear-gradient(90deg, #FF2D9B 0%, #BF5AF2 100%)' }} />
+                  <div className="agent-progressbar-fill" style={{ width: '75%', background: 'linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%)' }} />
                 </div>
               </div>
 
@@ -533,7 +533,7 @@ const Dashboard = () => {
                   <span className="agent-progress-val">60%</span>
                 </div>
                 <div className="agent-progressbar-bg">
-                  <div className="agent-progressbar-fill" style={{ width: '60%', background: 'linear-gradient(90deg, #7B61FF 0%, #FF2D9B 100%)' }} />
+                  <div className="agent-progressbar-fill" style={{ width: '60%', background: 'linear-gradient(90deg, #7B61FF 0%, var(--primary) 100%)' }} />
                 </div>
               </div>
 
@@ -558,7 +558,7 @@ const Dashboard = () => {
               <div className="exec-agent-row">
                 <div className="exec-agent-header">
                   <div className="agent-avatar-mini" style={{ background: 'rgba(255, 79, 216, 0.1)' }}>
-                    <Bot size={14} style={{ color: '#FF2D9B' }} />
+                    <Bot size={14} style={{ color: 'var(--primary)' }} />
                   </div>
                   <div className="agent-meta">
                     <span className="agent-row-name">Content Creator</span>
@@ -567,7 +567,7 @@ const Dashboard = () => {
                   <span className="agent-progress-val">30%</span>
                 </div>
                 <div className="agent-progressbar-bg">
-                  <div className="agent-progressbar-fill" style={{ width: '30%', background: 'linear-gradient(90deg, #FF2D9B 0%, #7B61FF 100%)' }} />
+                  <div className="agent-progressbar-fill" style={{ width: '30%', background: 'linear-gradient(90deg, var(--primary) 0%, #7B61FF 100%)' }} />
                 </div>
               </div>
             </div>
@@ -593,12 +593,12 @@ const Dashboard = () => {
                   <circle 
                     cx="42" cy="42" r="34" 
                     fill="transparent" 
-                    stroke="#FF2D9B" 
+                    stroke="var(--primary)" 
                     strokeWidth="7" 
                     strokeDasharray="166.6 47.0" 
                     strokeLinecap="round" 
                     transform="rotate(-90 42 42)" 
-                    style={{ filter: 'drop-shadow(0 0 4px #FF2D9B)' }}
+                    style={{ filter: 'drop-shadow(0 0 4px var(--primary))' }}
                   />
                   <text x="42" y="44" textAnchor="middle" fill="#FFFFFF" fontSize="13" fontWeight="800" fontFamily="var(--font-heading)">78%</text>
                   <text x="42" y="55" textAnchor="middle" fill="#A1A1B5" fontSize="7" fontWeight="600" letterSpacing="0.3">Uso</text>
@@ -888,7 +888,7 @@ const Dashboard = () => {
           letter-spacing: 0.3px;
         }
 
-        .text-pink { color: #FF2D9B; }
+        .text-pink { color: var(--primary); }
         .text-purple { color: #7B61FF; }
         .text-blue { color: #4DA3FF; }
         .text-yellow { color: #F59E0B; }
@@ -954,7 +954,7 @@ const Dashboard = () => {
         }
 
         .btn-link-action:hover {
-          color: #FF2D9B;
+          color: var(--primary);
         }
 
         /* Widget: IA Activity */
@@ -1029,7 +1029,7 @@ const Dashboard = () => {
         }
 
         .status-badge.execucao {
-          background: #FF2D9B;
+          background: var(--primary);
           color: #FFFFFF;
           animation: badgePulse 1.8s infinite ease-in-out;
         }
@@ -1046,7 +1046,7 @@ const Dashboard = () => {
 
         @keyframes badgePulse {
           0% { transform: scale(1); opacity: 0.9; }
-          50% { transform: scale(1.03); opacity: 1; box-shadow: 0 0 6px rgba(255, 45, 155, 0.4); }
+          50% { transform: scale(1.03); opacity: 1; box-shadow: 0 0 6px color-mix(in srgb, var(--primary) 40%, transparent); }
           100% { transform: scale(1); opacity: 0.9; }
         }
 
@@ -1098,7 +1098,7 @@ const Dashboard = () => {
           border-radius: 50%;
         }
 
-        .legend-dot.pink { background-color: #FF2D9B; }
+        .legend-dot.pink { background-color: var(--primary); }
         .legend-dot.purple { background-color: #7B61FF; }
         .legend-dot.blue { background-color: #4DA3FF; }
         .legend-dot.grey { background-color: #62627A; }
@@ -1206,7 +1206,7 @@ const Dashboard = () => {
           color: #FFFFFF;
         }
 
-        .insight-icon-bg.pink { background: rgba(255, 79, 216, 0.15); color: #FF2D9B; }
+        .insight-icon-bg.pink { background: rgba(255, 79, 216, 0.15); color: var(--primary); }
         .insight-icon-bg.purple { background: rgba(123, 97, 255, 0.15); color: #7B61FF; }
         .insight-icon-bg.yellow { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
 
@@ -1348,7 +1348,7 @@ const Dashboard = () => {
         }
 
         .btn-buy-credits {
-          background: #FF2D9B;
+          background: var(--primary);
           border: none;
           border-radius: 8px;
           padding: 8px 14px;
@@ -1361,7 +1361,7 @@ const Dashboard = () => {
         }
 
         .btn-buy-credits:hover {
-          background: #BF5AF2;
+          background: var(--secondary);
           transform: translateY(-1px);
           box-shadow: 0 6px 15px rgba(255, 79, 216, 0.3);
         }
@@ -1447,8 +1447,8 @@ const Dashboard = () => {
         }
 
         .onboarding-step-dot.active {
-          background: #FF2D9B;
-          border-color: #FF2D9B;
+          background: var(--primary);
+          border-color: var(--primary);
           color: white;
           box-shadow: 0 0 10px rgba(255, 47, 191, 0.4);
         }
@@ -1507,7 +1507,7 @@ const Dashboard = () => {
         }
 
         .onboarding-upload-zone:hover {
-          border-color: #FF2D9B;
+          border-color: var(--primary);
           background: rgba(255, 47, 191, 0.02);
         }
 
@@ -1538,12 +1538,12 @@ const Dashboard = () => {
         }
 
         .onboarding-style-card:hover {
-          border-color: #FF2D9B;
+          border-color: var(--primary);
           background: rgba(255, 47, 191, 0.02);
         }
 
         .onboarding-style-card.active {
-          border-color: #FF2D9B;
+          border-color: var(--primary);
           background: rgba(255, 47, 191, 0.08);
           box-shadow: 0 0 12px rgba(255, 47, 191, 0.1);
         }
@@ -1579,12 +1579,12 @@ const Dashboard = () => {
         }
 
         .input-field:focus {
-          border-color: #FF2D9B;
+          border-color: var(--primary);
           background: rgba(255, 255, 255, 0.05);
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #FF2D9B 0%, #BF5AF2 100%);
+          background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
           border: none;
           border-radius: 8px;
           color: #FFFFFF;

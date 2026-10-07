@@ -6,7 +6,7 @@
  *   2. Checagem automática (blocklist + checklist)
  *   3. Se reprovar → regenera 1x com instrução de correção
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateTextWithSystem, aisaReady } from "./aisa.js";
@@ -17,7 +17,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 let systemPrompt: string | null = null;
 function loadSystemPrompt(): string {
   if (!systemPrompt) {
-    systemPrompt = readFileSync(join(__dirname, "..", "prompts", "copy-system.md"), "utf-8");
+    // Tenta vários locais: dist (build), src (dev) e raiz do monorepo (Vercel).
+    const candidates = [
+      join(__dirname, "..", "prompts", "copy-system.md"),
+      join(process.cwd(), "packages", "api", "dist", "prompts", "copy-system.md"),
+      join(process.cwd(), "packages", "api", "src", "prompts", "copy-system.md"),
+    ];
+    const found = candidates.find((p) => existsSync(p));
+    if (!found) throw new Error("copy-system.md não encontrado no deploy (verifica includeFiles no vercel.json)");
+    systemPrompt = readFileSync(found, "utf-8");
   }
   return systemPrompt;
 }

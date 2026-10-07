@@ -6,7 +6,7 @@
 3. A Vercel deteta o `vercel.json` sozinha:
    - Build: `npm run build --workspace=@pink-logic/web`
    - Output: `packages/web/dist`
-   - Functions: `api/*.ts` → `/api/*`
+   - Functions: `api/**/*.ts` → `/api/*` (ex.: `api/carousel/render.ts` → `/api/carousel/render`)
 4. Clica **Deploy**
 
 ## 2. Variáveis de ambiente (Settings → Environment Variables)
@@ -19,7 +19,8 @@
 | `JEV_API_URL` | `https://api.typesafe.ai/v1/decide` | (opcional — já é o default) |
 | `JEV_MODEL` | `jev-latest` | (opcional — já é o default) |
 | `AISA_API_KEY` | (a tua chave) | tens crédito ✅ |
-| `AISA_API_URL` | `https://api.aisa.one/v1` | (opcional — já é o default) |
+| `AISA_API_URL` | `https://api.aisa.one` | (opcional — com ou sem `/v1` funciona) |
+| `AISA_MODEL` | nome do modelo na tua conta AIsa | (opcional — default `claude-opus-5`; se der 4xx, confirma o nome no console AIsa) |
 
 Marca **Production** (e Preview se quiseres testar em PRs). Depois faz **Redeploy**.
 

@@ -11,7 +11,7 @@ interface MetricCardProps {
   icon: React.ComponentType<any>;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ label, value, change, changeColor = '#FF2D9B', icon: Icon }) => {
+const MetricCard: React.FC<MetricCardProps> = ({ label, value, change, changeColor = 'var(--primary)', icon: Icon }) => {
   return (
     <div className="premium-metric-card">
       <div className="metric-header">
@@ -58,6 +58,11 @@ export const PinkLogicHeroPremium: React.FC = () => {
     window.addEventListener('resize', handleResize);
 
     const animate = () => {
+      // Canvas não entende var(): resolve as cores da marca ativa 1× por frame.
+      const cssVars = getComputedStyle(document.documentElement);
+      const brandPrimary = cssVars.getPropertyValue('--primary').trim() || '#FF2D9B';
+      const brandSecondary = cssVars.getPropertyValue('--secondary').trim() || '#BF5AF2';
+      const dotColors = [brandPrimary, brandSecondary, '#FFD60A', '#4DA3FF', '#34C759'];
       time += 0.008;
       ctx.clearRect(0, 0, width, height);
 
@@ -102,8 +107,7 @@ export const PinkLogicHeroPremium: React.FC = () => {
           ctx.globalAlpha = Math.max(0.08, Math.min(opacity, 0.85));
           ctx.beginPath();
           
-          // Select colors: rosa (#FF2D9B), roxo (#BF5AF2), amarelo (#FFD60A), azul (#4DA3FF), verde (#34C759)
-          const dotColors = ['#FF2D9B', '#BF5AF2', '#FFD60A', '#4DA3FF', '#34C759'];
+          // Select colors: rosa (var(--primary)), roxo (var(--secondary)), amarelo (#FFD60A), azul (#4DA3FF), verde (#34C759)
           const colorIndex = (i + l) % dotColors.length;
           ctx.fillStyle = dotColors[colorIndex];
           
@@ -131,7 +135,7 @@ export const PinkLogicHeroPremium: React.FC = () => {
         ctx.arc(x, y, 1, 0, Math.PI * 2);
         ctx.fillStyle = '#FFFFFF';
         ctx.shadowBlur = 4;
-        ctx.shadowColor = '#BF5AF2';
+        ctx.shadowColor = '#FFFFFF';
         ctx.fill();
         ctx.restore();
       }
@@ -183,10 +187,10 @@ export const PinkLogicHeroPremium: React.FC = () => {
           align-items: center;
           gap: 6px;
           padding: 6px 14px;
-          background: rgba(255, 45, 155, 0.05);
-          border: 1px solid rgba(255, 45, 155, 0.3);
+          background: color-mix(in srgb, var(--primary) 5%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
           border-radius: 100px;
-          color: var(--primary, #FF2D9B);
+          color: var(--primary);
           font-size: 0.72rem;
           font-weight: 600;
           letter-spacing: 0.05em;
@@ -203,10 +207,10 @@ export const PinkLogicHeroPremium: React.FC = () => {
         }
 
         .neon-pink-text {
-          color: var(--primary, #FF2D9B);
+          color: var(--primary);
           text-shadow: 
-            0 0 10px rgba(255, 45, 155, 0.6),
-            0 0 25px rgba(255, 45, 155, 0.3);
+            0 0 10px color-mix(in srgb, var(--primary) 60%, transparent),
+            0 0 25px color-mix(in srgb, var(--primary) 30%, transparent);
         }
 
         .hero-desc {
@@ -230,7 +234,7 @@ export const PinkLogicHeroPremium: React.FC = () => {
           gap: 8px;
           padding: 10px 20px;
           background: #6B21A8;
-          border: 1px solid rgba(255, 45, 155, 0.4);
+          border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
           border-radius: 10px;
           color: #FFFFFF;
           font-size: 0.82rem;
@@ -244,7 +248,7 @@ export const PinkLogicHeroPremium: React.FC = () => {
           transform: translateY(-2px);
           box-shadow: 
             0 6px 20px rgba(107, 33, 168, 0.45),
-            0 0 15px rgba(255, 45, 155, 0.25);
+            0 0 15px color-mix(in srgb, var(--primary) 25%, transparent);
           background: #7c2d9a;
         }
 
@@ -333,7 +337,7 @@ export const PinkLogicHeroPremium: React.FC = () => {
 
         .premium-metric-card:hover {
           transform: translateY(-4px);
-          border-color: rgba(255, 45, 155, 0.3);
+          border-color: color-mix(in srgb, var(--primary) 30%, transparent);
           background: rgba(26, 26, 26, 0.75);
         }
 
@@ -355,14 +359,14 @@ export const PinkLogicHeroPremium: React.FC = () => {
           width: 22px;
           height: 22px;
           border-radius: 6px;
-          background: rgba(255, 45, 155, 0.06);
+          background: color-mix(in srgb, var(--primary) 6%, transparent);
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .metric-icon {
-          color: var(--primary, #FF2D9B);
+          color: var(--primary);
         }
 
         .metric-body {
@@ -500,11 +504,11 @@ export const PinkLogicHeroPremium: React.FC = () => {
           <canvas ref={canvasRef} className="particle-canvas" />
         </div>
         <div className="floating-brand-logo-card">
-          <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 25px rgba(255, 45, 155, 0.95))' }}>
+          <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 25px color-mix(in srgb, var(--primary) 95%, transparent))' }}>
             <defs>
               <linearGradient id="heroLogoBubbleGrad" x1="0" y1="0" x2="24" y2="24">
-                <stop offset="0%" stop-color="#FF2D9B" />
-                <stop offset="100%" stop-color="#BF5AF2" />
+                <stop offset="0%" stop-color="var(--primary)" />
+                <stop offset="100%" stop-color="var(--secondary)" />
               </linearGradient>
             </defs>
             <path 
@@ -525,21 +529,21 @@ export const PinkLogicHeroPremium: React.FC = () => {
           label="Agentes ativos" 
           value="12" 
           change="+2 hoje" 
-          changeColor="#FF2D9B"
+          changeColor="var(--primary)"
           icon={Cpu} 
         />
         <MetricCard 
           label="Tarefas concluídas" 
           value="156" 
           change="+18%" 
-          changeColor="#FF2D9B"
+          changeColor="var(--primary)"
           icon={CheckCircle} 
         />
         <MetricCard 
           label="Tempo economizado" 
           value="24h" 
           change="+32%" 
-          changeColor="#FF2D9B"
+          changeColor="var(--primary)"
           icon={Clock} 
         />
         <MetricCard 

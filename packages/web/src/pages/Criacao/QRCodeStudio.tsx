@@ -56,6 +56,12 @@ const QRCodeStudio: React.FC = () => {
   // Customization
   const [fgColor, setFgColor] = useState(activeBrand?.palette.primary || '#FF2D8D');
   const [bgColor, setBgColor] = useState('#FFFFFF');
+  // Segue a marca ativa quando ela muda (antes só valia na 1.ª renderização).
+  useEffect(() => {
+    if (activeBrand?.palette.primary) setFgColor(activeBrand.palette.primary);
+    if (activeBrand?.logo) setLogoBase64(activeBrand.logo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBrand?.id, activeBrand?.palette.primary]);
   const [includeLogo, setIncludeLogo] = useState(true);
   const [logoBase64, setLogoBase64] = useState(activeBrand?.logo || '');
 
