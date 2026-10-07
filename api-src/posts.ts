@@ -1,11 +1,12 @@
 /**
  * Vercel serverless: POST /api/posts
- * Cria post passando pela porta do Jev.
- * Precisa da tabela pl_posts (migration) para persistir.
+ * Cria post passando pela porta do Jev, persiste em pl_posts.
+ * Precisa de SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY nas env vars.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { PostSchema } from "@pink-logic/shared";
 import { approvePost } from "@pink-logic/api/services/jev-decider.js";
+import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });
@@ -15,8 +16,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const decision = await approvePost(parsed.data as any);
   const status = decision.passed ? "SCHEDULED" : "PENDING_REVIEW";
 
-  res.status(501).json({
-    error: "Tabela `pl_posts` ainda não existe — aplica a migration no Supabase.",
-    contract: { ...parsed.data, status, decision },
-  });
+  const url = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    return res.status(501).json({
+      error: "Falta SUPABASE_SERVICE_ROLE_KEY nas env vars da Vercel.",
+      contract: { ...parsed.data, status, decision },
+    });
+  }
+
+  try {
+    const supabase = createClient(url, serviceKey);
+    const { data, error } = await supabase
+      .from("pl_posts")
+      .insert({
+        caption: parsed.data.caption,
+        image_url: (parsed.data as any).imageUrl ?? null,
+        hashtags: (parsed.data as any).hashtags ?? [],
+        status,
+        decision: decision as any,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ post: data, decision });
+  } catch (err: any) {
+    res.status(500).json({ error: "Falha ao gravar post: " + err.message, decision });
+  }
 }
