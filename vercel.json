@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build --workspace=@pink-logic/shared && npm run build --workspace=@pink-logic/api && npm run build --workspace=@pink-logic/web",
+  "buildCommand": "npm run build --workspace=@pink-logic/shared && npm run build --workspace=@pink-logic/api && node scripts/bundle-functions.mjs && npm run build --workspace=@pink-logic/web",
   "framework": "vite",
   "installCommand": "npm install",
   "outputDirectory": "packages/web/dist",

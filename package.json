@@ -18,7 +18,8 @@
   ],
   "devDependencies": {
     "@vercel/nft": "^1.11.0",
-    "@vercel/node": "^22.0.0"
+    "@vercel/node": "^22.0.0",
+    "esbuild": "^0.28.2"
   },
   "type": "module"
 }
