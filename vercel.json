@@ -7,10 +7,7 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60,
-      "includeFiles": [
-        "packages/api/dist/{fonts,prompts}/**",
-        "node_modules/harfbuzzjs/hb.wasm"
-      ]
+      "includeFiles": "{packages/api/dist/fonts/**,packages/api/dist/prompts/**,node_modules/harfbuzzjs/hb.wasm}"
     }
   },
   "rewrites": [
