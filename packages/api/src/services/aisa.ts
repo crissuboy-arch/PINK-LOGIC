@@ -41,6 +41,29 @@ export async function collect(req: CollectRequest) {
   return res.json();
 }
 
+/** Geração de texto com system prompt (usado pelo Gerador de Copy). */
+export async function generateTextWithSystem(system: string, user: string, model = "claude-opus-5") {
+  if (!aisaReady()) {
+    const err: any = new Error("AIsa não configurada: define AISA_API_KEY no .env");
+    err.status = 503;
+    throw err;
+  }
+  const res = await fetch(`${AISA_API_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`AIsa generate falhou: HTTP ${res.status}`);
+  const data = (await res.json()) as any;
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
 /** Geração de texto via modelos (substitui o copy mock). */
 export async function generateText(prompt: string, model = "claude-opus-5") {
   if (!aisaReady()) {

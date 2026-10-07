@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json && cp -r src/fonts dist/fonts",
+    "build": "tsc -p tsconfig.json && cp -r src/fonts dist/fonts && cp -r src/prompts dist/prompts",
     "start": "node dist/index.js"
   },
   "dependencies": {

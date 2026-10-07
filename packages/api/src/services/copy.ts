@@ -1,0 +1,86 @@
+/**
+ * Gerador de Copy — PinkLogic.
+ *
+ * Fluxo (secção 8 das diretrizes):
+ *   1. System prompt (copy-system.md) + briefing → AIsa
+ *   2. Checagem automática (blocklist + checklist)
+ *   3. Se reprovar → regenera 1x com instrução de correção
+ */
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { generateTextWithSystem, aisaReady } from "./aisa.js";
+import { checkCopy } from "./copy-check.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+let systemPrompt: string | null = null;
+function loadSystemPrompt(): string {
+  if (!systemPrompt) {
+    systemPrompt = readFileSync(join(__dirname, "..", "prompts", "copy-system.md"), "utf-8");
+  }
+  return systemPrompt;
+}
+
+export interface CopyBriefing {
+  prompt: string; // tema/produto em texto livre
+  brand?: string;
+  product?: string;
+  audience?: string;
+  pain?: string;
+  desire?: string;
+  objection?: string;
+  objective?: string; // vender | engajar | captar lead | educar
+  format?: string; // legenda | headline | roteiro reels | anúncio meta | email | whatsapp
+  language?: string; // PT-BR | PT-PT | EN | ES | FR
+  framework?: string; // AIDA | PAS | BAB | 4Ps | storytelling
+}
+
+function buildUserMessage(b: CopyBriefing): string {
+  const lines = [`Tema/produto: ${b.prompt}`];
+  if (b.brand) lines.push(`Marca: ${b.brand}`);
+  if (b.product) lines.push(`Oferta: ${b.product}`);
+  if (b.audience) lines.push(`Público: ${b.audience}`);
+  if (b.pain) lines.push(`Dor principal: ${b.pain}`);
+  if (b.desire) lines.push(`Desejo principal: ${b.desire}`);
+  if (b.objection) lines.push(`Objeção principal: ${b.objection}`);
+  if (b.objective) lines.push(`Objetivo: ${b.objective}`);
+  if (b.format) lines.push(`Formato: ${b.format}`);
+  if (b.language) lines.push(`Idioma: ${b.language}`);
+  if (b.framework) lines.push(`Framework: ${b.framework}`);
+  return `BRIEFING\n${lines.join("\n")}\n\nGera a peça conforme o formato de entrega (secção 4).`;
+}
+
+export async function generateCopy(briefing: CopyBriefing) {
+  if (!aisaReady()) {
+    const err: any = new Error("Copy real precisa de AIsa: define AISA_API_KEY (o mock foi removido)");
+    err.status = 503;
+    throw err;
+  }
+  const system = loadSystemPrompt();
+  const user = buildUserMessage(briefing);
+
+  let text = await generateTextWithSystem(system, user);
+  let check = checkCopy(text);
+  let regenerated = false;
+
+  if (!check.passed) {
+    regenerated = true;
+    text = await generateTextWithSystem(
+      system,
+      `${user}\n\nATENÇÃO: a versão anterior foi REPROVADA na checagem automática por: ${check.violations.join("; ")}. Reescreve eliminando TODAS as violações, mantendo a estrutura AIDA/PAS e o formato de entrega.`
+    );
+    check = checkCopy(text);
+  }
+
+  return {
+    module: "copy",
+    text,
+    metadata: {
+      provider: "aisa",
+      check: check.passed ? "passed" : "failed",
+      violations: check.violations,
+      regenerated,
+    },
+  };
+}
