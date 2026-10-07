@@ -20,6 +20,15 @@ export type AuthResult =
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest();
 
+/** Primeira URL http(s) válida entre SUPABASE_URL e VITE_SUPABASE_URL (a do site, pública). */
+function supabaseUrl(): string | null {
+  for (const raw of [process.env.SUPABASE_URL, process.env.VITE_SUPABASE_URL]) {
+    const v = (raw || "").trim();
+    if (/^https?:\/\/\S+$/i.test(v)) return v;
+  }
+  return null;
+}
+
 function isServiceKey(token: string): boolean {
   const key = process.env.PINK_LOGIC_SERVICE_KEY || "";
   if (key.length < 32) return false; // chave ausente ou fraca nunca autentica
@@ -34,8 +43,8 @@ export async function authenticate(authorization: string | undefined): Promise<A
 
   if (isServiceKey(token)) return { ok: true, ctx: { kind: "service" } };
 
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+  const url = supabaseUrl();
+  const anonKey = (process.env.SUPABASE_ANON_KEY || "").trim() || (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
   if (!url || !anonKey) {
     return { ok: false, status: 503, error: "Autenticação não configurada no servidor." };
   }
