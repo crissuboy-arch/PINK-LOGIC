@@ -7,7 +7,6 @@
  */
 import { GenerateModule } from "@pink-logic/shared";
 import { generateText, aisaReady } from "./aisa.js";
-import { buildCarouselPrompt, type CarouselStyle } from "./carousel-styles.js";
 
 export async function generate(module: GenerateModule, prompt: string, options: Record<string, unknown> = {}) {
   switch (module) {
@@ -40,13 +39,18 @@ export async function generate(module: GenerateModule, prompt: string, options: 
       throw err;
     }
     case "carousel": {
-      // Estilo via Pollinations (grátis). Texto longo em PT pode sair com
-      // gralhas — para texto pixel-perfect, usar overlay HTML no futuro.
-      const style = (options.style as CarouselStyle) || "maestro";
+      // Renderer híbrido: texto pixel-perfect via Satori+resvg.
+      // Para direção de arte IA pura, usar options.mode="art".
+      const { renderSlide } = await import("./carousel-render.js");
       const slideNumber = options.slideNumber as string | undefined;
-      const fullPrompt = buildCarouselPrompt(style, prompt, slideNumber);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?nologo=true&width=1080&height=1080`;
-      return { module, imageUrl, metadata: { provider: "pollinations", style } };
+      const png = await renderSlide({
+        title: prompt,
+        items: (options.items as string[]) || [],
+        footer: options.footer as string | undefined,
+        handle: (options.handle as string) || "",
+        counter: slideNumber || "",
+      });
+      return { module, imageBase64: png.toString("base64"), metadata: { renderer: "hybrid", style: "maestro" } };
     }
   }
 }

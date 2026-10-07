@@ -103,6 +103,22 @@ server.tool(
   })
 );
 
+// ─── Carrossel híbrido ────────────────────────────────────
+server.tool(
+  "render_carousel",
+  "Renderiza um slide de carrossel estilo 'maestro' (@maestroprompts): papel pautado, marker azul, texto pixel-perfect em PT. Devolve PNG 1080×1080 em base64.",
+  {
+    title: z.string().describe("Título grande do slide"),
+    items: z.array(z.string()).default([]).describe("Itens da lista"),
+    footer: z.string().optional().describe("CTA / linha de destaque no rodapé"),
+    handle: z.string().default("").describe("Atribuição (ex: @tumarca)"),
+    counter: z.string().default("").describe("Contador (ex: 4/6)"),
+  },
+  async ({ title, items, footer, handle, counter }) => ({
+    content: [{ type: "text", text: JSON.stringify(await api("/generate", { module: "carousel", prompt: title, options: { items, footer, handle, slideNumber: counter } })) }],
+  })
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error("[pink-logic-mcp] pronto — à espera da Athena via stdio");
