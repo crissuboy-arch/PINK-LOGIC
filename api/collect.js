@@ -4066,7 +4066,15 @@ var BrandSchema = external_exports.object({
   logoUrl: external_exports.string().url().optional(),
   defaultHashtags: external_exports.array(external_exports.string()).default([])
 });
-var GenerateModuleSchema = external_exports.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel"]);
+var GenerateModuleSchema = external_exports.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel", "mockup"]);
+var MockupTypeSchema = external_exports.enum(["card", "storefront", "uniform", "box", "laptop", "smartphone", "billboard", "mug", "sticker"]);
+var MockupRequestSchema = external_exports.object({
+  type: MockupTypeSchema,
+  artworkUrl: external_exports.string().min(1).max(8e3),
+  projectId: external_exports.string().max(100).optional(),
+  projectName: external_exports.string().max(100).optional(),
+  idempotencyKey: external_exports.string().max(100).optional()
+});
 var CarouselStyleSchema = external_exports.enum(["maestro", "clean", "bold"]);
 var GenerateRequestSchema = external_exports.object({
   module: GenerateModuleSchema,

@@ -75,5 +75,27 @@ export async function generate(module: GenerateModule, prompt: string, options: 
       });
       return { module, imageBase64: png.toString("base64"), metadata: { renderer: "hybrid", style: "maestro" } };
     }
+    case "mockup": {
+      // Renderer de mockups: mesmos 9 tipos do Mockup Studio web.
+      const { renderMockup, resolveArtwork, isValidMockupType } = await import("./mockup-render.js");
+      const mockupType = options.mockupType as string;
+      const artworkUrl = options.artworkUrl as string;
+      if (!isValidMockupType(mockupType)) {
+        const err: any = new Error(`tipo de mockup inválido: ${mockupType}`);
+        err.status = 400;
+        throw err;
+      }
+      const artwork = await resolveArtwork(artworkUrl);
+      const png = await renderMockup({
+        type: mockupType,
+        artworkUrl: artwork,
+        projectName: options.projectName as string | undefined,
+      });
+      return {
+        module,
+        imageBase64: png.toString("base64"),
+        metadata: { renderer: "satori", mockupType, idempotencyKey: options.idempotencyKey ?? null },
+      };
+    }
   }
 }

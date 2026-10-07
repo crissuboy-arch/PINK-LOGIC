@@ -3444,9 +3444,9 @@ var require_css_background_parser = __commonJS({
           return new Background(props);
         }
         props = props || {};
-        var bg2 = this;
+        var bg3 = this;
         function defprop(name, defaultValue) {
-          bg2[name] = name in props ? props[name] : defaultValue;
+          bg3[name] = name in props ? props[name] : defaultValue;
         }
         defprop("color", "");
         defprop("image", "none");
@@ -20628,6 +20628,204 @@ var init_carousel_render = __esm({
   }
 });
 
+// packages/api/dist/services/mockup-render.js
+var mockup_render_exports = {};
+__export(mockup_render_exports, {
+  isValidMockupType: () => isValidMockupType,
+  listMockupTypes: () => listMockupTypes,
+  renderMockup: () => renderMockup,
+  resolveArtwork: () => resolveArtwork,
+  validateArtwork: () => validateArtwork
+});
+import { Resvg as Resvg2 } from "@resvg/resvg-js";
+function isValidMockupType(t) {
+  return TYPES.includes(t);
+}
+function validateArtwork(url) {
+  if (!url || typeof url !== "string")
+    return { ok: false, error: "artworkUrl \xE9 obrigat\xF3rio" };
+  if (url.startsWith("data:image/")) {
+    if (url.length > 7e6)
+      return { ok: false, error: "imagem base64 excede 5MB" };
+    return { ok: true };
+  }
+  if (/^https?:\/\//i.test(url)) {
+    if (url.length > 2e3)
+      return { ok: false, error: "URL demasiado longa" };
+    return { ok: true };
+  }
+  return { ok: false, error: "artworkUrl deve ser URL http(s) ou data:image base64" };
+}
+async function resolveArtwork(url) {
+  const v2 = validateArtwork(url);
+  if (!v2.ok)
+    throw Object.assign(new Error(v2.error), { status: 400 });
+  if (url.startsWith("data:image/"))
+    return url;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15e3);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+    if (!r.ok)
+      throw Object.assign(new Error(`artwork HTTP ${r.status}`), { status: 400 });
+    const ct2 = r.headers.get("content-type") || "";
+    if (!ct2.startsWith("image/"))
+      throw Object.assign(new Error(`artwork n\xE3o \xE9 imagem (${ct2})`), { status: 400 });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 5 * 1024 * 1024)
+      throw Object.assign(new Error("artwork excede 5MB"), { status: 400 });
+    return `data:${ct2.split(";")[0]};base64,${buf.toString("base64")}`;
+  } catch (err2) {
+    if (err2.status)
+      throw err2;
+    throw Object.assign(new Error("falha ao obter artwork: " + err2.message), { status: 400 });
+  } finally {
+    clearTimeout(t);
+  }
+}
+function bg2() {
+  return {
+    type: "div",
+    props: {
+      style: {
+        ...abs(0, 0, 1080, 1080, { backgroundColor: BG, display: "flex" })
+      },
+      children: []
+    }
+  };
+}
+function art(url, box) {
+  return {
+    type: "img",
+    props: {
+      src: url,
+      style: {
+        ...abs(box.top, box.left, box.width, box.height, {
+          objectFit: "contain"
+        })
+      }
+    }
+  };
+}
+function mockupElements(type, artworkUrl) {
+  const C = 540;
+  switch (type) {
+    case "laptop": {
+      return [
+        { type: "div", props: { style: abs(300, C - 260, 520, 320, { backgroundColor: "#111", borderRadius: "16px 16px 0 0", border: "4px solid #2d2d2d", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 330, left: C - 220, width: 440, height: 250 }),
+        { type: "div", props: { style: abs(620, C - 300, 600, 18, { backgroundColor: "#444", borderRadius: "0 0 14px 14px", display: "flex" }), children: [] } }
+      ];
+    }
+    case "smartphone": {
+      return [
+        { type: "div", props: { style: abs(240, C - 140, 280, 600, { backgroundColor: "#0d0d12", borderRadius: "48px", border: "10px solid #2d2d2d", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 330, left: C - 100, width: 200, height: 380 }),
+        { type: "div", props: { style: abs(258, C - 40, 80, 18, { backgroundColor: "#000", borderRadius: "10px", display: "flex" }), children: [] } }
+      ];
+    }
+    case "card": {
+      return [
+        { type: "div", props: { style: abs(400, C - 260, 520, 280, { backgroundColor: "#0D0D12", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.12)", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(400, C - 260, 520, 6, { backgroundColor: ACCENT, borderRadius: "20px 20px 0 0", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 440, left: C - 180, width: 360, height: 140 })
+      ];
+    }
+    case "uniform": {
+      return [
+        { type: "div", props: { style: abs(340, C - 150, 300, 340, { backgroundColor: "#14141c", borderRadius: "36px 36px 10px 10px", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(350, C - 210, 70, 110, { backgroundColor: "#14141c", borderRadius: "18px", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(350, C + 140, 70, 110, { backgroundColor: "#14141c", borderRadius: "18px", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 450, left: C - 90, width: 180, height: 180 })
+      ];
+    }
+    case "box": {
+      return [
+        { type: "div", props: { style: abs(380, C - 160, 320, 320, { backgroundColor: "#1C1510", borderRadius: "20px", border: "2px solid rgba(255,255,255,0.06)", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(380, C - 14, 28, 320, { backgroundColor: "rgba(255,255,255,0.04)", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 450, left: C - 110, width: 220, height: 160 })
+      ];
+    }
+    case "storefront": {
+      return [
+        { type: "div", props: { style: abs(320, C - 300, 600, 360, { backgroundColor: "#09090c", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.1)", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(380, C - 220, 440, 140, { backgroundColor: "#040407", borderRadius: "8px", border: `3px solid ${ACCENT}`, display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 400, left: C - 190, width: 380, height: 100 }),
+        { type: "div", props: { style: abs(640, C - 300, 600, 40, { backgroundColor: "#111", display: "flex" }), children: [] } }
+      ];
+    }
+    case "billboard": {
+      return [
+        { type: "div", props: { style: abs(660, C - 120, 24, 220, { backgroundColor: "#333", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(660, C + 96, 24, 220, { backgroundColor: "#333", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(340, C - 300, 600, 320, { backgroundColor: "#fff", border: "10px solid #222", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(362, C - 278, 556, 276, { backgroundColor: "#0d0d12", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 390, left: C - 240, width: 480, height: 220 })
+      ];
+    }
+    case "mug": {
+      return [
+        { type: "div", props: { style: abs(380, C - 130, 260, 300, { backgroundColor: "#f5f0e8", borderRadius: "18px 18px 40px 40px", display: "flex" }), children: [] } },
+        { type: "div", props: { style: abs(430, C + 130, 90, 150, { border: "26px solid #f5f0e8", borderLeft: "none", borderRadius: "0 60px 60px 0", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 460, left: C - 90, width: 180, height: 140 })
+      ];
+    }
+    case "sticker": {
+      return [
+        { type: "div", props: { style: abs(330, C - 175, 350, 350, { backgroundColor: "#ffffff", borderRadius: "50%", display: "flex" }), children: [] } },
+        art(artworkUrl, { top: 365, left: C - 140, width: 280, height: 280 })
+      ];
+    }
+  }
+}
+async function renderMockup(input) {
+  const v2 = validateArtwork(input.artworkUrl);
+  if (!v2.ok)
+    throw Object.assign(new Error(v2.error), { status: 400 });
+  if (!isValidMockupType(input.type))
+    throw Object.assign(new Error(`tipo inv\xE1lido: ${input.type}`), { status: 400 });
+  const svg = await Op({
+    type: "div",
+    props: {
+      style: { width: "1080px", height: "1080px", position: "relative", display: "flex", backgroundColor: BG },
+      children: [bg2(), ...mockupElements(input.type, input.artworkUrl)]
+    }
+  }, { width: 1080, height: 1080, fonts: [] });
+  const resvg = new Resvg2(svg, { fitTo: { mode: "width", value: 1080 } });
+  return Buffer.from(resvg.render().asPng());
+}
+function listMockupTypes() {
+  return [
+    { id: "laptop", label: "Port\xE1til" },
+    { id: "smartphone", label: "Smartphone" },
+    { id: "card", label: "Cart\xE3o de visita" },
+    { id: "uniform", label: "T-shirt / Uniforme" },
+    { id: "box", label: "Caixa / Embalagem" },
+    { id: "storefront", label: "Fachada de loja" },
+    { id: "billboard", label: "Outdoor" },
+    { id: "mug", label: "Caneca" },
+    { id: "sticker", label: "Sticker die-cut" }
+  ];
+}
+var BG, ACCENT, TYPES, abs;
+var init_mockup_render = __esm({
+  "packages/api/dist/services/mockup-render.js"() {
+    "use strict";
+    init_dist2();
+    BG = "#07070a";
+    ACCENT = "#FF2D8D";
+    TYPES = ["card", "storefront", "uniform", "box", "laptop", "smartphone", "billboard", "mug", "sticker"];
+    abs = (top, left, width, height, extra = {}) => ({
+      position: "absolute",
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+      ...extra
+    });
+  }
+});
+
 // node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
@@ -24690,7 +24888,15 @@ var BrandSchema = external_exports.object({
   logoUrl: external_exports.string().url().optional(),
   defaultHashtags: external_exports.array(external_exports.string()).default([])
 });
-var GenerateModuleSchema = external_exports.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel"]);
+var GenerateModuleSchema = external_exports.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel", "mockup"]);
+var MockupTypeSchema = external_exports.enum(["card", "storefront", "uniform", "box", "laptop", "smartphone", "billboard", "mug", "sticker"]);
+var MockupRequestSchema = external_exports.object({
+  type: MockupTypeSchema,
+  artworkUrl: external_exports.string().min(1).max(8e3),
+  projectId: external_exports.string().max(100).optional(),
+  projectName: external_exports.string().max(100).optional(),
+  idempotencyKey: external_exports.string().max(100).optional()
+});
 var CarouselStyleSchema = external_exports.enum(["maestro", "clean", "bold"]);
 var GenerateRequestSchema = external_exports.object({
   module: GenerateModuleSchema,
@@ -24816,6 +25022,27 @@ async function generate(module, prompt, options = {}) {
         counter: slideNumber || ""
       });
       return { module, imageBase64: png.toString("base64"), metadata: { renderer: "hybrid", style: "maestro" } };
+    }
+    case "mockup": {
+      const { renderMockup: renderMockup2, resolveArtwork: resolveArtwork2, isValidMockupType: isValidMockupType2 } = await Promise.resolve().then(() => (init_mockup_render(), mockup_render_exports));
+      const mockupType = options.mockupType;
+      const artworkUrl = options.artworkUrl;
+      if (!isValidMockupType2(mockupType)) {
+        const err2 = new Error(`tipo de mockup inv\xE1lido: ${mockupType}`);
+        err2.status = 400;
+        throw err2;
+      }
+      const artwork = await resolveArtwork2(artworkUrl);
+      const png = await renderMockup2({
+        type: mockupType,
+        artworkUrl: artwork,
+        projectName: options.projectName
+      });
+      return {
+        module,
+        imageBase64: png.toString("base64"),
+        metadata: { renderer: "satori", mockupType, idempotencyKey: options.idempotencyKey ?? null }
+      };
     }
   }
 }

@@ -119,6 +119,52 @@ server.tool(
   })
 );
 
+// ─── Mockup Studio (backend) ──────────────────────────────
+server.tool(
+  "generate_mockup",
+  "Gera um mockup da identidade visual/artwork num objeto real (caneca, fachada, uniforme, caixa, smartphone, etc.). Mesmos 9 tipos do Mockup Studio web. Devolve PNG 1080×1080 em base64. Para vários mockups, chama uma vez por tipo (cada chamada é independente e idempotente nos mesmos inputs). Não publica nada.",
+  {
+    artworkUrl: z.string().describe("URL http(s) pública da arte/logo OU data:image/...;base64 (máx 5MB)"),
+    type: z.enum(["card", "storefront", "uniform", "box", "laptop", "smartphone", "billboard", "mug", "sticker"]).describe("Tipo de mockup (ex: 'mug' para caneca)"),
+    projectName: z.string().max(100).optional().describe("Nome/identificador do projeto (opcional)"),
+    idempotencyKey: z.string().max(100).optional().describe("Chave de idempotência (opcional): mesmos inputs → mesmo resultado"),
+  },
+  async ({ artworkUrl, type, projectName, idempotencyKey }) => {
+    try {
+      const result = await api("/generate", {
+        module: "mockup",
+        prompt: projectName || type,
+        options: { mockupType: type, artworkUrl, projectName, idempotencyKey },
+      });
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "ok",
+            type,
+            projectName: projectName ?? null,
+            idempotencyKey: idempotencyKey ?? null,
+            imageBase64: result.imageBase64,
+            renderer: result.metadata?.renderer,
+          }),
+        }],
+      };
+    } catch (err: any) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            type,
+            error: err.message || "falha ao gerar mockup",
+            code: "MOCKUP_GENERATION_FAILED",
+          }),
+        }],
+      };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error("[pink-logic-mcp] pronto — à espera da Athena via stdio");

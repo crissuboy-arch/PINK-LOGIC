@@ -28,7 +28,17 @@ export const BrandSchema = z.object({
 export type Brand = z.infer<typeof BrandSchema>;
 
 // ─── Geração ──────────────────────────────────────────────
-export const GenerateModuleSchema = z.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel"]);
+export const GenerateModuleSchema = z.enum(["logo", "qrcode", "sticker", "story", "copy", "carousel", "mockup"]);
+export const MockupTypeSchema = z.enum(["card", "storefront", "uniform", "box", "laptop", "smartphone", "billboard", "mug", "sticker"]);
+export type MockupType = z.infer<typeof MockupTypeSchema>;
+export const MockupRequestSchema = z.object({
+  type: MockupTypeSchema,
+  artworkUrl: z.string().min(1).max(8000),
+  projectId: z.string().max(100).optional(),
+  projectName: z.string().max(100).optional(),
+  idempotencyKey: z.string().max(100).optional(),
+});
+export type MockupRequest = z.infer<typeof MockupRequestSchema>;
 export const CarouselStyleSchema = z.enum(["maestro", "clean", "bold"]);
 export type CarouselStyle = z.infer<typeof CarouselStyleSchema>;
 export type GenerateModule = z.infer<typeof GenerateModuleSchema>;
