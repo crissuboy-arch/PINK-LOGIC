@@ -78,33 +78,8 @@ export async function generateTextWithSystem(system: string, user: string, model
       ],
     }),
   });
-  // [copy-diag] TEMPORÁRIO: só metadados — nunca o texto, token ou dados pessoais.
-  console.log("[copy-diag] aisa status", res.status, "ok", res.ok, "model", model);
   if (!res.ok) throw await upstreamError("AIsa generate falhou", res);
-  const raw = await res.text();
-  let data: any;
-  try {
-    data = JSON.parse(raw);
-  } catch (e: any) {
-    console.log("[copy-diag] aisa parse error", e?.message, "bytes", raw.length);
-    throw e;
-  }
-  const choice = data?.choices?.[0];
-  const msg = choice?.message;
-  const content = msg?.content;
-  console.log("[copy-diag] aisa body", JSON.stringify({
-    bytes: raw.length,
-    topKeys: Object.keys(data || {}),
-    choices: Array.isArray(data?.choices) ? data.choices.length : typeof data?.choices,
-    finish: choice?.finish_reason ?? null,
-    choiceKeys: Object.keys(choice || {}),
-    msgKeys: Object.keys(msg || {}),
-    contentType: Array.isArray(content) ? "array" : content === null ? "null" : typeof content,
-    contentLen: typeof content === "string" ? content.length : Array.isArray(content) ? content.length : 0,
-    contentParts: Array.isArray(content) ? content.map((p: any) => ({ type: p?.type, len: (p?.text || "").length })) : undefined,
-    altLens: Object.fromEntries(Object.entries(msg || {}).filter(([k, v]) => k !== "content" && typeof v === "string").map(([k, v]) => [k, (v as string).length])),
-    errorField: data?.error ? Object.keys(data.error) : null,
-  }));
+  const data = (await res.json()) as any;
   return data.choices?.[0]?.message?.content ?? "";
 }
 

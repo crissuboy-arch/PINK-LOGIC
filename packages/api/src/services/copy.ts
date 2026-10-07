@@ -81,12 +81,6 @@ export async function generateCopy(briefing: CopyBriefing) {
     check = checkCopy(text);
   }
 
-  // [copy-diag] TEMPORÁRIO: só metadados do resultado final.
-  console.log("[copy-diag] copy result", JSON.stringify({
-    textType: typeof text, textLen: typeof text === "string" ? text.length : 0,
-    check: check.passed, violations: check.violations.length, regenerated,
-  }));
-
   return {
     module: "copy",
     text,
