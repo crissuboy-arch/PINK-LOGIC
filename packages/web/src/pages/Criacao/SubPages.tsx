@@ -22,9 +22,7 @@ export { default as CopyGenerator } from './CopyGenerator';
 export const StrategicVision = () => (
   <ModulePlaceholder title="Visão Estratégica" hint="Análise de nicho — será ligado à coleta AIsa + Jev." />
 );
-export const StickerStudio = () => (
-  <ModulePlaceholder title="Estúdio de Stickers" hint="Stickers com fundo transparente — será ligado ao POST /api/generate." />
-);
+export { default as StickerStudio } from './StickerStudio';
 export const HubModels = () => (
   <ModulePlaceholder title="Hub de Modelos" hint="Central de modelos IA via AIsa." />
 );

@@ -3,8 +3,8 @@
  * Motores reais do PINK-LOGIC (logo/sticker/qrcode grátis, copy via AIsa).
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GenerateRequestSchema } from "../packages/shared/dist/index.js";
-import { generate } from "../packages/api/dist/services/generate.js";
+import { GenerateRequestSchema } from "@pink-logic/shared";
+import { generate } from "@pink-logic/api/services/generate.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });

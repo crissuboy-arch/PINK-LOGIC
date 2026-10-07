@@ -8,6 +8,7 @@ import Campanhas from './pages/Gestao/Campanhas';
 import Produtos from './pages/Gestao/Produtos';
 import Status from './pages/Gestao/Status';
 import Editor from './pages/Criacao/Editor';
+import CaptionStudio from './pages/Criacao/CaptionStudio';
 import { StoryCreator, CopyGenerator, StrategicVision, StickerStudio, HubModels } from './pages/Criacao/SubPages';
 import LogoStudioIA from './pages/Criacao/LogoStudioIA';
 import BrandKitPro from './pages/Criacao/BrandKitPro';
@@ -60,6 +61,7 @@ function App() {
                     <Route path="criacao/manual" element={<BrandManual />} />
                     <Route path="criacao/vision" element={<StrategicVision />} />
                     <Route path="criacao/stickers" element={<StickerStudio />} />
+                    <Route path="criacao/legendas" element={<CaptionStudio />} />
                     <Route path="criacao/models" element={<HubModels />} />
                     
                     <Route path="estrategia" element={<Estrategia />} />

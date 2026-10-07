@@ -4,7 +4,7 @@
  * Body: { title, items?, footer?, handle?, counter? }
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { renderSlide } from "../../packages/api/dist/services/carousel-render.js";
+import { renderSlide } from "@pink-logic/api/services/carousel-render.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });

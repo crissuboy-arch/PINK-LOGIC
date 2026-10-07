@@ -27,3 +27,16 @@ Substitui os ficheiros no repositório por estes e faz push (o Claude Code só p
 - `POST /api/generate` com `{"module":"copy","prompt":"teste"}` → 200 (se 502, lê a mensagem: normalmente é o nome do modelo em `AISA_MODEL`)
 - `POST /api/carousel/render` com `{"title":"TESTE"}` → PNG
 Se o deploy ainda falhar, copia as linhas vermelhas do Build Log.
+
+## Estúdio de Stickers (novo)
+- `pages/Criacao/StickerStudio.tsx` + módulo `sticker` do `/api/generate` reescrito.
+- 8 estilos (Kawaii, Retrô 90s, Neon, 3D, Meme, Aquarela, Pixel 8-bit, Grafite), cores da marca ativa, 1–8 figurinhas por vez, botão "Surpreenda-me", confete, cartões que balançam, download PNG 512×512 (tamanho WhatsApp).
+- Usa Pollinations (grátis, sem chave). Fundo transparente real exige remoção de fundo (próximo passo).
+
+## Legendas Animadas (novo módulo)
+- `pages/Criacao/CaptionStudio.tsx` — rota `/criacao/legendas`, entrada no menu "Criação".
+- 10 animações: Karaokê, Pop (viral), Máquina de escrever, Pulinho, Neon pulsante, Tremida, Sobe e aparece, Caixa de destaque, Onda, Arco-íris.
+- Cores: 24 cores (círculo cromático completo + neutros) para texto e destaque, mais seletor livre, contorno, "Cores da marca" e "Surpreenda-me".
+- Formatos: 9:16 (Reels/TikTok/Shorts), 1:1, 4:5, 16:9. Fundo: transparente, cor, degradê, verde chroma key ou imagem.
+- Exporta vídeo (MP4 quando o navegador suporta, senão WebM), PNG do quadro e arquivo .srt. Cada linha do texto vira uma legenda.
+- Não exporta GIF (próximo passo, se quiser).

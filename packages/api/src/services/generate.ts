@@ -10,11 +10,28 @@ import { generateText, aisaReady } from "./aisa.js";
 
 export async function generate(module: GenerateModule, prompt: string, options: Record<string, unknown> = {}) {
   switch (module) {
-    case "logo":
-    case "sticker": {
-      // Pollinations: GET https://image.pollinations.ai/prompt/{prompt}
+    case "logo": {
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true`;
       return { module, imageUrl, metadata: { provider: "pollinations" } };
+    }
+    case "sticker": {
+      // Figurinha "die-cut": estilo + cores da marca + semente (para variações).
+      const STYLES: Record<string, string> = {
+        kawaii: "kawaii chibi cartoon, big sparkly eyes, pastel colors, super cute",
+        retro: "retro 90s cartoon sticker, bold outlines, halftone dots, vibrant",
+        neon: "neon glow sticker, dark outline, electric colors, cyber cute",
+        "3d": "glossy 3D render sticker, soft shadows, playful clay look",
+        meme: "funny expressive meme sticker, exaggerated face, thick outline",
+        watercolor: "hand painted watercolor sticker, soft edges, whimsical",
+        pixel: "pixel art sticker, 8-bit, crisp pixels, fun",
+        graffiti: "street graffiti sticker, bold lettering, spray paint, urban",
+      };
+      const style = STYLES[String(options.style)] ?? STYLES.kawaii;
+      const colors = Array.isArray(options.colors) ? (options.colors as string[]).slice(0, 3).join(", ") : "";
+      const seed = Number.isFinite(Number(options.seed)) ? Number(options.seed) : Math.floor(Math.random() * 1e6);
+      const full = `${prompt}, ${style}, die-cut sticker design, thick white border, centered, isolated on plain white background, flat vector illustration, no text${colors ? `, color palette ${colors}` : ""}`;
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?nologo=true&width=768&height=768&seed=${seed}`;
+      return { module, imageUrl, metadata: { provider: "pollinations", style: String(options.style || "kawaii"), seed } };
     }
     case "qrcode": {
       const data = encodeURIComponent(prompt);

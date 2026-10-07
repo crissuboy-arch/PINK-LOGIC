@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
+  Captions,
   Settings, 
   Calendar, 
   Lightbulb, 
@@ -88,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
         { label: 'Estúdio de Maquetes', icon: Box, path: '/criacao/mockups' },
         { label: 'Estúdio de Código QR', icon: QrCode, path: '/criacao/qrcode' },
         { label: 'Estúdio de Stickers IA', icon: Sticker, path: '/criacao/stickers' },
+        { label: 'Legendas Animadas', icon: Captions, path: '/criacao/legendas' },
         { label: 'Gerador de Copy', icon: FileText, path: '/criacao/copy' },
       ]
     },
