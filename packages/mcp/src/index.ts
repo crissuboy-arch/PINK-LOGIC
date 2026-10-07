@@ -10,11 +10,16 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const API_URL = process.env.PINK_LOGIC_API_URL || "http://localhost:3001";
+// Chave de serviço da Athena: a API exige autenticação em todas as rotas exceto /health.
+const SERVICE_KEY = process.env.PINK_LOGIC_SERVICE_KEY || "";
 
 async function api(path: string, body?: unknown) {
   const res = await fetch(`${API_URL}/api${path}`, {
     method: body ? "POST" : "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(SERVICE_KEY ? { Authorization: `Bearer ${SERVICE_KEY}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();

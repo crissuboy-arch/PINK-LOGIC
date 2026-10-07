@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export interface UserSession {
@@ -7,102 +8,153 @@ export interface UserSession {
   token?: string;
 }
 
+type AuthResult = { success: boolean; error?: string };
+
 const SESSION_KEY = 'pinklogic.auth.session';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Sessão local só em desenvolvimento e sem Supabase configurado. Em produção, login é sempre Supabase Auth.
+const devLocalAuth = import.meta.env.DEV && !isSupabaseConfigured;
+
+/** Traduz as mensagens do Supabase Auth mais comuns para PT. */
+function translateAuthError(message?: string): string {
+  const m = (message || '').toLowerCase();
+  if (m.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).';
+  if (m.includes('already registered')) return 'Já existe uma conta com este e-mail.';
+  if (m.includes('rate limit') || m.includes('too many')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+  if (m.includes('password')) return 'Senha inválida: use pelo menos 6 caracteres.';
+  return message || 'Não foi possível concluir. Tente novamente.';
+}
+
+function displayName(session: Session): string {
+  const meta = session.user.user_metadata || {};
+  const raw = (meta.name as string) || session.user.email?.split('@')[0] || 'Usuário';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
 
 class AuthService {
-  /**
-   * Tenta fazer login via Supabase Auth.
-   * Se não estiver configurado ou se falhar pelas credenciais do admin demo local, realiza fallback local.
-   */
-  async login(emailRaw: string, passwordRaw: string): Promise<{ success: boolean; error?: string }> {
-    const email = (emailRaw || '').trim();
-    const password = (passwordRaw || '').trim();
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return { success: false, error: 'Formato de e-mail inválido.' };
-    }
-
-    if (password.length < 6) {
-      return { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' };
-    }
-
-    // Se o Supabase estiver ativo, tentamos autenticar por ele
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (!error && data.user) {
-          const name = data.user.email?.split('@')[0] || 'User';
-          const userSession: UserSession = {
-            email: data.user.email || email,
-            name: name.charAt(0).toUpperCase() + name.slice(1),
-            role: 'Premium User',
-            token: data.session?.access_token
-          };
-          localStorage.setItem(SESSION_KEY, JSON.stringify(userSession));
-          window.dispatchEvent(new Event('pinklogic:auth-changed'));
-          return { success: true };
-        }
-
-        // Se o erro for de credenciais incorretas e for a conta admin demo local, 
-        // permitimos o desvio/fallback local para facilitar desenvolvimento.
-        const isDemoAdmin = email === 'admin@pinklogic.com' && password === 'pinklogic123';
-        if (!isDemoAdmin && error) {
-          return { success: false, error: error.message || 'Credenciais inválidas.' };
-        }
-      } catch (e) {
-        console.warn('[Supabase Auth] Falha ao contatar servidor de autenticação, usando fallback local.');
-      }
-    }
-
-    // Fallback Local Provisório (Sempre ativado caso Supabase não esteja ativo ou se for o admin demo)
-    if (email === 'admin@pinklogic.com' && password !== 'pinklogic123') {
-      return { success: false, error: 'Senha incorreta para a conta de administrador (Senha demo: pinklogic123).' };
-    }
-
-    const name = email.split('@')[0];
-    const userSession: UserSession = {
-      email,
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      role: email === 'admin@pinklogic.com' ? 'Administrator' : 'Premium User',
-    };
-
-    try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(userSession));
-      window.dispatchEvent(new Event('pinklogic:auth-changed'));
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: 'Falha ao salvar sessão local.' };
-    }
+  constructor() {
+    // Mantém o cache local (nome/e-mail no header) em sincronia com a sessão real do Supabase.
+    supabase?.auth.onAuthStateChange((_event, session) => this.cacheSession(session));
   }
 
-  /**
-   * Efetua o logout do usuário (Supabase e local)
-   */
+  private cacheSession(session: Session | null) {
+    try {
+      if (session) {
+        const userSession: UserSession = {
+          email: session.user.email || '',
+          name: displayName(session),
+          role: 'Premium User',
+        };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(userSession));
+      } else {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    } catch {
+      /* storage indisponível */
+    }
+    window.dispatchEvent(new Event('pinklogic:auth-changed'));
+  }
+
+  private validate(email: string, password: string): string | null {
+    if (!EMAIL_RE.test(email)) return 'Formato de e-mail inválido.';
+    if (password.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
+    return null;
+  }
+
+  async login(emailRaw: string, passwordRaw: string): Promise<AuthResult> {
+    const email = (emailRaw || '').trim();
+    const password = passwordRaw || '';
+    const invalid = this.validate(email, password);
+    if (invalid) return { success: false, error: invalid };
+
+    if (supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error || !data.session) return { success: false, error: translateAuthError(error?.message) };
+      this.cacheSession(data.session);
+      return { success: true };
+    }
+
+    if (devLocalAuth) {
+      const name = email.split('@')[0];
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ email, name, role: 'Dev Local' }));
+      window.dispatchEvent(new Event('pinklogic:auth-changed'));
+      return { success: true };
+    }
+
+    return { success: false, error: 'Login indisponível: autenticação não configurada.' };
+  }
+
+  /** Cria conta. Se o projeto exigir confirmação de e-mail, needsConfirmation = true. */
+  async signUp(nameRaw: string, emailRaw: string, passwordRaw: string): Promise<AuthResult & { needsConfirmation?: boolean }> {
+    const name = (nameRaw || '').trim();
+    const email = (emailRaw || '').trim();
+    const password = passwordRaw || '';
+    const invalid = this.validate(email, password);
+    if (invalid) return { success: false, error: invalid };
+    if (!supabase) return { success: false, error: 'Cadastro indisponível: autenticação não configurada.' };
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name }, emailRedirectTo: `${window.location.origin}/login` },
+    });
+    if (error) return { success: false, error: translateAuthError(error.message) };
+    if (data.session) {
+      this.cacheSession(data.session);
+      return { success: true };
+    }
+    return { success: true, needsConfirmation: true };
+  }
+
+  async requestPasswordReset(emailRaw: string): Promise<AuthResult> {
+    const email = (emailRaw || '').trim();
+    if (!EMAIL_RE.test(email)) return { success: false, error: 'Formato de e-mail inválido.' };
+    if (!supabase) return { success: false, error: 'Recuperação indisponível: autenticação não configurada.' };
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/redefinir-senha`,
+    });
+    return error ? { success: false, error: translateAuthError(error.message) } : { success: true };
+  }
+
+  /** Define a nova senha (sessão de recuperação aberta pelo link do e-mail). */
+  async updatePassword(password: string): Promise<AuthResult> {
+    if (password.length < 6) return { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' };
+    if (!supabase) return { success: false, error: 'Autenticação não configurada.' };
+    const { error } = await supabase.auth.updateUser({ password });
+    return error ? { success: false, error: translateAuthError(error.message) } : { success: true };
+  }
+
   async logout(): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
+    if (supabase) {
       try {
         await supabase.auth.signOut();
-      } catch (e) {
+      } catch {
         console.warn('[Supabase Auth] Erro ao efetuar signOut remoto');
       }
     }
-
-    try {
-      localStorage.removeItem(SESSION_KEY);
-      window.dispatchEvent(new Event('pinklogic:auth-changed'));
-    } catch (e) {
-      console.warn('Erro ao remover sessão de autenticação local');
-    }
+    this.cacheSession(null);
   }
 
-  /**
-   * Retorna o usuário logado atualmente
-   */
+  /** Confirma a sessão real (Supabase) e atualiza o cache. Devolve se há sessão válida. */
+  async syncSession(): Promise<boolean> {
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      const hadCache = this.isAuthenticated();
+      if (data.session || hadCache) this.cacheSession(data.session);
+      return !!data.session;
+    }
+    return devLocalAuth && this.isAuthenticated();
+  }
+
+  /** Token de acesso atual (renovado automaticamente pelo Supabase) para chamar a API. */
+  async getAccessToken(): Promise<string | null> {
+    if (!supabase) return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }
+
   getCurrentUser(): UserSession | null {
     try {
       const data = localStorage.getItem(SESSION_KEY);
@@ -113,9 +165,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Verifica se o usuário está autenticado
-   */
   isAuthenticated(): boolean {
     return this.getCurrentUser() !== null;
   }

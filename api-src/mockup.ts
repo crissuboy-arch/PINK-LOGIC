@@ -4,11 +4,14 @@
  * Mesmos 9 tipos do Mockup Studio web. Render puro nos inputs → idempotente.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { requireAuth } from "@pink-logic/api/services/auth.js";
 import { MockupRequestSchema } from "@pink-logic/shared";
 import { renderMockup, resolveArtwork } from "@pink-logic/api/services/mockup-render.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
   const parsed = MockupRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "payload inválido", details: parsed.error.flatten() });
 

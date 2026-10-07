@@ -31,6 +31,15 @@ const Layout = () => {
     };
 
     window.addEventListener('pinklogic:auth-changed', checkAuth);
+
+    // Confirma a sessão real no Supabase (o cache local sozinho não basta)
+    authService.syncSession().then(valid => {
+      if (!valid) {
+        setIsAuthenticated(false);
+        navigate('/login', { replace: true });
+      }
+    });
+
     return () => {
       window.removeEventListener('pinklogic:auth-changed', checkAuth);
     };

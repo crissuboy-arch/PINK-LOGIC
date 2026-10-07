@@ -1,6 +1,9 @@
 /**
  * Cliente da API serverless (/api/*). Devolve erros legíveis em PT.
+ * Envia o token da sessão Supabase: a API exige login em todas as rotas exceto /api/health.
  */
+import { authService } from '../services/authService';
+
 export interface ApiResult<T> {
   ok: boolean;
   status: number;
@@ -10,11 +13,20 @@ export interface ApiResult<T> {
 
 export async function apiPost<T = any>(path: string, body: unknown): Promise<ApiResult<T>> {
   try {
+    const token = await authService.getAccessToken();
     const res = await fetch(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
     });
+    if (res.status === 401) {
+      // Sessão expirada/inválida: sai e o Layout redireciona para /login.
+      await authService.logout();
+      return { ok: false, status: 401, error: 'Sua sessão expirou. Faça login novamente.' };
+    }
     const text = await res.text();
     let json: any = null;
     try { json = text ? JSON.parse(text) : null; } catch { /* resposta não-JSON */ }

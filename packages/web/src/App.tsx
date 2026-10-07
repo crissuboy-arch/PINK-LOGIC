@@ -39,6 +39,7 @@ function App() {
               <Router>
                 <Routes>
                   <Route path="/login" element={<Login />} />
+                  <Route path="/redefinir-senha" element={<Login initialMode="reset" />} />
                   <Route path="/" element={<Layout />}>
                     <Route index element={<Dashboard />} />
                     <Route path="gestao/calendario" element={<Calendario />} />

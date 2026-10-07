@@ -1,27 +1,77 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff, User, UserPlus, KeyRound } from 'lucide-react';
 import { authService } from '../../services/authService';
 
-const Login = () => {
+type Mode = 'login' | 'signup' | 'forgot' | 'reset';
+
+const COPY: Record<Mode, { title: string; subtitle: string; cta: string }> = {
+  login: { title: 'Boas-vindas ao', subtitle: 'Acesse sua central estratégica de design e dados', cta: 'Entrar na Plataforma' },
+  signup: { title: 'Crie sua conta no', subtitle: 'Comece a criar com a sua marca em minutos', cta: 'Criar conta' },
+  forgot: { title: 'Recuperar acesso ao', subtitle: 'Enviaremos um link para você criar uma nova senha', cta: 'Enviar link' },
+  reset: { title: 'Nova senha no', subtitle: 'Escolha uma nova senha para a sua conta', cta: 'Salvar nova senha' },
+};
+
+const Login = ({ initialMode = 'login' }: { initialMode?: Mode }) => {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Já logado com sessão válida → vai direto para a plataforma
+  // (exceto na redefinição de senha: o link do e-mail abre uma sessão de recuperação)
+  useEffect(() => {
+    if (initialMode === 'reset') return;
+    authService.syncSession().then(valid => {
+      if (valid) navigate('/', { replace: true });
+    });
+  }, [navigate, initialMode]);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError(null);
+    setInfo(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const result = await authService.login(email, password);
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError(result.error || 'Erro ao autenticar.');
+    setInfo(null);
+    setLoading(true);
+    try {
+      if (mode === 'login') {
+        const result = await authService.login(email, password);
+        if (result.success) navigate('/');
+        else setError(result.error || 'Erro ao autenticar.');
+      } else if (mode === 'signup') {
+        const result = await authService.signUp(name, email, password);
+        if (!result.success) setError(result.error || 'Erro ao criar conta.');
+        else if (result.needsConfirmation) {
+          setInfo('Conta criada! Enviamos um e-mail de confirmação. Confirme e depois entre.');
+          setMode('login');
+        } else navigate('/');
+      } else if (mode === 'reset') {
+        const result = await authService.updatePassword(password);
+        if (result.success) navigate('/', { replace: true });
+        else setError(result.error || 'Erro ao salvar a nova senha. Peça um novo link.');
+      } else {
+        const result = await authService.requestPasswordReset(email);
+        if (result.success) setInfo('Se existir uma conta com este e-mail, você receberá o link em instantes.');
+        else setError(result.error || 'Erro ao enviar o link.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
+
+  const copy = COPY[mode];
 
   return (
     <div className="login-page">
@@ -41,11 +91,16 @@ const Login = () => {
           >
             <img src="/logo.png" alt="PinkLogic" className="login-logo-img" />
           </motion.div>
-          <h1>Boas-vindas ao <span className="notranslate" translate="no">PinkLogic</span></h1>
-          <p>Acesse sua central estratégica de design e dados</p>
+          <h1>{copy.title} <span className="notranslate" translate="no">PinkLogic</span></h1>
+          <p>{copy.subtitle}</p>
         </div>
 
-        <form onSubmit={handleLogin} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form">
+          {info && (
+            <div className="login-info-message" role="status">
+              {info}
+            </div>
+          )}
           {error && (
             <div className="login-error-message" style={{
               background: 'rgba(239, 68, 68, 0.1)',
@@ -61,22 +116,42 @@ const Login = () => {
             </div>
           )}
 
-          <div className="input-field">
-            <Mail size={18} />
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
-          
+          {mode === 'signup' && (
+            <div className="input-field">
+              <User size={18} />
+              <input
+                type="text"
+                placeholder="Seu nome"
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          {mode !== 'reset' && (
+            <div className="input-field">
+              <Mail size={18} />
+              <input
+                type="email"
+                placeholder="Email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          {mode !== 'forgot' && (
           <div className="input-field">
             <Lock size={18} />
             <input 
               type={showPassword ? "text" : "password"} 
-              placeholder="Senha" 
+              placeholder={mode === 'reset' ? 'Nova senha' : mode === 'signup' ? 'Crie uma senha' : 'Senha'}
+              autoComplete={mode === 'signup' || mode === 'reset' ? 'new-password' : 'current-password'}
+              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required 
@@ -102,24 +177,33 @@ const Login = () => {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          )}
 
-          <button 
-            type="submit" 
+          {mode === 'login' && (
+            <button type="button" className="login-link login-forgot" onClick={() => switchMode('forgot')}>
+              Esqueci minha senha
+            </button>
+          )}
+
+          <button
+            type="submit"
             className="btn-login"
+            disabled={loading}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            <LogIn size={18} />
-            <span>Entrar na Plataforma</span>
+            {mode === 'login' ? <LogIn size={18} /> : mode === 'signup' ? <UserPlus size={18} /> : <KeyRound size={18} />}
+            <span>{loading ? 'Aguarde...' : copy.cta}</span>
             <Sparkles size={16} />
           </button>
         </form>
 
         <div className="login-footer" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <p style={{ margin: 0, fontSize: '0.72rem', color: '#a1a1b5', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px' }}>
-            🔑 Demo: <strong style={{ color: 'white' }}>admin@pinklogic.com</strong> | Senha: <strong style={{ color: 'white' }}>pinklogic123</strong>
-          </p>
-          <p>Não tem uma conta? <span className="text-primary cursor-pointer">Comece agora</span></p>
+          {mode === 'login' ? (
+            <p>Não tem uma conta? <button type="button" className="login-link" onClick={() => switchMode('signup')}>Comece agora</button></p>
+          ) : (
+            <p>Já tem uma conta? <button type="button" className="login-link" onClick={() => switchMode('login')}>Entrar</button></p>
+          )}
         </div>
       </motion.div>
 
@@ -263,6 +347,58 @@ const Login = () => {
 
         .text-primary { color: var(--primary); font-weight: 600; }
         .cursor-pointer { cursor: pointer; }
+
+        .btn-login:disabled {
+          opacity: 0.7;
+          cursor: wait;
+          transform: none;
+        }
+
+        .login-info-message {
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.25);
+          border-radius: 8px;
+          padding: 0.75rem;
+          color: #4ade80;
+          font-size: 0.825rem;
+          text-align: center;
+          font-weight: 500;
+        }
+
+        .login-link {
+          background: none;
+          border: none;
+          padding: 0.25rem;
+          color: var(--primary);
+          font-weight: 600;
+          font-size: inherit;
+          cursor: pointer;
+        }
+
+        .login-forgot {
+          align-self: flex-end;
+          margin-top: -0.5rem;
+          font-size: 0.82rem;
+          font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+          .login-page {
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 1.5rem 1rem;
+          }
+          .login-container {
+            padding: 2rem 1.25rem;
+            border-radius: 18px;
+          }
+          .login-branding {
+            margin-bottom: 1.75rem;
+          }
+          .login-branding h1 {
+            font-size: 1.4rem;
+          }
+        }
       `}</style>
     </div>
   );

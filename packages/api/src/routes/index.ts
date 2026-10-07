@@ -8,6 +8,7 @@ import {
 import { generate } from "../services/generate.js";
 import { decide, approvePost } from "../services/jev-decider.js";
 import { collect, aisaReady } from "../services/aisa.js";
+import { requireAuth } from "../services/auth.js";
 
 export const router = Router();
 
@@ -22,6 +23,11 @@ router.get("/health", (_req, res) => {
       aisa: aisaReady(),
     },
   });
+});
+
+// ─── Autenticação: tudo abaixo de /health exige login ou a chave de serviço ──
+router.use(async (req, res, next) => {
+  if (await requireAuth(req, res)) next();
 });
 
 // ─── Geração (motores reais do PINK-LOGIC) ────────────────
