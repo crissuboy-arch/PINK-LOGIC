@@ -4,8 +4,8 @@
  * Precisa da tabela pl_posts (migration) para persistir.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { PostSchema } from "@pink-logic/shared";
-import { approvePost } from "@pink-logic/api/services/jev-decider.js";
+import { PostSchema } from "../packages/shared/dist/index.js";
+import { approvePost } from "../packages/api/dist/services/jev-decider.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });
