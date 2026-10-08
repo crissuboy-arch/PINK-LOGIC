@@ -6,7 +6,7 @@
   "outputDirectory": "packages/web/dist",
   "functions": {
     "api/**/*.js": {
-      "maxDuration": 300,
+      "maxDuration": 60,
       "includeFiles": "{packages/api/dist/fonts/**,packages/api/dist/prompts/**,node_modules/harfbuzzjs/hb.wasm}"
     }
   },
