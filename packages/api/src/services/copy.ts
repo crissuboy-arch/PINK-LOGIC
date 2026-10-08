@@ -14,8 +14,8 @@ import { checkCopy } from "./copy-check.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** Tempo máximo da 1ª geração para ainda caber uma reescrita dentro dos 60s da função. */
-const REGEN_BUDGET_MS = 25_000;
+/** Tempo máximo da 1ª geração para ainda caber uma reescrita dentro do limite da função (vercel.json). */
+const REGEN_BUDGET_MS = 90_000;
 
 let systemPrompt: string | null = null;
 function loadSystemPrompt(): string {
@@ -83,7 +83,7 @@ export async function generateCopy(briefing: CopyBriefing) {
   let check = checkCopy(text, briefing.format);
   let regenerated = false;
 
-  // A função tem 60s (vercel.json). Só reescreve se a 1ª geração deixou tempo para uma 2ª;
+  // A função tem 300s (vercel.json). Só reescreve se a 1ª geração deixou tempo para uma 2ª;
   // senão devolve a 1ª versão com o aviso "Revisar" em vez de estourar o tempo (504).
   if (!check.passed && firstMs < REGEN_BUDGET_MS) {
     regenerated = true;
