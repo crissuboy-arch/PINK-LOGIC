@@ -14,6 +14,17 @@ import { checkCopy } from "./copy-check.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/** Erro legível quando a IA estoura o tempo (a AIsa corta conexões em ~60s). */
+function friendlyAiError(e: any): Error {
+  const msg = String(e?.message || "");
+  if (/terminated|timeout|timed out|HTTP 504|aborted|ECONNRESET/i.test(msg)) {
+    const err: any = new Error("A IA demorou demais para responder. Tente novamente.");
+    err.status = 504;
+    return err;
+  }
+  return e;
+}
+
 /** Tempo máximo da 1ª geração para ainda caber uma reescrita dentro do limite da função (vercel.json). */
 const REGEN_BUDGET_MS = 90_000;
 
@@ -72,7 +83,12 @@ export async function generateCopy(briefing: CopyBriefing) {
   const user = buildUserMessage(briefing);
 
   const t0 = Date.now();
-  let text = await generateTextWithSystem(system, user);
+  let text: string;
+  try {
+    text = await generateTextWithSystem(system, user);
+  } catch (e: any) {
+    throw friendlyAiError(e);
+  }
   const firstMs = Date.now() - t0;
   if (!text.trim()) {
     // Nunca devolver "sucesso" em branco: o usuário precisa ver que falhou.
@@ -87,10 +103,11 @@ export async function generateCopy(briefing: CopyBriefing) {
   // senão devolve a 1ª versão com o aviso "Revisar" em vez de estourar o tempo (504).
   if (!check.passed && firstMs < REGEN_BUDGET_MS) {
     regenerated = true;
+    // Se a reescrita falhar (ex.: tempo esgotado), mantém a primeira versão com o aviso de revisão.
     const retry = await generateTextWithSystem(
       system,
       `${user}\n\nATENÇÃO: a versão anterior foi REPROVADA na checagem automática por: ${check.violations.join("; ")}. Reescreve eliminando TODAS as violações, mantendo a estrutura AIDA/PAS e o formato de entrega.`
-    );
+    ).catch(() => "");
     // Se a reescrita vier vazia, mantém a primeira versão (com o aviso de revisão).
     if (retry.trim()) {
       text = retry;
