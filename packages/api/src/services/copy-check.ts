@@ -107,7 +107,9 @@ export function checkCopy(text: string, format?: string): CopyCheckResult {
 
   // travessão em texto curto
   const f = (format || "").toLowerCase();
-  if (f && SHORT_FORMATS.some((s) => f.includes(s)) && copy.includes("—")) {
+  // (ignora títulos de seção como "## Variação 1 — ângulo DOR", que não são copy)
+  const copyLines = copy.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+  if (f && SHORT_FORMATS.some((s) => f.includes(s)) && copyLines.includes("—")) {
     violations.push("travessão (—) em texto curto");
   }
 

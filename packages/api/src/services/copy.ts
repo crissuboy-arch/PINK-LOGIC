@@ -26,7 +26,7 @@ function friendlyAiError(e: any): Error {
 }
 
 /** Tempo máximo da 1ª geração para ainda caber uma reescrita dentro do limite da função (vercel.json). */
-const REGEN_BUDGET_MS = 90_000;
+const REGEN_BUDGET_MS = 40_000;
 
 let systemPrompt: string | null = null;
 function loadSystemPrompt(): string {
