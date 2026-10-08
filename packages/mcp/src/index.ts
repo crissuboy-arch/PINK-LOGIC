@@ -13,18 +13,27 @@ const API_URL = process.env.PINK_LOGIC_API_URL || "http://localhost:3001";
 // Chave de serviço da Athena: a API exige autenticação em todas as rotas exceto /health.
 const SERVICE_KEY = process.env.PINK_LOGIC_SERVICE_KEY || "";
 
-async function api(path: string, body?: unknown) {
+async function api(path: string, body?: unknown, method?: "GET" | "POST" | "PATCH" | "DELETE") {
   const res = await fetch(`${API_URL}/api${path}`, {
-    method: body ? "POST" : "GET",
+    method: method || (body ? "POST" : "GET"),
     headers: {
       "Content-Type": "application/json",
       ...(SERVICE_KEY ? { Authorization: `Bearer ${SERVICE_KEY}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 204) return { ok: true };
   const data = await res.json();
   if (!res.ok) throw new Error((data as any).error || `HTTP ${res.status}`);
   return data;
+}
+
+/** Monta a query string para GET, ignorando campos vazios/undefined. */
+function qs(params: Record<string, unknown>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") sp.set(k, String(v));
+  const s = sp.toString();
+  return s ? `?${s}` : "";
 }
 
 const server = new McpServer({ name: "pink-logic", version: "2.0.0" });
@@ -103,17 +112,77 @@ server.tool(
   })
 );
 
-// ─── Posts ────────────────────────────────────────────────
+// ─── Posts (mesma tabela que o Calendário do site usa) ────
+const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X/Twitter", "WordPress", "Blog"] as const;
+
 server.tool(
   "create_post",
-  "Cria um post (rascunho). A API passa automaticamente pela porta do Jev: aprovado → SCHEDULED, senão → PENDING_REVIEW.",
+  "Cria um post. Sem scheduledAt, fica rascunho. Com scheduledAt, a API passa pela porta do Jev antes de agendar: " +
+    "aprovado → agendado de verdade; reprovado → continua rascunho, para revisão humana (nunca agenda sozinho algo fraco).",
   {
-    caption: z.string(),
-    imageUrl: z.string().url().optional(),
+    title: z.string().min(1).max(200),
+    caption: z.string().max(2200),
     hashtags: z.array(z.string()).default([]),
+    mediaUrl: z.string().url().optional().describe("URL pública da imagem/arte do post"),
+    aspectRatio: z.string().max(10).optional().describe("ex.: 4:5, 1:1, 9:16"),
+    platforms: z.array(z.enum(PLATFORMS)).min(1).describe("Onde publicar: Instagram, Facebook, ..."),
+    scheduledAt: z.string().datetime().optional().describe("ISO 8601; omitido = fica rascunho"),
+    projectId: z.string().uuid().optional().describe("Omitido = primeiro projeto da conta"),
   },
   async (input) => ({
     content: [{ type: "text", text: JSON.stringify(await api("/posts", input)) }],
+  })
+);
+
+server.tool(
+  "list_posts",
+  "Lista posts (rascunhos, agendados, publicados...). Usa antes de agendar/publicar para ver o que já existe.",
+  {
+    status: z.enum(["rascunho", "editando", "agendado", "publicando", "publicado", "falhou"]).optional(),
+    projectId: z.string().uuid().optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    limit: z.number().int().min(1).max(200).default(50),
+  },
+  async (input) => ({
+    content: [{ type: "text", text: JSON.stringify(await api(`/posts${qs(input)}`)) }],
+  })
+);
+
+server.tool(
+  "update_post",
+  "Edita um post existente (legenda, mídia, plataformas, data...). Passa só os campos que queres mudar.",
+  {
+    id: z.string().uuid(),
+    title: z.string().min(1).max(200).optional(),
+    caption: z.string().max(2200).optional(),
+    hashtags: z.array(z.string()).optional(),
+    mediaUrl: z.string().url().optional(),
+    aspectRatio: z.string().max(10).optional(),
+    platforms: z.array(z.enum(PLATFORMS)).optional(),
+    scheduledAt: z.string().datetime().optional(),
+  },
+  async ({ id, ...patch }) => ({
+    content: [{ type: "text", text: JSON.stringify(await api(`/posts/${id}`, patch, "PATCH")) }],
+  })
+);
+
+server.tool(
+  "schedule_post",
+  "Agenda um post já existente para uma data/hora (não passa pelo Jev — usa create_post com scheduledAt para isso).",
+  { id: z.string().uuid(), scheduledAt: z.string().datetime() },
+  async ({ id, scheduledAt }) => ({
+    content: [{ type: "text", text: JSON.stringify(await api(`/posts/${id}/schedule`, { scheduledAt })) }],
+  })
+);
+
+server.tool(
+  "publish_post",
+  "Publica um post AGORA, de imediato, no Instagram e/ou Facebook conforme as plataformas do post. " +
+    "Ação real e visível publicamente — só usa depois de confirmar com a Cristiane, nunca por iniciativa própria.",
+  { id: z.string().uuid() },
+  async ({ id }) => ({
+    content: [{ type: "text", text: JSON.stringify(await api(`/posts/${id}/publish`, {})) }],
   })
 );
 

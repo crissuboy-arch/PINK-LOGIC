@@ -3,12 +3,15 @@ import {
   GenerateRequestSchema,
   DecideRequestSchema,
   CollectRequestSchema,
-  PostSchema,
+  ScheduledPostCreateSchema,
+  ScheduledPostUpdateSchema,
+  ScheduledPostListQuerySchema,
 } from "@pink-logic/shared";
 import { generate } from "../services/generate.js";
-import { decide, approvePost } from "../services/jev-decider.js";
+import { decide } from "../services/jev-decider.js";
 import { collect, aisaReady } from "../services/aisa.js";
 import { requireAuth } from "../services/auth.js";
+import { createPost, listPosts, getPost, updatePost, deletePost, schedulePost, publishPostNow, publishDuePosts } from "../services/posts.js";
 
 export const router = Router();
 
@@ -64,24 +67,93 @@ router.post("/collect", async (req, res) => {
   }
 });
 
-// ─── Posts — máquina de conteúdo ──────────────────────────
-// Nota: tabelas `posts` ainda não existem no Supabase — os endpoints
-// validam o contrato e devolvem 501 até a migration ser aplicada.
-// A Athena (via MCP) já pode programar contra este contrato.
+// ─── Posts — máquina de conteúdo (mesma tabela que o site usa) ───
 router.post("/posts", async (req, res) => {
-  const parsed = PostSchema.safeParse(req.body);
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const parsed = ScheduledPostCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  // Porta do Jev: DRAFT → PENDING_REVIEW | SCHEDULED
-  const decision = await approvePost(parsed.data as any);
-  const status = decision.passed ? "SCHEDULED" : "PENDING_REVIEW";
-
-  res.status(501).json({
-    error: "Tabela `posts` ainda não existe — aplica a migration primeiro.",
-    contract: { ...parsed.data, status, decision },
-  });
+  try {
+    res.status(201).json({ post: await createPost(auth, parsed.data) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
-router.get("/posts", (_req, res) => {
-  res.status(501).json({ error: "Tabela `posts` ainda não existe — aplica a migration primeiro." });
+router.get("/posts", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const parsed = ScheduledPostListQuerySchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    res.json({ posts: await listPosts(auth, parsed.data) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/posts/:id", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  try {
+    res.json({ post: await getPost(auth, req.params.id) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.patch("/posts/:id", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const parsed = ScheduledPostUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    res.json({ post: await updatePost(auth, req.params.id, parsed.data) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.delete("/posts/:id", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  try {
+    await deletePost(auth, req.params.id);
+    res.status(204).end();
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/posts/:id/schedule", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  try {
+    res.json({ post: await schedulePost(auth, req.params.id, req.body?.scheduledAt) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/posts/:id/publish", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  try {
+    res.json({ post: await publishPostNow(auth, req.params.id) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── Cron (produção: /api/cron/publish, protegido por CRON_SECRET) ───
+router.get("/cron/publish", async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return res.status(503).json({ error: "CRON_SECRET não configurado." });
+  if (req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ error: "Não autorizado." });
+  try {
+    const outcomes = await publishDuePosts();
+    res.json({ ok: true, processed: outcomes.length, outcomes });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });

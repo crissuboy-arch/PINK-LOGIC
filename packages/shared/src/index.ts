@@ -134,3 +134,48 @@ export const CollectRequestSchema = z.object({
   limit: z.number().int().min(1).max(500).default(50),
 });
 export type CollectRequest = z.infer<typeof CollectRequestSchema>;
+
+// ─── Posts (scheduled_posts) — API /api/posts + MCP ───────────────────────
+// Opera sobre a mesma tabela que o site usa (Fase 2): um post criado pela
+// Athena aparece no Calendário, e vice-versa.
+export const PublisherPlatformSchema = z.enum(["Instagram", "Facebook", "LinkedIn", "X/Twitter", "WordPress", "Blog"]);
+export const ScheduledPostStatusSchema = z.enum(["rascunho", "editando", "agendado", "publicando", "publicado", "falhou"]);
+
+export const ScheduledPostCreateSchema = z.object({
+  projectId: z.string().uuid().optional(), // omitido → primeiro projeto do dono
+  brandId: z.string().uuid().optional(),
+  campaignId: z.string().uuid().optional(),
+  title: z.string().min(1).max(200),
+  caption: z.string().max(2200),
+  hashtags: z.array(z.string()).default([]),
+  mediaUrl: z.string().url().optional(),
+  aspectRatio: z.string().max(10).optional(), // ex.: "4:5", "1:1", "9:16"
+  platforms: z.array(PublisherPlatformSchema).min(1),
+  scheduledAt: z.string().datetime().optional(), // omitido → rascunho (não agendado)
+  decision: z
+    .object({ approved: z.boolean(), confidence: z.number().min(0).max(1), reason: z.string().optional() })
+    .optional(),
+});
+export type ScheduledPostCreate = z.infer<typeof ScheduledPostCreateSchema>;
+
+export const ScheduledPostUpdateSchema = ScheduledPostCreateSchema.partial().extend({
+  status: ScheduledPostStatusSchema.optional(),
+});
+export type ScheduledPostUpdate = z.infer<typeof ScheduledPostUpdateSchema>;
+
+export const ScheduledPostListQuerySchema = z.object({
+  status: ScheduledPostStatusSchema.optional(),
+  projectId: z.string().uuid().optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type ScheduledPostListQuery = z.infer<typeof ScheduledPostListQuerySchema>;
+
+// Resultado da publicação na Meta Graph API (Instagram e/ou Facebook).
+export const PlatformPublishResultSchema = z.object({
+  ok: z.boolean(),
+  id: z.string().optional(), // ig_media_id ou fb_post_id
+  error: z.string().optional(),
+});
+export type PlatformPublishResult = z.infer<typeof PlatformPublishResultSchema>;

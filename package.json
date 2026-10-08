@@ -8,6 +8,7 @@
   "scripts": {
     "build": "npm run build --workspace=@pink-logic/shared && npm run build --workspace=@pink-logic/api && npm run build --workspace=@pink-logic/mcp && npm run build --workspace=@pink-logic/web",
     "test:carousel": "npm run build --workspace=@pink-logic/shared && npm run build --workspace=@pink-logic/api && node --test tests/carousel-content.test.mjs",
+    "test:posts": "npm run build --workspace=@pink-logic/shared && npm run build --workspace=@pink-logic/api && node --test tests/meta-graph.test.mjs",
     "dev": "npm run dev --workspace=@pink-logic/web",
     "dev:api": "npm run dev --workspace=@pink-logic/api",
     "dev:mcp": "npm run dev --workspace=@pink-logic/mcp",
