@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { ScheduledPost, SocialAccount, PublisherPlatform, PublishStatus } from '../types/publisher';
 import { useCentralStore } from '../store/CentralStore';
 import type { Post as PostStore } from '../store/types';
@@ -8,7 +8,7 @@ interface PublisherContextType {
   socialAccounts: SocialAccount[];
   createScheduledPost: (
     post: Omit<ScheduledPost, 'id' | 'user_id' | 'status' | 'created_at' | 'updated_at'>
-  ) => ScheduledPost;
+  ) => Promise<ScheduledPost>;
   deleteScheduledPost: (id: string) => void;
   updatePostStatus: (id: string, status: PublishStatus, errorMessage?: string | null) => void;
   updateScheduledPostDate: (id: string, date: Date) => void;
@@ -72,36 +72,21 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return projectPosts.map(mapToScheduledPost);
   }, [centralPosts, activeProjectId]);
 
-  // Load accounts locally
-  useEffect(() => {
-    try {
-      const savedAccounts = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS);
-      if (savedAccounts) {
-        const parsed = JSON.parse(savedAccounts);
-        setSocialAccounts(Array.isArray(parsed) ? parsed : DEFAULT_ACCOUNTS);
-      } else {
-        setSocialAccounts(DEFAULT_ACCOUNTS);
-        localStorage.setItem(LOCAL_STORAGE_ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
-      }
-    } catch {
-      setSocialAccounts(DEFAULT_ACCOUNTS);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // OAuth is not wired yet. Never present local demo flags as real connections.
+  useEffect(() => { setSocialAccounts(DEFAULT_ACCOUNTS); setIsLoading(false); }, []);
 
   const saveAccounts = (accounts: SocialAccount[]) => {
     setSocialAccounts(accounts);
     localStorage.setItem(LOCAL_STORAGE_ACCOUNTS, JSON.stringify(accounts));
   };
 
-  const createScheduledPost = (
+  const createScheduledPost = async (
     postData: Omit<ScheduledPost, 'id' | 'user_id' | 'status' | 'created_at' | 'updated_at'>
-  ): ScheduledPost => {
-    const id = crypto.randomUUID();
+  ): Promise<ScheduledPost> => {
+    if (!activeProjectId) throw new Error('Selecione um projeto antes de salvar.');
     
-    createPost({
-      projectId: activeProjectId || 'default-project-1',
+    const saved = await createPost({
+      projectId: activeProjectId,
       campaignId: null,
       title: postData.title,
       caption: postData.caption,
@@ -117,7 +102,7 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     return {
       ...postData,
-      id,
+      id: saved.id,
       user_id: 'user-default',
       project_id: activeProjectId,
       status: 'scheduled',
@@ -148,14 +133,8 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
-  const connectAccount = (platform: PublisherPlatform, name: string) => {
-    const updated = socialAccounts.map((acc) => {
-      if (acc.platform === platform) {
-        return { ...acc, account_name: name || acc.account_name, status: 'connected' as const, updated_at: new Date().toISOString() };
-      }
-      return acc;
-    });
-    saveAccounts(updated);
+  const connectAccount = (_platform: PublisherPlatform, _name: string) => {
+    throw new Error('A conexão OAuth com as redes ainda precisa ser configurada. Informar um nome não conecta a conta.');
   };
 
   const disconnectAccount = (id: string) => {
@@ -168,29 +147,9 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     saveAccounts(updated);
   };
 
-  const publishPostNow = async (id: string) => {
-    // Instant publication simulation
-    console.log(`[PublisherFacade] Publishing post instantly: ${id}`);
-    await updatePostStatus(id, 'published');
+  const publishPostNow = async (_id: string) => {
+    throw new Error('Publicação automática ainda não configurada. O conteúdo permanece salvo para revisão e exportação.');
   };
-
-  // Background scheduler simulation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      scheduledPosts.forEach((post) => {
-        if (post.status === 'scheduled') {
-          const scheduledTime = new Date(post.scheduled_at);
-          if (scheduledTime <= now) {
-            console.log(`[SchedulerFacade] Auto-publishing post: "${post.title}"`);
-            publishPostNow(post.id);
-          }
-        }
-      });
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [scheduledPosts]);
 
   return (
     <PublisherContext.Provider

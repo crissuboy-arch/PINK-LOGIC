@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Project, Brand, Campaign, Post, ChecklistItem, Product } from './types';
+import { supabase } from '../lib/supabaseClient';
 import { apiService } from '../services/api';
 
 interface CentralStoreContextType {
+  userId: string | null;
+  isLoading: boolean;
+  error: string | null;
   projects: Project[];
   brands: Brand[];
   campaigns: Campaign[];
@@ -57,48 +61,33 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
-  // 1. Initial Load (Supabase-ready LocalStorage Mock)
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    async function loadData() {
-      try {
-        const projs = await apiService.getProjects();
-        const brs = await apiService.getBrands();
-        const camps = await apiService.getCampaigns();
-        const pts = await apiService.getPosts();
-        const prods = await apiService.getProducts();
-        const chk = await apiService.getChecklist();
-
-        setProjects(projs);
-        setBrands(brs);
-        setCampaigns(camps);
-        setPosts(pts);
-        setProducts(prods);
-        setChecklist(chk);
-
-        // Auto select active project if available
-        if (projs.length > 0) {
-          const storedActiveId = localStorage.getItem('pink_logic_v2_active_project_id');
-          if (storedActiveId && projs.some(p => p.id === storedActiveId)) {
-            setActiveProjectId(storedActiveId);
-          } else {
-            setActiveProjectId(projs[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load initial CentralStore data:', err);
-      }
-    }
-    loadData();
+    if (!supabase) { setIsLoading(false); setError('Conexão com Supabase não configurada.'); return; }
+    let alive = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (alive) { setUserId(session?.user.id || null); }
+    });
+    return () => { alive = false; subscription.unsubscribe(); };
   }, []);
 
-  // Sync active project id to localStorage for page-reload persistence
   useEffect(() => {
-    if (activeProjectId) {
-      localStorage.setItem('pink_logic_v2_active_project_id', activeProjectId);
-    } else {
-      localStorage.removeItem('pink_logic_v2_active_project_id');
-    }
-  }, [activeProjectId]);
+    let cancelled = false;
+    setProjects([]); setBrands([]); setCampaigns([]); setPosts([]); setProducts([]); setChecklist([]); setActiveProjectId(null);
+    if (!userId) { setIsLoading(false); return; }
+    setIsLoading(true); setError(null);
+    Promise.all([apiService.getProjects(), apiService.getBrands(), apiService.getCampaigns(), apiService.getPosts(), apiService.getProducts(), apiService.getChecklist()])
+      .then(([projs, brs, camps, pts, prods, chk]) => {
+        if (cancelled) return;
+        setProjects(projs); setBrands(brs); setCampaigns(camps); setPosts(pts); setProducts(prods); setChecklist(chk);
+        setActiveProjectId(projs[0]?.id || null);
+      }).catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Falha ao carregar seus projetos.'); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const activeProject = activeProjectId ? projects.find(p => p.id === activeProjectId) || null : null;
   const activeBrand = activeProject ? brands.find(b => b.projectId === activeProjectId) || null : null;
@@ -201,71 +190,57 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
       overlays: [],
     };
 
-    const updatedProjects = [...projects, newProj];
-    const updatedBrands = [...brands, newBrand];
-
-    setProjects(updatedProjects);
-    setBrands(updatedBrands);
-    await apiService.saveProjects(updatedProjects);
-    await apiService.saveBrands(updatedBrands);
+    await apiService.saveProjects([newProj]);
+    try { await apiService.saveBrands([newBrand]); }
+    catch (error) { await apiService.deleteRecord('projects', id); throw error; }
+    setProjects(current => [...current, newProj]);
+    setBrands(current => [...current, newBrand]);
 
     // Auto-switch to newly created project
     setActiveProjectId(id);
     return newProj;
-  }, [projects, brands]);
+  }, []);
 
   const updateProject = useCallback(async (id: string, data: Partial<Project>): Promise<void> => {
     const list = projects.map(p => p.id === id ? { ...p, ...data } : p);
-    setProjects(list);
-    await apiService.saveProjects(list);
+    await apiService.saveProjects(list.filter(item => item.id === id));
+    setProjects(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [projects]);
 
   const deleteProject = useCallback(async (id: string): Promise<void> => {
-    const list = projects.filter(p => p.id !== id);
-    setProjects(list);
-    await apiService.saveProjects(list);
-
-    // Cleanup cascaded brands, campaigns, etc.
-    const remainingBrands = brands.filter(b => b.projectId !== id);
-    setBrands(remainingBrands);
-    await apiService.saveBrands(remainingBrands);
-
-    const remainingCamps = campaigns.filter(c => c.projectId !== id);
-    setCampaigns(remainingCamps);
-    await apiService.saveCampaigns(remainingCamps);
-
-    const remainingPosts = posts.filter(p => p.projectId !== id);
-    setPosts(remainingPosts);
-    await apiService.savePosts(remainingPosts);
-
-    const remainingProducts = products.filter(p => p.projectId !== id);
-    setProducts(remainingProducts);
-    await apiService.saveProducts(remainingProducts);
-
-    const remainingChecklist = checklist.filter(c => c.projectId !== id);
-    setChecklist(remainingChecklist);
-    await apiService.saveChecklist(remainingChecklist);
-
-    // Shift active project if deleted
-    if (activeProjectId === id) {
-      setActiveProjectId(list.length > 0 ? list[0].id : null);
-    }
-  }, [projects, brands, campaigns, posts, products, checklist, activeProjectId]);
+    await apiService.deleteRecord('projects', id);
+    setProjects(current => current.filter(p => p.id !== id));
+    setBrands(current => current.filter(p => p.projectId !== id));
+    setCampaigns(current => current.filter(p => p.projectId !== id));
+    setPosts(current => current.filter(p => p.projectId !== id));
+    setProducts(current => current.filter(p => p.projectId !== id));
+    setChecklist(current => current.filter(p => p.projectId !== id));
+    setActiveProjectId(current => current === id ? null : current);
+  }, []);
 
   // Brands CRUD
   const createBrand = useCallback(async (data: Omit<Brand, 'id'>): Promise<Brand> => {
     const id = crypto.randomUUID();
     const item: Brand = { ...data, id };
     const list = [...brands, item];
-    setBrands(list);
-    await apiService.saveBrands(list);
+    await apiService.saveBrands(list.filter(item => item.id === id));
+    setBrands(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
     return item;
   }, [brands]);
 
   const updateBrand = useCallback(async (id: string, data: Partial<Brand>): Promise<void> => {
     const list = brands.map(b => b.id === id ? { ...b, ...data } : b);
-    setBrands(list);
-    await apiService.saveBrands(list);
+    await apiService.saveBrands(list.filter(item => item.id === id));
+    setBrands(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [brands]);
 
   // Campaigns CRUD
@@ -273,22 +248,27 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const id = crypto.randomUUID();
     const item: Campaign = { ...data, id };
     const list = [...campaigns, item];
-    setCampaigns(list);
-    await apiService.saveCampaigns(list);
+    await apiService.saveCampaigns(list.filter(item => item.id === id));
+    setCampaigns(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
     return item;
   }, [campaigns]);
 
   const updateCampaign = useCallback(async (id: string, data: Partial<Campaign>): Promise<void> => {
     const list = campaigns.map(c => c.id === id ? { ...c, ...data } : c);
-    setCampaigns(list);
-    await apiService.saveCampaigns(list);
+    await apiService.saveCampaigns(list.filter(item => item.id === id));
+    setCampaigns(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [campaigns]);
 
   const deleteCampaign = useCallback(async (id: string): Promise<void> => {
-    const list = campaigns.filter(c => c.id !== id);
-    setCampaigns(list);
-    await apiService.saveCampaigns(list);
-  }, [campaigns]);
+    await apiService.deleteRecord('campaigns', id);
+    setCampaigns(current => current.filter(item => item.id !== id));
+  }, []);
 
   // Posts CRUD
   const createPost = useCallback(async (data: Omit<Post, 'id' | 'reach' | 'engagement'>): Promise<Post> => {
@@ -300,84 +280,106 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
       engagement: '-',
     };
     const list = [...posts, item];
-    setPosts(list);
-    await apiService.savePosts(list);
+    await apiService.savePosts(list.filter(item => item.id === id));
+    setPosts(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
     return item;
   }, [posts]);
 
   const updatePost = useCallback(async (id: string, data: Partial<Post>): Promise<void> => {
     const list = posts.map(p => p.id === id ? { ...p, ...data } : p);
-    setPosts(list);
-    await apiService.savePosts(list);
+    await apiService.savePosts(list.filter(item => item.id === id));
+    setPosts(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [posts]);
 
   const deletePost = useCallback(async (id: string): Promise<void> => {
-    const list = posts.filter(p => p.id !== id);
-    setPosts(list);
-    await apiService.savePosts(list);
-  }, [posts]);
+    await apiService.deleteRecord('scheduled_posts', id);
+    setPosts(current => current.filter(item => item.id !== id));
+  }, []);
 
   // Products CRUD
   const createProduct = useCallback(async (data: Omit<Product, 'id'>): Promise<Product> => {
     const id = crypto.randomUUID();
     const item: Product = { ...data, id };
     const list = [...products, item];
-    setProducts(list);
-    await apiService.saveProducts(list);
+    await apiService.saveProducts(list.filter(item => item.id === id));
+    setProducts(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
     return item;
   }, [products]);
 
   const updateProduct = useCallback(async (id: string, data: Partial<Product>): Promise<void> => {
     const list = products.map(p => p.id === id ? { ...p, ...data } : p);
-    setProducts(list);
-    await apiService.saveProducts(list);
+    await apiService.saveProducts(list.filter(item => item.id === id));
+    setProducts(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [products]);
 
   const deleteProduct = useCallback(async (id: string): Promise<void> => {
-    const list = products.filter(p => p.id !== id);
-    setProducts(list);
-    await apiService.saveProducts(list);
-  }, [products]);
+    await apiService.deleteRecord('products', id);
+    setProducts(current => current.filter(item => item.id !== id));
+  }, []);
 
   // Checklist CRUD
   const addChecklistItem = useCallback(async (text: string, responsible?: string | null): Promise<ChecklistItem> => {
     const id = crypto.randomUUID();
+    if (!activeProjectId) throw new Error('Selecione um projeto antes de criar uma tarefa.');
     const item: ChecklistItem = {
       id,
-      projectId: activeProjectId || 'default-project-1',
+      projectId: activeProjectId,
       text,
       completed: false,
       responsible: responsible || 'Social Media',
     };
     const list = [...checklist, item];
-    setChecklist(list);
-    await apiService.saveChecklist(list);
+    await apiService.saveChecklist(list.filter(item => item.id === id));
+    setChecklist(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
     return item;
   }, [checklist, activeProjectId]);
 
   const toggleChecklistItem = useCallback(async (id: string): Promise<void> => {
     const list = checklist.map(c => c.id === id ? { ...c, completed: !c.completed } : c);
-    setChecklist(list);
-    await apiService.saveChecklist(list);
+    await apiService.saveChecklist(list.filter(item => item.id === id));
+    setChecklist(current => {
+      const changed = list.find(item => item.id === id);
+      return changed ? (current.some(item => item.id === id) ? current.map(item => item.id === id ? changed : item) : [...current, changed]) : current;
+    });
   }, [checklist]);
 
   const deleteChecklistItem = useCallback(async (id: string): Promise<void> => {
-    const list = checklist.filter(c => c.id !== id);
-    setChecklist(list);
-    await apiService.saveChecklist(list);
-  }, [checklist]);
+    await apiService.deleteRecord('checklist_items', id);
+    setChecklist(current => current.filter(item => item.id !== id));
+  }, []);
+
+  // Every mutation exposes persistence failures in the shared layout as well as to its caller.
+  const reportError = <Args extends unknown[], Result>(operation: (...args: Args) => Promise<Result>) => async (...args: Args): Promise<Result> => {
+    try { setError(null); return await operation(...args); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível salvar.'); throw error; }
+  };
 
   return (
     <CentralStoreContext.Provider value={{
-      projects, brands, campaigns, posts, products, checklist,
+      userId, isLoading, error, projects, brands, campaigns, posts, products, checklist,
       activeProjectId, activeProject, activeBrand,
       setActiveProjectId,
-      createProject, updateProject, deleteProject,
-      createBrand, updateBrand,
-      createCampaign, updateCampaign, deleteCampaign,
-      createPost, updatePost, deletePost,
-      createProduct, updateProduct, deleteProduct,
-      addChecklistItem, toggleChecklistItem, deleteChecklistItem,
+      createProject: reportError(createProject), updateProject: reportError(updateProject), deleteProject: reportError(deleteProject),
+      createBrand: reportError(createBrand), updateBrand: reportError(updateBrand),
+      createCampaign: reportError(createCampaign), updateCampaign: reportError(updateCampaign), deleteCampaign: reportError(deleteCampaign),
+      createPost: reportError(createPost), updatePost: reportError(updatePost), deletePost: reportError(deletePost),
+      createProduct: reportError(createProduct), updateProduct: reportError(updateProduct), deleteProduct: reportError(deleteProduct),
+      addChecklistItem: reportError(addChecklistItem), toggleChecklistItem: reportError(toggleChecklistItem), deleteChecklistItem: reportError(deleteChecklistItem),
     }}>
       {children}
     </CentralStoreContext.Provider>

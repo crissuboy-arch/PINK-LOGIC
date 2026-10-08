@@ -1,3 +1,4 @@
+import { useCentralStore } from '../store/CentralStore';
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -6,6 +7,7 @@ import { authService } from '../services/authService';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 const Layout = () => {
+  const { error: persistenceError } = useCentralStore();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -74,6 +76,7 @@ const Layout = () => {
       <main className="main-content" style={{ transition: 'margin-left 0.2s cubic-bezier(0.16, 1, 0.3, 1)', marginLeft: 'var(--sidebar-width)' }}>
         <Header onOpenMenu={() => setMobileNavOpen(true)} />
         <div className="page-container">
+          {persistenceError && <div role="alert" style={{ padding: 16, color: '#ffb4b4' }}>{persistenceError}</div>}
           <Outlet />
         </div>
       </main>

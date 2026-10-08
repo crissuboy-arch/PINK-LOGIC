@@ -15,7 +15,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 if (isSupabaseConfigured) {
-  console.log('[Supabase] Conectado com sucesso utilizando chaves ambientais.');
+  console.log('[Supabase] Cliente configurado. A conexão será verificada ao carregar os dados.');
 } else {
-  console.log('[Supabase] Credenciais não encontradas. Utilizando fallback em localStorage.');
+  console.log('[Supabase] Configuração ausente. Salvamento na nuvem indisponível.');
 }

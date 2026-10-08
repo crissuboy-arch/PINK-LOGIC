@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Folder, 
   Plus, 
@@ -13,41 +13,40 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useProject } from '../../providers/ProjectProvider';
-import { loadEditorData } from '../../contexts/EditorContext';
+import { mapToProjectSchema } from '../../providers/ProjectProvider';
+import { useCentralStore } from '../../store/CentralStore';
+import type { ProjectSchema } from '../../types/ProjectSchema';
+import { loadEditorData, saveEditorData } from '../../services/editorDocuments';
 
 const MeusProjetos = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { projects, createProject, removeProject } = useProject();
+  const { projects: storedProjects, brands, createProject, deleteProject: removeProject, isLoading, error: loadError } = useCentralStore();
+  const projects = storedProjects.map(project => mapToProjectSchema(project, brands.find(b => b.projectId === project.id)));
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    migrateOldProjects(projects, createProject);
-  }, []);
-
-  const deleteProject = (id: string) => {
-    removeProject(id);
-    try {
-      const all = JSON.parse(localStorage.getItem('pinklogic.projects.editor') || '{}');
-      delete all[id];
-      localStorage.setItem('pinklogic.projects.editor', JSON.stringify(all));
-    } catch {}
+  const deleteProject = async (id: string) => {
+    if (!window.confirm('Excluir este projeto e seus designs salvos?')) return;
+    setBusy(true); setError(null);
+    try { await removeProject(id); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Falha ao excluir.'); }
+    finally { setBusy(false); }
   };
 
-  const duplicateProject = (project: any) => {
-    const now = new Date();
-    const copy = createProject({
-      name: `${project.name} (Cópia)`,
-      branding: project.branding,
-      settings: project.settings,
-    });
-    const editorData = loadEditorData(project.id);
-    if (editorData) {
-      const all = JSON.parse(localStorage.getItem('pinklogic.projects.editor') || '{}');
-      all[copy.id] = editorData;
-      localStorage.setItem('pinklogic.projects.editor', JSON.stringify(all));
-    }
+  const duplicateProject = async (project: ProjectSchema) => {
+    setBusy(true); setError(null);
+    try {
+      const original = storedProjects.find(p => p.id === project.id)!;
+      const editorData = await loadEditorData(project.id);
+      const copy = await createProject({ ...original, name: `${project.name} (Cópia)` });
+      if (editorData) {
+        try { await saveEditorData(copy.id, editorData.document, 0); }
+        catch (error) { await removeProject(copy.id); throw error; }
+      }
+    } catch (error) { setError(error instanceof Error ? error.message : 'Falha ao duplicar.'); }
+    finally { setBusy(false); }
   };
 
   const getPreviewBg = (project: any): string => {
@@ -85,6 +84,8 @@ const MeusProjetos = () => {
         </button>
       </header>
 
+      {(error || loadError) && <p role="alert">{error || loadError}</p>}
+      {isLoading && <p role="status">Carregando seus projetos…</p>}
       <div className="projects-toolbar">
         <div className="search-box">
           <Search size={18} />
@@ -154,8 +155,8 @@ const MeusProjetos = () => {
                   <div className="dropdown">
                     <button className="icon-btn-sm"><MoreVertical size={16} /></button>
                     <div className="dropdown-content">
-                      <button onClick={() => duplicateProject(project)}><Copy size={14} /> {t('projects.duplicate')}</button>
-                      <button onClick={() => deleteProject(project.id)} className="danger"><Trash2 size={14} /> {t('projects.delete')}</button>
+                      <button disabled={busy} onClick={() => duplicateProject(project)}><Copy size={14} /> {t('projects.duplicate')}</button>
+                      <button disabled={busy} onClick={() => deleteProject(project.id)} className="danger"><Trash2 size={14} /> {t('projects.delete')}</button>
                     </div>
                   </div>
                 </div>
@@ -164,7 +165,7 @@ const MeusProjetos = () => {
           ))}
         </AnimatePresence>
 
-        {filteredProjects.length === 0 && (
+        {!isLoading && !loadError && filteredProjects.length === 0 && (
           <div className="empty-state">
             <Folder size={60} opacity={0.1} />
             <h3>{t('projects.empty_title')}</h3>
@@ -399,36 +400,5 @@ const MeusProjetos = () => {
     </div>
   );
 };
-
-function migrateOldProjects(currentProjects: any[], createProject: any) {
-  const migrated = localStorage.getItem('pinklogic.migrated.v1');
-  if (migrated) return;
-  const oldRaw = localStorage.getItem('pink_logic_projects');
-  if (!oldRaw) {
-    localStorage.setItem('pinklogic.migrated.v1', 'true');
-    return;
-  }
-  try {
-    const oldList = JSON.parse(oldRaw);
-    if (!Array.isArray(oldList)) return;
-    const existingIds = new Set(currentProjects.map((p: any) => p.id));
-    for (const old of oldList) {
-      if (existingIds.has(old.id)) continue;
-      createProject({
-        id: old.id,
-        name: old.name || `Projeto`,
-      });
-      if (old.slides || old.canvasFormat) {
-        const all = JSON.parse(localStorage.getItem('pinklogic.projects.editor') || '{}');
-        all[old.id] = { slides: old.slides || [], canvasFormat: old.canvasFormat || null, updatedAt: old.updatedAt };
-        localStorage.setItem('pinklogic.projects.editor', JSON.stringify(all));
-      }
-    }
-    localStorage.setItem('pinklogic.migrated.v1', 'true');
-    localStorage.removeItem('pink_logic_projects');
-  } catch (e) {
-    console.warn('[Migration] Failed to migrate old projects:', e);
-  }
-}
 
 export default MeusProjetos;

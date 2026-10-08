@@ -59,6 +59,25 @@ export const GenerateResultSchema = z.object({
 });
 export type GenerateResult = z.infer<typeof GenerateResultSchema>;
 
+// Documento editável: geração termina em revisão, nunca em publicação.
+export const CarouselBriefSchema = z.object({
+  topic: z.string().trim().min(3).max(2000),
+  audience: z.string().max(500).default(""),
+  brand: z.string().max(200).default(""),
+  tone: z.string().max(200).default("profissional"),
+  objective: z.string().max(500).default("educar"),
+  slideCount: z.number().int().min(3).max(10).default(5),
+});
+export const CarouselDocumentSchema = z.object({
+  slides: z.array(z.object({
+    title: z.string().trim().min(1).max(110),
+    body: z.string().trim().min(1).max(350),
+  })).min(3).max(10),
+  caption: z.string().trim().min(1).max(2200),
+  hashtags: z.array(z.string().regex(/^#[\p{L}\p{N}_]+$/u).max(80)).max(10),
+});
+export type CarouselDocument = z.infer<typeof CarouselDocumentSchema>;
+
 // ─── Posts (máquina de conteúdo) ──────────────────────────
 export const PostStatusSchema = z.enum([
   "DRAFT",

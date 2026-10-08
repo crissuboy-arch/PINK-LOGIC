@@ -71,6 +71,7 @@ export async function generateTextWithSystem(system: string, user: string, model
   // com stream o texto chega aos poucos e a conexão não fica parada.
   const res = await fetch(`${AISA_BASE_URL}/v1/chat/completions`, {
     method: "POST",
+    signal: AbortSignal.timeout(90_000),
     headers: headers(),
     body: JSON.stringify({
       model,

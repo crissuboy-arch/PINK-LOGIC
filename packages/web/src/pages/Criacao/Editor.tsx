@@ -35,6 +35,8 @@ import type { EditorElement, Slide } from '../../contexts/EditorContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCentralStore } from '../../store/CentralStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { apiPost } from '../../lib/apiClient';
+import { buildEditableCarousel, type CarouselContent } from '../../services/carouselDocument';
 
 const getGradientCss = (color1: string, color2: string, direction: 'tb' | 'lr' | 'diag') => {
   const dirMap = {
@@ -121,7 +123,7 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     slides, setSlides, currentSlideIndex, setCurrentSlideIndex,
     selectedElementId, setSelectedElementId,
     canvasFormat, setCanvasFormat, availableFormats,
-    saveProject,
+    saveProject, generatedCaption, setGeneratedCaption, isSaving, isLoadingDocument, persistenceError, saveMessage,
     slideCount, setSlideCount,
     addSlide, duplicateSlide, removeSlide, reorderSlides, updateCurrentSlide,
     colorHistory, addToHistory
@@ -314,8 +316,9 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     };
   }, [canvasFormat, mobileToolOpen, mobilePropsOpen]);
 
-  const [showFormatModal, setShowFormatModal] = useState(!isCarouselOnly);
+  const [showFormatModal, setShowFormatModal] = useState(!isCarouselOnly && !new URLSearchParams(window.location.search).has('id'));
   const [showAIModal, setShowAIModal] = useState(false);
+  const [generationError, setGenerationError] = useState('');
   const [aiInputs, setAiInputs] = useState({ niche: '', topic: '', tone: 'motivational' });
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
@@ -1563,274 +1566,44 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     return result;
   };
 
-  const handleGenerateAI = () => {
-    // Check if the current slides are not default, and if so, confirm overwrite
-    const isDefault = slides.length === 1 && 
-      slides[0].elements.length === 4 && 
-      slides[0].elements[0].content === 'PinkLogic' &&
-      slides[0].elements[1].content === 'A revolução visual com inteligência artificial para o seu negócio.';
-      
-    if (!isDefault && (slides.length > 1 || (slides[0] && slides[0].elements.length > 0))) {
-      const confirm = window.confirm("Deseja gerar um novo design com a Inteligência Artificial? Seus slides e conteúdos atuais serão substituídos.");
-      if (!confirm) return;
+  const handleGenerateAI = async () => {
+    if (isProcessing) return;
+    const topic = (aiInputs.topic || aiInputs.niche).trim();
+    if (topic.length < 3) {
+      setGenerationError('Descreva o tema com pelo menos 3 caracteres.');
+      return;
     }
-
+    const isDefault = slides.length === 1 && slides[0]?.elements[0]?.content === 'PinkLogic';
+    if (!isDefault && slides.some(slide => slide.elements.length > 0) &&
+      !window.confirm('Gerar um novo rascunho? Os slides atuais só serão substituídos após a geração terminar com sucesso.')) return;
     setIsProcessing(true);
-    setShowAIModal(false);
-    
-    setTimeout(() => {
-      const promptText = (aiInputs.topic || aiInputs.niche || '').toLowerCase();
-      
-      // Match template ID based on keywords
-      let templateId = 'dark-infoproduto';
-      if (promptText.includes('beleza') || promptText.includes('maquiagem') || promptText.includes('estética') || promptText.includes('beauty') || promptText.includes('skin') || promptText.includes('cabelo')) {
-        templateId = 'beauty-premium';
-      } else if (promptText.includes('tech') || promptText.includes('tecnologia') || promptText.includes('ia') || promptText.includes('ai') || promptText.includes('software') || promptText.includes('programação')) {
-        templateId = 'tech-neon';
-      } else if (promptText.includes('black') || promptText.includes('friday') || promptText.includes('desconto') || promptText.includes('promo') || promptText.includes('liquidação')) {
-        templateId = 'black-friday';
-      } else if (promptText.includes('drop') || promptText.includes('loja') || promptText.includes('venda') || promptText.includes('produto') || promptText.includes('anúncio')) {
-        templateId = 'dropshipping-dark';
-      } else if (promptText.includes('ebook') || promptText.includes('livro') || promptText.includes('guia') || promptText.includes('pdf') || promptText.includes('digital')) {
-        templateId = 'ebook-premium';
-      } else if (promptText.includes('coach') || promptText.includes('mulher') || promptText.includes('feminina') || promptText.includes('carreira') || promptText.includes('vida')) {
-        templateId = 'coach-feminina';
-      } else if (promptText.includes('lux') || promptText.includes('gold') || promptText.includes('ouro') || promptText.includes('premium') || promptText.includes('grife')) {
-        templateId = 'luxury-gold';
-      } else if (promptText.includes('viral') || promptText.includes('instagram') || promptText.includes('feed') || promptText.includes('dica')) {
-        templateId = 'instagram-viral';
-      } else if (promptText.includes('neon') || promptText.includes('balada') || promptText.includes('brilho') || promptText.includes('festa')) {
-        templateId = 'story-neon';
-      } else if (promptText.includes('clean') || promptText.includes('minimal') || promptText.includes('simples')) {
-        templateId = 'minimal-clean';
-      } else if (promptText.includes('link') || promptText.includes('cta') || promptText.includes('story') || promptText.includes('bio')) {
-        templateId = 'cta-story';
-      }
-
-      // Load matching template base composition
-      const tpl = TEMPLATES_DATA[templateId] || TEMPLATES_DATA['dark-infoproduto'];
-      const W = canvasFormat.width;
-      const H = canvasFormat.height;
-      const scaleX = W / 1080;
-      const scaleY = H / 1080;
-
-      // Copywriting generator based on prompt topic
-      const topicName = aiInputs.topic || aiInputs.niche || 'Seu Negócio';
-      let titleCopy = `MÉTODO ${topicName.toUpperCase()}`;
-      let subtitleCopy = `Como acelerar seus resultados e se destacar no mercado digital hoje.`;
-      let ctaCopy = `QUERO ACESSAR AGORA`;
-
-      if (templateId === 'beauty-premium') {
-        titleCopy = `Sua Beleza Autêntica`;
-        subtitleCopy = `Descubra cuidados e tratamentos personalizados para o nicho de ${topicName}.`;
-        ctaCopy = `AGENDAR AVALIAÇÃO`;
-      } else if (templateId === 'tech-neon') {
-        titleCopy = `REVOLUÇÃO TECH: ${topicName.toUpperCase()}`;
-        subtitleCopy = `Implemente automação e sistemas com IA de alta performance no seu negócio.`;
-        ctaCopy = `INICIAR INTEGRAÇÃO ➔`;
-      } else if (templateId === 'black-friday') {
-        titleCopy = `BLACK FRIDAY: ${topicName.toUpperCase()}`;
-        subtitleCopy = `Toda a nossa linha de produtos com condições insanas. Últimas unidades!`;
-        ctaCopy = `APROVEITAR DESCONTO`;
-      } else if (templateId === 'dropshipping-dark') {
-        titleCopy = `${topicName.toUpperCase()} COM 50% OFF`;
-        subtitleCopy = `Garanta frete grátis e entrega rápida monitorada em todo o país.`;
-        ctaCopy = `COMPRAR COM DESCONTO`;
-      } else if (templateId === 'ebook-premium') {
-        titleCopy = `Guia Definitivo de ${topicName}`;
-        subtitleCopy = `O livro digital que ensina os bastidores da escala e performance profissional.`;
-        ctaCopy = `BAIXAR EBOOK GRATUITO`;
-      } else if (templateId === 'coach-feminina') {
-        titleCopy = `Evolução & Propósito`;
-        subtitleCopy = `Mentoria focada no desenvolvimento e inteligência emocional em ${topicName}.`;
-        ctaCopy = `APLICAR PARA VAGA`;
-      } else if (templateId === 'luxury-gold') {
-        titleCopy = `O Estilo de ${topicName}`;
-        subtitleCopy = `Sofisticação, exclusividade e os mais finos detalhes desenhados sob medida.`;
-        ctaCopy = `CONHECER COLEÇÃO`;
-      } else if (templateId === 'instagram-viral') {
-        titleCopy = `3 REGRAS DE OURO DE ${topicName.toUpperCase()}`;
-        subtitleCopy = `Arraste para o lado e entenda o hack de crescimento que ninguém te conta.`;
-        ctaCopy = `SALVAR ESTE POST`;
-      }
-
-      // Apply to elements
-      const newElements = tpl.elements.map((el: any) => {
-        let content = el.content;
-        // Replace text contents of template dynamically
-        if (el.id.includes('title')) {
-          content = titleCopy;
-        } else if (el.id.includes('desc') || el.id.includes('sub') || el.id.includes('card-text') || el.id.includes('step')) {
-          content = subtitleCopy;
-        } else if (el.id.includes('btn-txt') || el.id.includes('badge-txt')) {
-          if (el.id.includes('btn-txt')) content = ctaCopy;
-        }
-        
-        return {
-          ...el,
-          id: `${el.id}-${Math.random().toString(36).substr(2, 9)}`,
-          content: content,
-          x: Math.round(el.x * scaleX),
-          y: Math.round(el.y * scaleY),
-          width: Math.round(el.width * scaleX),
-          height: el.type === 'text' ? el.height : Math.round(el.height * scaleY),
-          borderRadius: el.borderRadius ? Math.round(el.borderRadius * Math.min(scaleX, scaleY)) : undefined,
-          shadowEnabled: tpl.shadow,
-          glow: tpl.glow ? '0 0 20px rgba(255, 45, 141, 0.45)' : undefined,
-        };
+    setGenerationError('');
+    try {
+      const result = await apiPost<{ document: CarouselContent }>('/api/generate', {
+        module: 'carousel', prompt: topic,
+        options: {
+          mode: 'content', slideCount: canvasFormat.id === 'carousel' ? slideCount : 3,
+          audience: aiInputs.niche, tone: aiInputs.tone,
+          brand: activeBrandKit?.name || '', objective: 'educar e incentivar uma ação relevante',
+        },
       });
-
-      if (activeBrandKit?.logo) {
-        const logoIndex = newElements.findIndex((el: any) => el.id.includes('logo') || el.type === 'image' && el.content.includes('logo'));
-        if (logoIndex !== -1) {
-          newElements[logoIndex].content = activeBrandKit.logo;
-        } else {
-          const maxZ = newElements.length > 0 ? Math.max(...newElements.map((e: any) => e.zIndex)) : 0;
-          newElements.push({
-            id: 'logo-' + Math.random().toString(36).substr(2, 9),
-            type: 'image',
-            content: activeBrandKit.logo,
-            x: 40,
-            y: 40,
-            width: 120,
-            height: 120,
-            rotation: 0,
-            opacity: 100,
-            zIndex: maxZ + 1,
-            borderRadius: 0,
-            objectFit: 'contain',
-          });
-        }
-      }
-
-      // Auto-Brand Apply
-      let finalBg = { ...tpl.background };
-      let finalElements = [...newElements];
-      const isAutoBrand = localStorage.getItem('pink_logic_auto_brand') === 'true';
-      if (isAutoBrand && activeBrandKit) {
-        if (finalBg.type === 'gradient') {
-          finalBg.color1 = activeBrandKit.palette?.primary || activeBrandKit.colors?.[0] || finalBg.color1 || '#FF2D8D';
-          finalBg.color2 = activeBrandKit.palette?.secondary || activeBrandKit.colors?.[1] || finalBg.color2 || '#7000FF';
-        } else if (finalBg.type === 'color') {
-          finalBg.value = activeBrandKit.palette?.background || activeBrandKit.palette?.primary || activeBrandKit.colors?.[0] || finalBg.value || '#0d0d12';
-        }
-
-        finalElements = finalElements.map((el: any) => {
-          const updated = { ...el };
-          if (el.type === 'shape') {
-            if (updated.content.startsWith('#') || updated.content.startsWith('rgb')) {
-              updated.content = activeBrandKit.palette?.primary || activeBrandKit.colors?.[0] || updated.content;
-            }
-            if (updated.glow) {
-              updated.glow = activeBrandKit.palette?.primary || activeBrandKit.colors?.[0];
-            }
-          } else if (el.type === 'text') {
-            const isHeading = (el.fontSize && el.fontSize >= 24) || el.id.includes('title') || el.fontWeight === 'bold' || el.fontWeight === 800;
-            updated.fontFamily = isHeading ? (activeBrandKit.typography?.heading || 'Outfit') : (activeBrandKit.typography?.body || 'Inter');
-            if (isHeading) {
-              updated.color = activeBrandKit.palette?.primary || activeBrandKit.colors?.[0] || updated.color;
-            } else {
-              updated.color = activeBrandKit.palette?.text || activeBrandKit.colors?.[2] || updated.color;
-            }
-          }
-          return updated;
-        });
-      }
-
-      const isCTAElement = (el: any) => {
-        const lowerId = el.id.toLowerCase();
-        return lowerId.includes('btn') || lowerId.includes('button') || lowerId.includes('cta');
-      };
-
-      const isTitleElement = (el: any) => {
-        const lowerId = el.id.toLowerCase();
-        return lowerId.includes('title') || lowerId.includes('headline');
-      };
-
-      const isDescElement = (el: any) => {
-        const lowerId = el.id.toLowerCase();
-        return lowerId.includes('desc') || lowerId.includes('sub') || lowerId.includes('card-text') || lowerId.includes('step');
-      };
-
+      if (!result.ok || !result.data?.document) throw new Error(result.error || 'A geração não devolveu slides.');
+      const document = result.data.document;
+      const nextSlides = buildEditableCarousel(document, canvasFormat, activeBrandKit);
       if (canvasFormat.id === 'carousel') {
-        const generatedSlides: Slide[] = [];
-        const numSlides = slideCount;
-        const steps = getCarouselSteps(topicName, numSlides - 2);
-
-        for (let s = 0; s < numSlides; s++) {
-          // Clone and map elements for unique IDs
-          const slideElements = finalElements.map((el: any) => {
-            const baseId = el.id.split('-')[0] || el.id;
-            return {
-              ...el,
-              id: `${baseId}-${Math.random().toString(36).substr(2, 9)}`,
-            };
-          });
-
-          // Filter and update content based on slide type
-          let filteredElements = [];
-          if (s === 0) {
-            // Cover Slide
-            filteredElements = slideElements.filter(el => !isCTAElement(el));
-            filteredElements = filteredElements.map(el => {
-              if (isTitleElement(el)) {
-                return { ...el, content: titleCopy };
-              }
-              if (isDescElement(el)) {
-                return { ...el, content: subtitleCopy };
-              }
-              return el;
-            });
-          } else if (s === numSlides - 1) {
-            // CTA Slide
-            filteredElements = slideElements.map(el => {
-              if (isTitleElement(el)) {
-                return { ...el, content: "Comece Hoje Mesmo!" };
-              }
-              if (isDescElement(el)) {
-                return { ...el, content: "O próximo passo só depende de você. Clique no link para acelerar." };
-              }
-              if (el.id.includes('btn-txt')) {
-                return { ...el, content: ctaCopy };
-              }
-              return el;
-            });
-          } else {
-            // Intermediate step slides
-            filteredElements = slideElements.filter(el => !isCTAElement(el));
-            const stepIndex = s - 1;
-            const currentStep = steps[stepIndex];
-            filteredElements = filteredElements.map(el => {
-              if (isTitleElement(el)) {
-                return { ...el, content: currentStep.title };
-              }
-              if (isDescElement(el)) {
-                return { ...el, content: currentStep.desc };
-              }
-              return el;
-            });
-          }
-
-          generatedSlides.push({
-            id: `slide-${s}-${Math.random().toString(36).substr(2, 9)}`,
-            elements: filteredElements,
-            background: JSON.parse(JSON.stringify(finalBg)),
-          });
-        }
-
-        setSlides(generatedSlides);
+        setSlides(nextSlides);
         setCurrentSlideIndex(0);
       } else {
-        // Non-carousel format: update the current active slide
-        updateCurrentSlide({
-          background: finalBg,
-          elements: finalElements
-        });
+        updateCurrentSlide({ elements: nextSlides[0].elements, background: nextSlides[0].background });
       }
-
+      setGeneratedCaption([document.caption, document.hashtags.join(' ')].filter(Boolean).join('\n\n'));
       setSelectedElementId(null);
+      setShowAIModal(false);
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Não foi possível gerar o carrossel.');
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   const drawSlideToCanvas = async (slide: Slide, canvas: HTMLCanvasElement) => {
@@ -2437,6 +2210,19 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
 
   return (
     <div className={`editor-layout ${isMobile && (mobileToolOpen || mobilePropsOpen) ? 'mobile-sheet-open' : ''}`}>
+      {persistenceError && <div role="alert" style={{ padding: 12, color: '#ffb4b4' }}>{persistenceError}</div>}
+      {saveMessage && <div role="status" style={{ padding: 12 }}>{saveMessage}</div>}
+      {isLoadingDocument && <div role="status" style={{ position: 'absolute', inset: 0, zIndex: 9999, background: 'var(--background)', padding: 24 }}>Carregando design…</div>}
+      {generationError && <div role="alert" style={{ gridColumn: '1 / -1', padding: 16, color: '#ffb4b4' }}>{generationError}</div>}
+      <details style={{ gridColumn: '1 / -1', padding: 16 }}>
+        <summary>Rascunho para revisão — legenda e hashtags</summary>
+        <textarea aria-label="Legenda do carrossel" value={generatedCaption} onChange={event => setGeneratedCaption(event.target.value)} rows={5} style={{ width: '100%' }} />
+        <button className="btn-secondary" onClick={() => {
+          const url = URL.createObjectURL(new Blob([generatedCaption], { type: 'text/plain;charset=utf-8' }));
+          const link = document.createElement('a'); link.href = url; link.download = 'legenda-carrossel.txt'; link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }}>Baixar legenda</button>
+      </details>
       {/* Top Header */}
       <div className="editor-header">
         <div className="editor-header-left">
@@ -2493,7 +2279,7 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
           <div className="slide-counter">
             {canvasFormat.id === 'carousel' ? `Slide ${currentSlideIndex + 1} de ${slides.length}` : (formats.find(f => f.id === canvasFormat.id)?.name || '')}
           </div>
-          <button className="btn-secondary" onClick={saveProject}><Save size={18} /> {t('common.save')}</button>
+          <button className="btn-secondary" disabled={isSaving || isLoadingDocument} onClick={saveProject}><Save size={18} /> {isSaving ? 'Salvando…' : t('common.save')}</button>
           <button className="btn-secondary" onClick={sendToPublisher} disabled={isProcessing} title="Enviar arte para o composer do Publicador Automático">
             <Sparkles size={18} />
             <span>Agendar Publicação</span>
@@ -5220,7 +5006,7 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
                 </div>
                 <div className="form-actions" style={{ marginTop: '1.5rem' }}>
                   <button className="btn-secondary" onClick={() => setShowAIModal(false)}>Cancelar</button>
-                  <button className="btn-primary" onClick={handleGenerateAI} disabled={!aiInputs.niche}>
+                  <button className="btn-primary" onClick={handleGenerateAI} disabled={isProcessing || !(aiInputs.topic || aiInputs.niche).trim()}>
                     {isProcessing ? 'Gerando...' : 'Criar Design'}
                   </button>
                 </div>

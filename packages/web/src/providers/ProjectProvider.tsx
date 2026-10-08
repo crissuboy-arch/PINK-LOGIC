@@ -14,7 +14,7 @@ interface ProjectContextValue {
   projects: ProjectSchema[]
   currentProjectId: string | null
   currentProject: ProjectSchema | null
-  createProject: (data: Partial<ProjectSchema>) => ProjectSchema
+  createProject: (data: Partial<ProjectSchema>) => Promise<ProjectSchema>
   updateProject: (id: string, data: Partial<ProjectSchema>) => void
   removeProject: (id: string) => void
   setCurrentProject: (id: string | null) => void
@@ -98,13 +98,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const currentProject = activeProject ? mapToProjectSchema(activeProject, activeBrand) : null;
 
-  const createProject = useCallback((data: Partial<ProjectSchema>): ProjectSchema => {
+  const createProject = useCallback(async (data: Partial<ProjectSchema>): Promise<ProjectSchema> => {
     const name = data.name || 'Novo Projeto';
     const email = '';
     const desc = data.settings?.objective || '';
     
     // Call centralized store creation which handles Projects & Brands creation
-    centralCreateProject({
+    const project = await centralCreateProject({
       name,
       description: desc,
       brandId: '',
@@ -114,51 +114,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       status: 'active'
     });
 
-    // Mock direct sync return value
-    const tempId = crypto.randomUUID();
-    return {
-      id: tempId,
-      name,
-      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      branding: {
-        palette: {
-          primary: data.branding?.palette?.primary || '#FF2D8D',
-          secondary: data.branding?.palette?.secondary || '#7B2D8E',
-          accent: data.branding?.palette?.accent || '#FFD700',
-          background: data.branding?.palette?.background || '#0D0D12',
-          text: data.branding?.palette?.text || '#FFFFFF',
-        },
-        fonts: {
-          heading: data.branding?.fonts?.heading || 'Outfit',
-          body: data.branding?.fonts?.body || 'Inter',
-        },
-        tone: '',
-        visualStyle: '',
-      },
-      content: { pieces: 0, formats: [] },
-      campaigns: [],
-      calendar: { events: 0 },
-      workflows: [],
-      automations: [],
-      assets: { images: [], logos: [], fonts: [], templates: [] },
-      settings: {
-        niche: '',
-        audience: '',
-        objective: desc,
-        platform: data.settings?.platform || 'Instagram',
-        timezone: data.settings?.timezone || 'America/Sao_Paulo',
-        language: 'pt-BR',
-      },
-      metadata: {
-        version: 2,
-        createdBy: 'system',
-        tags: [],
-        notes: '',
-        status: 'draft',
-      }
-    };
+    return mapToProjectSchema(project);
   }, [centralCreateProject]);
 
   const updateProject = useCallback((id: string, data: Partial<ProjectSchema>) => {

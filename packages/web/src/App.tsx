@@ -35,8 +35,8 @@ function App() {
       <ProductProvider>
         <PublisherProvider>
           <GestaoProvider>
-            <EditorProvider>
-              <Router>
+            <Router>
+              <EditorProvider>
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/redefinir-senha" element={<Login initialMode="reset" />} />
@@ -71,8 +71,8 @@ function App() {
                     <Route path="sistema/execucao" element={<ExecutionDashboard />} />
                   </Route>
                 </Routes>
-              </Router>
-            </EditorProvider>
+              </EditorProvider>
+            </Router>
           </GestaoProvider>
         </PublisherProvider>
       </ProductProvider>

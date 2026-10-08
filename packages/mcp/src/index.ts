@@ -29,6 +29,24 @@ async function api(path: string, body?: unknown) {
 
 const server = new McpServer({ name: "pink-logic", version: "2.0.0" });
 
+server.tool(
+  "generate_carousel_content",
+  "Cria um rascunho estruturado de carrossel com slides, legenda e hashtags. Exige revisão; não agenda nem publica.",
+  {
+    topic: z.string().min(3).max(2000),
+    audience: z.string().max(500).default(""),
+    brand: z.string().max(200).default(""),
+    tone: z.string().max(200).default("profissional"),
+    objective: z.string().max(500).default("educar"),
+    slideCount: z.number().int().min(3).max(10).default(5),
+  },
+  async ({ topic, ...brief }) => ({
+    content: [{ type: "text", text: JSON.stringify(await api("/generate", {
+      module: "carousel", prompt: topic, options: { ...brief, mode: "content" },
+    })) }],
+  }),
+);
+
 // ─── Geração ──────────────────────────────────────────────
 server.tool(
   "generate_logo",

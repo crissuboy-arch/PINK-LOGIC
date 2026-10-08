@@ -146,13 +146,14 @@ const PublicadorAutomatico: React.FC = () => {
 
   const confirmConnect = () => {
     if (modalPlatform) {
-      connectAccount(modalPlatform, accountNameInput || `conta_${modalPlatform.toLowerCase()}`);
+      try { connectAccount(modalPlatform, accountNameInput || `conta_${modalPlatform.toLowerCase()}`); }
+      catch (error) { setErrorFeedback(error instanceof Error ? error.message : 'Falha ao conectar.'); }
       setShowConnectModal(false);
       setModalPlatform(null);
     }
   };
 
-  const handleScheduleSubmit = (e: React.FormEvent) => {
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
@@ -178,7 +179,7 @@ const PublicadorAutomatico: React.FC = () => {
       .map(t => t.trim())
       .filter(t => t.length > 0);
 
-    createScheduledPost({
+    try { await createScheduledPost({
       title,
       caption,
       hashtags,
@@ -187,7 +188,7 @@ const PublicadorAutomatico: React.FC = () => {
       platforms: selectedPlatforms,
       scheduled_at: scheduledDateTime.toISOString(),
       timezone,
-    });
+    }); } catch (error) { setErrorFeedback(error instanceof Error ? error.message : 'Falha ao salvar.'); return; }
 
     // Reset Composer
     setTitle('');
@@ -197,7 +198,7 @@ const PublicadorAutomatico: React.FC = () => {
     setSelectedPlatforms([]);
     setErrorFeedback(null);
     
-    setSuccessFeedback('Post agendado com sucesso!');
+    setSuccessFeedback('Planejamento salvo. O envio automático às redes ainda não está configurado.');
     setTimeout(() => setSuccessFeedback(null), 4000);
   };
 
@@ -685,7 +686,7 @@ const PublicadorAutomatico: React.FC = () => {
                           <button 
                             type="button" 
                             className="btn-action-icon flex-center"
-                            onClick={() => publishPostNow(post.id)}
+                            onClick={() => publishPostNow(post.id).catch(error => setErrorFeedback(error.message))}
                             title="Publicar agora"
                           >
                             <Send size={14} />

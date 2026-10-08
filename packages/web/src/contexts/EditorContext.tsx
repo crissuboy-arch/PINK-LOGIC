@@ -1,33 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useBrand } from '../providers/BrandProvider';
 import { useCentralStore } from '../store/CentralStore';
 import { TEMPLATES_DATA } from '../templates_data';
 
-const EDITOR_DATA_KEY = 'pinklogic.projects.editor'
-
-function saveEditorData(projectId: string, data: { slides: Slide[]; canvasFormat: CanvasFormat; slideCount?: number }) {
-  try {
-    const all = JSON.parse(localStorage.getItem(EDITOR_DATA_KEY) || '{}')
-    all[projectId] = { 
-      slides: data.slides, 
-      canvasFormat: data.canvasFormat, 
-      slideCount: data.slideCount, 
-      updatedAt: new Date().toISOString() 
-    }
-    localStorage.setItem(EDITOR_DATA_KEY, JSON.stringify(all))
-  } catch (e) {
-    console.warn('[EditorContext] Failed to save editor data:', e)
-  }
-}
-
-export function loadEditorData(projectId: string): { slides: Slide[]; canvasFormat: CanvasFormat; slideCount?: number } | null {
-  try {
-    const all = JSON.parse(localStorage.getItem(EDITOR_DATA_KEY) || '{}')
-    return all[projectId] || null
-  } catch {
-    return null
-  }
-}
+import { useLocation, useNavigate } from 'react-router-dom';
+import { requireSupabase } from '../services/api';
+import { loadEditorData, saveEditorData } from '../services/editorDocuments';
 
 export interface EditorElement {
   id: string;
@@ -118,7 +96,13 @@ interface EditorContextType {
   activeBrandKit: ReturnType<typeof useBrand>['activeBrand'];
   setActiveBrandKit: (kit: ReturnType<typeof useBrand>['activeBrand']) => void;
 
-  saveProject: () => void;
+  saveProject: () => Promise<void>;
+  generatedCaption: string;
+  setGeneratedCaption: React.Dispatch<React.SetStateAction<string>>;
+  isSaving: boolean;
+  isLoadingDocument: boolean;
+  persistenceError: string | null;
+  saveMessage: string | null;
   slideCount: number;
   setSlideCount: (count: number) => void;
 
@@ -133,6 +117,14 @@ interface EditorContextType {
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined);
+
+const availableFormats: CanvasFormat[] = [
+    { id: 'ig_post', name: 'Instagram Post', width: 1080, height: 1080 },
+    { id: 'ig_story', name: 'Instagram Story', width: 1080, height: 1920 },
+    { id: 'reels', name: 'Reels Cover', width: 1080, height: 1920 },
+    { id: 'tiktok', name: 'TikTok Vertical', width: 1080, height: 1920 },
+    { id: 'carousel', name: 'Carousel', width: 1080, height: 1350 },
+  ];
 
 export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [slides, setSlides] = useState<Slide[]>([{
@@ -222,35 +214,69 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const availableFormats: CanvasFormat[] = [
-    { id: 'ig_post', name: 'Instagram Post', width: 1080, height: 1080 },
-    { id: 'ig_story', name: 'Instagram Story', width: 1080, height: 1920 },
-    { id: 'reels', name: 'Reels Cover', width: 1080, height: 1920 },
-    { id: 'tiktok', name: 'TikTok Vertical', width: 1080, height: 1920 },
-    { id: 'carousel', name: 'Carousel', width: 1080, height: 1350 },
-  ];
+
 
   const [canvasFormat, setCanvasFormatState] = useState<CanvasFormat>(availableFormats[0]);
   const [slideCount, setSlideCount] = useState<number>(5);
 
   // Bridge to BrandProvider — activeBrandKit/brandKits are managed externally
   const { brands: brandKits, activeBrand: activeBrandKit, setActiveBrand: setActiveBrandKit } = useBrand();
-  const { projects: centralProjects, createProject: centralCreateProject, updateProject: centralUpdateProject } = useCentralStore();
+  const { userId, createProject: centralCreateProject } = useCentralStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [generatedCaption, setGeneratedCaption] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingDocument, setIsLoadingDocument] = useState(false);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const versionRef = useRef(0);
+  const savingRef = useRef(false);
+  const loadedRef = useRef(false);
+  const initialSlides = useRef(slides);
   const projectRef = useRef<string | null>(null);
 
-  // Dynamic parameter loading on mount
+  // Clear account-specific content before another account can open the editor.
   useEffect(() => {
+    projectRef.current = null; versionRef.current = 0; loadedRef.current = false;
+    setSlides(initialSlides.current); setGeneratedCaption(''); setSaveMessage(null);
+  }, [userId]);
+
+  // Reload documents on navigation, including when the provider stays mounted.
+  useEffect(() => {
+    if (!userId) return;
+    if (!['/criacao/editor', '/criacao/carrossel'].includes(location.pathname)) return;
+    let cancelled = false;
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get('id');
+    if (projectId && projectId === projectRef.current && loadedRef.current) return;
+    projectRef.current = projectId;
+    versionRef.current = 0;
+    loadedRef.current = !projectId;
+    setPersistenceError(null); setSaveMessage(null); setGeneratedCaption('');
+    setCurrentSlideIndex(0); setSelectedElementId(null);
+    setSlides(initialSlides.current);
+    setCanvasFormatState(availableFormats.find(f => f.id === (location.pathname.endsWith('carrossel') ? 'carousel' : 'ig_post'))!);
+    setSlideCount(5);
+    setIsLoadingDocument(Boolean(projectId));
     try {
-      const params = new URLSearchParams(window.location.search);
-      const projectId = params.get('id');
       if (projectId) {
-        projectRef.current = projectId;
-        const loaded = loadEditorData(projectId);
-        if (loaded) {
-          if (loaded.slides) setSlides(loaded.slides);
-          if (loaded.canvasFormat) setCanvasFormatState(loaded.canvasFormat);
-          if (loaded.slideCount) setSlideCount(loaded.slideCount);
-        }
+        loadEditorData(projectId).then(async loaded => {
+          if (cancelled) return;
+          if (!loaded) {
+            const { data, error } = await requireSupabase().from('projects').select('id').eq('id', projectId).maybeSingle();
+            if (cancelled) return;
+            if (error || !data) throw new Error('Projeto não encontrado ou sem permissão de acesso.');
+            loadedRef.current = true;
+            return;
+          }
+          setSlides(loaded.document.slides);
+          setCanvasFormatState(loaded.document.canvasFormat);
+          setSlideCount(loaded.document.slideCount || loaded.document.slides.length);
+          setGeneratedCaption(loaded.document.caption || '');
+          versionRef.current = loaded.version;
+          loadedRef.current = true;
+        }).catch(error => { if (!cancelled) setPersistenceError(error instanceof Error ? error.message : 'Não foi possível abrir o design.'); })
+          .finally(() => { if (!cancelled) setIsLoadingDocument(false); });
       } else {
         const templateParam = params.get('template');
         if (templateParam) {
@@ -311,16 +337,17 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
     } catch (e) {
-      console.warn('[EditorContext] Failed to load param project:', e);
+      setPersistenceError(e instanceof Error ? e.message : 'Não foi possível abrir o design.');
     }
-  }, []);
+    return () => { cancelled = true; };
+  }, [location.pathname, location.search, userId]);
 
-  const setCanvasFormat = (formatId: string) => {
+  const setCanvasFormat = useCallback((formatId: string) => {
     const format = availableFormats.find(f => f.id === formatId);
     if (format) {
-      setCanvasFormatState(format);
+      setCanvasFormatState(current => current.id === format.id ? current : format);
     }
-  };
+  }, []);
 
   const [colorHistory, setColorHistory] = useState<string[]>(['#FF2D8D', '#0d0d12', '#ffffff', '#7000FF', '#00E0FF']);
 
@@ -377,33 +404,25 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const saveProject = async () => {
-    const projectId = projectRef.current || crypto.randomUUID();
-    
-    // Save slides to local storage
-    saveEditorData(projectId, { slides, canvasFormat, slideCount });
-
-    // Sync project entity to central store
-    const existing = centralProjects.find(p => p.id === projectId);
-    if (!existing) {
-      await centralCreateProject({
-        name: `Design ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-        description: 'Criado pelo editor visual',
-        brandId: '',
-        socialAccounts: ['Instagram'],
-        email: '',
-        timezone: 'America/Sao_Paulo',
-        status: 'active',
-      });
-    } else {
-      await centralUpdateProject(projectId, {
-        // Keep existing fields
-      });
-    }
-
-    projectRef.current = projectId;
-    
-    // Go back to editorial calendar
-    window.location.href = '/gestao/calendario';
+    if (savingRef.current || isLoadingDocument) return;
+    if (projectRef.current && !loadedRef.current) { setPersistenceError('Reabra o projeto antes de salvar para evitar substituir um design que não foi carregado.'); return; }
+    savingRef.current = true; setIsSaving(true); setPersistenceError(null); setSaveMessage(null);
+    try {
+      if (!projectRef.current) {
+        const project = await centralCreateProject({
+          name: `Design ${new Date().toLocaleString('pt-BR')}`,
+          description: 'Criado pelo editor visual', brandId: '', socialAccounts: ['Instagram'],
+          email: '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, status: 'active',
+        });
+        projectRef.current = project.id;
+        loadedRef.current = true;
+      }
+      versionRef.current = await saveEditorData(projectRef.current, { slides, canvasFormat, slideCount, caption: generatedCaption }, versionRef.current);
+      setSaveMessage('Design e legenda salvos na sua conta.');
+      navigate(`${location.pathname}?id=${projectRef.current}`, { replace: true });
+    } catch (error) {
+      setPersistenceError(error instanceof Error ? error.message : 'Falha ao salvar. Seu conteúdo continua no editor.');
+    } finally { savingRef.current = false; setIsSaving(false); }
   };
 
   return (
@@ -414,7 +433,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       canvasFormat, setCanvasFormat,
       availableFormats,
       brandKits, activeBrandKit, setActiveBrandKit,
-      saveProject,
+      saveProject, generatedCaption, setGeneratedCaption, isSaving, isLoadingDocument, persistenceError, saveMessage,
       slideCount, setSlideCount,
       colorHistory, addToHistory,
       addSlide, duplicateSlide, removeSlide, reorderSlides, updateCurrentSlide

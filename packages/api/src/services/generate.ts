@@ -62,6 +62,10 @@ export async function generate(module: GenerateModule, prompt: string, options: 
       throw err;
     }
     case "carousel": {
+      if (options.mode === "content") {
+        const { generateCarouselContent } = await import("./carousel-content.js");
+        return generateCarouselContent({ ...options, topic: prompt });
+      }
       // Renderer híbrido: texto pixel-perfect via Satori+resvg.
       // Para direção de arte IA pura, usar options.mode="art".
       const { renderSlide } = await import("./carousel-render.js");
