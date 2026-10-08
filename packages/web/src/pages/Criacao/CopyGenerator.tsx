@@ -53,7 +53,12 @@ export default function CopyGeneratorPage() {
     });
     setLoading(false);
     if (!r.ok) { setError(r.error || 'Falha ao gerar.'); return; }
-    setResult(r.data!);
+    // Resposta sem texto nunca vira "sucesso" em branco
+    if (!r.data || typeof r.data.text !== 'string' || !r.data.text.trim()) {
+      setError('A IA não devolveu texto. Tente gerar novamente.');
+      return;
+    }
+    setResult(r.data);
   };
 
   const copyText = async () => {

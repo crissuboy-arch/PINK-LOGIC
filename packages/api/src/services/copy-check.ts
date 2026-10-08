@@ -35,7 +35,40 @@ const BLOCKED_PHRASES = [
   "take it to the next level",
   "game-changer",
   "revolutionary",
+  // aberturas/fechamentos prontos e frases de marketing (adaptado de marketingskills, MIT)
+  "nos dias de hoje",
+  "quando se trata de",
+  "a verdade é que",
+  "a verdade e que",
+  "diga adeus",
+  "diga olá",
+  "porque você merece",
+  "isso muda tudo",
+  "tudo o que você precisa",
+  "tudo o que voce precisa",
+  "sem esforço",
+  "sem esforco",
+  "em poucos cliques",
+  "junte-se a milhares",
+  "divisor de águas",
+  "especialistas afirmam",
+  "estudos mostram",
+  "alavancar",
+  "alavanque",
+  "potencializ",
+  "turbine",
+  "turbinar",
 ];
+
+// Formatos em que o travessão é proibido (texto curto). E-mail (corpo) fica de fora.
+const SHORT_FORMATS = ["legenda", "headline", "reels", "anúncio", "anuncio", "whatsapp", "carrossel"];
+
+/** Parte da resposta que é a copy em si (antes da direção de arte / explicação). */
+function copySection(text: string): string {
+  // Corta no TÍTULO da seção ("## Direção de arte", "**Direção de arte**", ou linha que começa assim).
+  const cut = text.search(/^[ \t]*(#{1,6}[ \t]*|\*\*)?[ \t]*dire[cç][aã]o de arte/im);
+  return cut >= 0 ? text.slice(0, cut) : text;
+}
 
 export interface CopyCheckResult {
   passed: boolean;
@@ -43,12 +76,39 @@ export interface CopyCheckResult {
 }
 
 /** Devolve as frases bloqueadas encontradas (vazio = passou). */
-export function checkCopy(text: string): CopyCheckResult {
+export function checkCopy(text: string, format?: string): CopyCheckResult {
   const lower = text.toLowerCase();
   const violations: string[] = [];
 
   for (const phrase of BLOCKED_PHRASES) {
     if (lower.includes(phrase)) violations.push(`frase bloqueada: "${phrase}"`);
+  }
+
+  // Estruturas típicas de IA — verificadas só na copy (não na direção de arte).
+  const copy = copySection(text);
+
+  // abertura "Imagine/Imagina..." no início de frase
+  if (/(^|[.!?\n>]\s*)imagin[ea]\b/i.test(copy)) violations.push('abertura "Imagine/Imagina..."');
+
+  // revelação por contraste: "não é X, é Y" / "não foi seu, foi do método"
+  if (/\bn[ãa]o (é|foi|era|são)\s[^.!?\n]{0,50}[,;.]\s*(é|foi|era|são)\s/i.test(copy)) {
+    violations.push('revelação por contraste ("não é X, é Y")');
+  }
+
+  // lista de negações: "Sem X. Sem Y." / "sem X, sem Y" / "Nada de X, Y ou Z"
+  if (/\bsem\s[^.!?,\n]{1,40}[.,]\s+sem\s/i.test(copy) || /\bnada de\s[^.!?\n]{1,40},\s[^.!?\n]{1,40}\sou\s/i.test(copy)) {
+    violations.push('lista de negações ("sem X, sem Y")');
+  }
+
+  // pergunta/dois-pontos que revelam a resposta
+  if (/\b(o resultado|a melhor parte|o segredo|a diferença|a diferenca|o motivo)\s*[?:]/i.test(copy)) {
+    violations.push('revelação com "?" ou ":" ("O resultado? ...")');
+  }
+
+  // travessão em texto curto
+  const f = (format || "").toLowerCase();
+  if (f && SHORT_FORMATS.some((s) => f.includes(s)) && copy.includes("—")) {
+    violations.push("travessão (—) em texto curto");
   }
 
   // excesso de emojis (>6) — sinal de IA

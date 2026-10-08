@@ -56,7 +56,7 @@ function buildUserMessage(b: CopyBriefing): string {
   if (b.format) lines.push(`Formato: ${b.format}`);
   if (b.language) lines.push(`Idioma: ${b.language}`);
   if (b.framework) lines.push(`Framework: ${b.framework}`);
-  return `BRIEFING\n${lines.join("\n")}\n\nGera a peça conforme o formato de entrega (secção 4).`;
+  return `BRIEFING\n${lines.join("\n")}\n\nGera a peça seguindo as regras do formato (secção 4) e o formato de entrega (secção 5). Faz a autochecagem (secção 6) antes de responder.`;
 }
 
 export async function generateCopy(briefing: CopyBriefing) {
@@ -69,16 +69,26 @@ export async function generateCopy(briefing: CopyBriefing) {
   const user = buildUserMessage(briefing);
 
   let text = await generateTextWithSystem(system, user);
-  let check = checkCopy(text);
+  if (!text.trim()) {
+    // Nunca devolver "sucesso" em branco: o usuário precisa ver que falhou.
+    const err: any = new Error("A IA não devolveu texto. Tente gerar novamente.");
+    err.status = 502;
+    throw err;
+  }
+  let check = checkCopy(text, briefing.format);
   let regenerated = false;
 
   if (!check.passed) {
     regenerated = true;
-    text = await generateTextWithSystem(
+    const retry = await generateTextWithSystem(
       system,
       `${user}\n\nATENÇÃO: a versão anterior foi REPROVADA na checagem automática por: ${check.violations.join("; ")}. Reescreve eliminando TODAS as violações, mantendo a estrutura AIDA/PAS e o formato de entrega.`
     );
-    check = checkCopy(text);
+    // Se a reescrita vier vazia, mantém a primeira versão (com o aviso de revisão).
+    if (retry.trim()) {
+      text = retry;
+      check = checkCopy(text, briefing.format);
+    }
   }
 
   return {
