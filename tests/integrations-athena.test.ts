@@ -114,6 +114,33 @@ describe("GET /api/integrations/stats — auth", () => {
     assert.equal(res.body.contract, "v1");
   });
 
+  it("usa VITE_SUPABASE_URL quando SUPABASE_URL não existe (fallback)", async () => {
+    const res = fakeRes();
+    let usedUrl = "";
+    const h = createHandler({
+      env: {
+        [API_KEY_ENV]: "CHAVE-TESTE-123",
+        VITE_SUPABASE_URL: "https://x.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "SRV",
+      },
+      makeClient: (u: string, _k: string) => { usedUrl = u; return fakeSupabase(); },
+    });
+    await h(fakeReq("GET", { authorization: "Bearer CHAVE-TESTE-123" }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(usedUrl, "https://x.supabase.co");
+  });
+
+  it("503 sem service key (VITE_ sozinho não basta)", async () => {
+    const res = fakeRes();
+    const h = createHandler({
+      env: { [API_KEY_ENV]: "CHAVE-TESTE-123", VITE_SUPABASE_URL: "https://x.supabase.co" },
+      makeClient: (_u: string, _k: string) => fakeSupabase(),
+    });
+    await h(fakeReq("GET", { authorization: "Bearer CHAVE-TESTE-123" }), res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, "Banco de dados não configurado.");
+  });
+
   it("405 para método diferente de GET", async () => {
     const res = fakeRes();
     await handler(GOOD_ENV)(fakeReq("POST", { authorization: "Bearer CHAVE-TESTE-123" }), res);

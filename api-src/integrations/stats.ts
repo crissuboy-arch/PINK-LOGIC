@@ -134,7 +134,12 @@ export function createHandler(deps: Deps) {
       : req.headers.authorization;
     if (!bearerMatches(header, expected)) return unauthorized(res);
 
-    const url = deps.env.SUPABASE_URL;
+    // URL do Supabase: SUPABASE_URL (servidor) com fallback para VITE_SUPABASE_URL
+    // (variável pública já existente na Vercel — mesmo projeto). Segue a mesma
+    // convenção de packages/api/src/services/auth.ts.
+    // NOTA: PINK_LOGIC_SERVICE_KEY NÃO é usada aqui — é o segredo partilhado da
+    // API (Athena/MCP, servidor-a-servidor), não uma credencial do Supabase.
+    const url = deps.env.SUPABASE_URL || deps.env.VITE_SUPABASE_URL;
     const serviceKey = deps.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !serviceKey) {
       return res.status(503).json({ error: "Banco de dados não configurado." });

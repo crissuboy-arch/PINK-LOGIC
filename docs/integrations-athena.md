@@ -70,6 +70,13 @@ Autenticação: `Authorization: Bearer <PINKLOGIC_ATHENA_API_KEY>`
    `openssl rand -hex 32`
 2. Na Vercel → projeto `pink-logic` → Settings → Environment Variables:
    adicionar `PINKLOGIC_ATHENA_API_KEY` = a chave (Production).
+   O endpoint `/stats` precisa ainda, no servidor:
+   - `SUPABASE_SERVICE_ROLE_KEY` (obrigatória — só existe no servidor;
+     obtém-se em Supabase → Project Settings → API). Não usar
+     `PINK_LOGIC_SERVICE_KEY` aqui: essa é o segredo partilhado da API
+     (Athena/MCP), não uma credencial do Supabase.
+   - URL do Supabase: `SUPABASE_URL`, com fallback automático para a
+     `VITE_SUPABASE_URL` já existente (mesmo projeto).
 3. Fazer redeploy (ou o próximo push para `main` faz deploy automático).
 4. Na Athena Control: criar a integração API
    `https://<dominio>/api/integrations/stats` e guardar a mesma chave
@@ -81,7 +88,7 @@ Autenticação: `Authorization: Bearer <PINKLOGIC_ATHENA_API_KEY>`
 - `api-src/integrations/health.ts` → `GET /api/integrations/health`
 - `api-src/integrations/stats.ts` → `GET /api/integrations/stats`
 - `api/integrations/*.js` — bundle gerado (versionado por convenção do repo)
-- `tests/integrations-athena.test.ts` — 14 testes (`npx tsx --test`)
+- `tests/integrations-athena.test.ts` — 16 testes (`npx tsx --test`)
 
 ## Segurança
 

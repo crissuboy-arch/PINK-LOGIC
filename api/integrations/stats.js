@@ -22169,7 +22169,7 @@ function createHandler(deps) {
     }
     const header = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
     if (!bearerMatches(header, expected)) return unauthorized(res);
-    const url = deps.env.SUPABASE_URL;
+    const url = deps.env.SUPABASE_URL || deps.env.VITE_SUPABASE_URL;
     const serviceKey = deps.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !serviceKey) {
       return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
