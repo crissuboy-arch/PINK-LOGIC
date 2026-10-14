@@ -22169,8 +22169,12 @@ function createHandler(deps) {
     }
     const header = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
     if (!bearerMatches(header, expected)) return unauthorized(res);
-    const url = deps.env.SUPABASE_URL;
-    const serviceKey = deps.env.SUPABASE_SERVICE_ROLE_KEY;
+    const pickUrl = (v) => {
+      const t = (v || "").trim();
+      return /^https?:\/\/\S+$/i.test(t) ? t : null;
+    };
+    const url = pickUrl(deps.env.SUPABASE_URL) || pickUrl(deps.env.VITE_SUPABASE_URL);
+    const serviceKey = (deps.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
     if (!url || !serviceKey) {
       return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
     }
