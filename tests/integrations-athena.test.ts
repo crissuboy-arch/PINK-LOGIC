@@ -130,6 +130,23 @@ describe("GET /api/integrations/stats — auth", () => {
     assert.equal(usedUrl, "https://x.supabase.co");
   });
 
+  it("ignora SUPABASE_URL malformada e usa o fallback VITE_", async () => {
+    const res = fakeRes();
+    let usedUrl = "";
+    const h = createHandler({
+      env: {
+        [API_KEY_ENV]: "CHAVE-TESTE-123",
+        SUPABASE_URL: "tpzzlyhcdfyjnxptbckl.supabase.co",
+        VITE_SUPABASE_URL: "https://x.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "SRV",
+      },
+      makeClient: (u: string, _k: string) => { usedUrl = u; return fakeSupabase(); },
+    });
+    await h(fakeReq("GET", { authorization: "Bearer CHAVE-TESTE-123" }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(usedUrl, "https://x.supabase.co");
+  });
+
   it("503 sem service key (VITE_ sozinho não basta)", async () => {
     const res = fakeRes();
     const h = createHandler({
