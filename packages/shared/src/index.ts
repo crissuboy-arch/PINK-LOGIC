@@ -33,19 +33,33 @@ export const MockupTypeSchema = z.enum(["card", "storefront", "uniform", "box", 
 export type MockupType = z.infer<typeof MockupTypeSchema>;
 export const MockupRequestSchema = z.object({
   type: MockupTypeSchema,
-  artworkUrl: z.string().min(1).max(8000),
+  artworkUrl: z.string().min(1).max(2000),
   projectId: z.string().max(100).optional(),
   projectName: z.string().max(100).optional(),
   idempotencyKey: z.string().max(100).optional(),
 });
 export type MockupRequest = z.infer<typeof MockupRequestSchema>;
+// Render de carrossel (Achado 3): antes sem schema nenhum — título e itens
+// sem limite. Agora com tetos iguais aos do documento de carrossel.
+export const CarouselRenderSchema = z.object({
+  title: z.string().min(1).max(200),
+  items: z
+    .array(z.object({ title: z.string().max(110).optional(), body: z.string().max(350).optional() }).passthrough())
+    .max(10)
+    .default([]),
+  footer: z.string().max(200).optional(),
+  handle: z.string().max(200).optional(),
+  counter: z.string().max(200).optional(),
+});
+export type CarouselRender = z.infer<typeof CarouselRenderSchema>;
 export const CarouselStyleSchema = z.enum(["maestro", "clean", "bold"]);
 export type CarouselStyle = z.infer<typeof CarouselStyleSchema>;
 export type GenerateModule = z.infer<typeof GenerateModuleSchema>;
 
 export const GenerateRequestSchema = z.object({
   module: GenerateModuleSchema,
-  prompt: z.string().min(1),
+  // Achado 3: antes min(1) sem máximo — um prompt gigante era aceite.
+  prompt: z.string().min(1).max(2000),
   brandId: z.string().uuid().optional(),
   options: z.record(z.unknown()).default({}),
 });

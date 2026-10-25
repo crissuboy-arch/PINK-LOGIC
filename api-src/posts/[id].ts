@@ -1,10 +1,12 @@
 /**
  * Vercel serverless: GET/PATCH/DELETE /api/posts/:id
+ * Erros seguros (sem detalhe interno no cliente).
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "@pink-logic/api/services/auth.js";
 import { ScheduledPostUpdateSchema } from "@pink-logic/shared";
 import { getPost, updatePost, deletePost } from "@pink-logic/api/services/posts.js";
+import { toPublicError } from "@pink-logic/api/services/http-errors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await requireAuth(req, res);
@@ -25,6 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return res.status(405).json({ error: "Só GET, PATCH ou DELETE" });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err);
+    res.status(pub.status).json({ error: pub.message });
   }
 }

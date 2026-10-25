@@ -11,6 +11,7 @@
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import type { MockupType } from "@pink-logic/shared";
+import { fetchPublicImage } from "./ssrf.js";
 
 const BG = "#07070a";
 const FRAME = "#1a1a22";
@@ -47,27 +48,18 @@ export function validateArtwork(url: string): { ok: true } | { ok: false; error:
 /**
  * Resolve a artwork para data URL (o satori bloqueia URLs externas por SSRF).
  * Só aceita content-type image/*, máx 5MB, timeout 15s.
+ * Proteção SSRF (Achado 2): o pedido passa por fetchPublicImage, que
+ * valida o destino como público ANTES de cada pedido e APÓS cada redirect
+ * — loopback, rede privada, link-local e metadados cloud são bloqueados.
+ * As mensagens são genéricas: o código HTTP anterior servia de oráculo
+ * para varrer serviços internos.
  */
 export async function resolveArtwork(url: string): Promise<string> {
   const v = validateArtwork(url);
   if (!v.ok) throw Object.assign(new Error(v.error), { status: 400 });
   if (url.startsWith("data:image/")) return url;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 15_000);
-  try {
-    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
-    if (!r.ok) throw Object.assign(new Error(`artwork HTTP ${r.status}`), { status: 400 });
-    const ct = r.headers.get("content-type") || "";
-    if (!ct.startsWith("image/")) throw Object.assign(new Error(`artwork não é imagem (${ct})`), { status: 400 });
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > 5 * 1024 * 1024) throw Object.assign(new Error("artwork excede 5MB"), { status: 400 });
-    return `data:${ct.split(";")[0]};base64,${buf.toString("base64")}`;
-  } catch (err: any) {
-    if (err.status) throw err;
-    throw Object.assign(new Error("falha ao obter artwork: " + err.message), { status: 400 });
-  } finally {
-    clearTimeout(t);
-  }
+  const { contentType, buffer } = await fetchPublicImage(url);
+  return `data:${contentType};base64,${buffer.toString("base64")}`;
 }
 
 type El = any;

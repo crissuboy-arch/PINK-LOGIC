@@ -1,32 +1,36 @@
 /**
  * Vercel serverless: POST /api/carousel/render
  * Renderer híbrido estilo "maestro" — devolve PNG 1080×1080.
- * Body: { title, items?, footer?, handle?, counter? }
+ * Segurança: schema com tetos (antes sem schema nenhum), rate limit
+ * por chamador e erros seguros.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "@pink-logic/api/services/auth.js";
+import { CarouselRenderSchema } from "@pink-logic/shared";
 import { renderSlide } from "@pink-logic/api/services/carousel-render.js";
+import { generationLimiter, rateLimitKey, enforceRateLimit } from "@pink-logic/api/services/rate-limit.js";
+import { toPublicError } from "@pink-logic/api/services/http-errors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Só POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  const { title, items, footer, handle, counter } = req.body || {};
-  if (!title || typeof title !== "string") {
-    return res.status(400).json({ error: "title é obrigatório" });
-  }
+  if (!enforceRateLimit(generationLimiter, rateLimitKey(auth), res)) return;
+  const parsed = CarouselRenderSchema.safeParse(req.body || {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
     const png = await renderSlide({
-      title,
-      items: Array.isArray(items) ? items : [],
-      footer,
-      handle: handle || "",
-      counter: counter || "",
+      title: parsed.data.title,
+      items: parsed.data.items,
+      footer: parsed.data.footer,
+      handle: parsed.data.handle || "",
+      counter: parsed.data.counter || "",
     });
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Content-Length", png.length);
     res.status(200).send(png);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const pub = toPublicError(err);
+    res.status(pub.status).json({ error: pub.message });
   }
 }

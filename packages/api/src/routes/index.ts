@@ -11,7 +11,10 @@ import { generate } from "../services/generate.js";
 import { decide } from "../services/jev-decider.js";
 import { collect, aisaReady } from "../services/aisa.js";
 import { requireAuth } from "../services/auth.js";
-import { createPost, listPosts, getPost, updatePost, deletePost, schedulePost, publishPostNow, publishDuePosts } from "../services/posts.js";
+import { createPost, listPosts, getPost, updatePost, deletePost, schedulePost, publishPostNow, publishDuePosts, approvePostHuman } from "../services/posts.js";
+import { toPublicError } from "../services/http-errors.js";
+import { isCronSecretValid } from "../services/cron-auth.js";
+import { generalLimiter, generationLimiter, dailyQuota, rateLimitKey, enforceRateLimit } from "../services/rate-limit.js";
 
 export const router = Router();
 
@@ -35,35 +38,48 @@ router.use(async (req, res, next) => {
 
 // ─── Geração (motores reais do PINK-LOGIC) ────────────────
 router.post("/generate", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generationLimiter, rateLimitKey(auth), res)) return;
+  if (!enforceRateLimit(dailyQuota, rateLimitKey(auth), res)) return;
   const parsed = GenerateRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
     const result = await generate(parsed.data.module, parsed.data.prompt, parsed.data.options);
     res.json(result);
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
 // ─── Jev — decisão ────────────────────────────────────────
 router.post("/decide", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generationLimiter, rateLimitKey(auth), res)) return;
+  if (!enforceRateLimit(dailyQuota, rateLimitKey(auth), res)) return;
   const parsed = DecideRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
-    res.json(await decide(parsed.data));
+    const result = await decide(parsed.data);
+    res.json({ ...result, error: result.error ? "Decisão indisponível; revisão manual necessária." : undefined });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
 // ─── AIsa — coleta ────────────────────────────────────────
 router.post("/collect", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generationLimiter, rateLimitKey(auth), res)) return;
+  if (!enforceRateLimit(dailyQuota, rateLimitKey(auth), res)) return;
   const parsed = CollectRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
     res.json(await collect(parsed.data));
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -71,12 +87,13 @@ router.post("/collect", async (req, res) => {
 router.post("/posts", async (req, res) => {
   const auth = await requireAuth(req, res);
   if (!auth) return;
+  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
   const parsed = ScheduledPostCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
     res.status(201).json({ post: await createPost(auth, parsed.data) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -88,7 +105,7 @@ router.get("/posts", async (req, res) => {
   try {
     res.json({ posts: await listPosts(auth, parsed.data) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -98,7 +115,7 @@ router.get("/posts/:id", async (req, res) => {
   try {
     res.json({ post: await getPost(auth, req.params.id) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -110,7 +127,7 @@ router.patch("/posts/:id", async (req, res) => {
   try {
     res.json({ post: await updatePost(auth, req.params.id, parsed.data) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -121,7 +138,7 @@ router.delete("/posts/:id", async (req, res) => {
     await deletePost(auth, req.params.id);
     res.status(204).end();
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -131,7 +148,7 @@ router.post("/posts/:id/schedule", async (req, res) => {
   try {
     res.json({ post: await schedulePost(auth, req.params.id, req.body?.scheduledAt) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -141,7 +158,17 @@ router.post("/posts/:id/publish", async (req, res) => {
   try {
     res.json({ post: await publishPostNow(auth, req.params.id) });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
+  }
+});
+
+router.post("/posts/:id/approve", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  try {
+    res.json({ post: await approvePostHuman(auth, req.params.id) });
+  } catch (err: any) {
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
 
@@ -149,11 +176,11 @@ router.post("/posts/:id/publish", async (req, res) => {
 router.get("/cron/publish", async (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(503).json({ error: "CRON_SECRET não configurado." });
-  if (req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ error: "Não autorizado." });
+  if (!isCronSecretValid(req.headers.authorization, secret)) return res.status(401).json({ error: "Não autorizado." });
   try {
     const outcomes = await publishDuePosts();
     res.json({ ok: true, processed: outcomes.length, outcomes });
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
 });
