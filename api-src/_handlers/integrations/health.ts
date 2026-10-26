@@ -1,6 +1,6 @@
 /**
  * Handler GET /api/integrations/health (público, sem auth) — servido
- * pelo router integrations/[...all] (não é função direta).
+ * pelo front-controller api/router (não é função direta).
  * Código INTACTO da consolidação Opção B.
  *
  * Identidade oficial da plataforma para a Athena Control.

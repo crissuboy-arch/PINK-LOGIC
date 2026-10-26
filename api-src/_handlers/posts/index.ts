@@ -1,5 +1,5 @@
 /**
- * Handler GET/POST /api/posts — servido pela função posts/index
+ * Handler GET/POST /api/posts — servido pelo front-controller api/router
  * (não é função direta; vive em _handlers/ por isso o bundle ignora-o).
  * Código INTACTO da consolidação Opção B.
  * Lista ou cria posts na mesma tabela (scheduled_posts) que o site usa.

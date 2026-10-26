@@ -1,6 +1,6 @@
 /**
- * Handler POST /api/posts/:id/publish — servido pelo router
- * posts/[...all] (não é função direta; vive em _handlers/).
+ * Handler POST /api/posts/:id/publish — servido pelo
+ * front-controller api/router (não é função direta; vive em _handlers/).
  * Código INTACTO da consolidação Opção B.
  * Publica imediatamente (fora do cron) no Instagram e/ou Facebook, conforme
  * `platforms` do post. Desde a correção de segurança: SÓ a proprietária,

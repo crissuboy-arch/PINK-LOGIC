@@ -1,6 +1,6 @@
 /**
- * Handler GET/PATCH/DELETE /api/posts/:id — servido pelo router
- * posts/[...all] (não é função direta; vive em _handlers/).
+ * Handler GET/PATCH/DELETE /api/posts/:id — servido pelo
+ * front-controller api/router (não é função direta; vive em _handlers/).
  * Código INTACTO da consolidação Opção B.
  * Erros seguros (sem detalhe interno no cliente).
  */

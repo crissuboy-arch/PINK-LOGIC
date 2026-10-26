@@ -1,11 +1,10 @@
 /**
- * Testes de dispatch/roteamento da consolidação Opção B (limite Hobby:
- * 12 funções) — provam que as rotas consolidadas chegam ao handler
- * certo, com os gates certos, sem base de dados nem rede real.
+ * Testes de dispatch/roteamento do FRONT-CONTROLLER (plano Hobby:
+ * 1 função) — provam que TODAS as rotas chegam ao handler certo, com
+ * os gates certos, sem base de dados nem rede real.
  *
- * Importam os BUNDLES REAIS (api/posts/index.js,
- * api/posts/[...all].js e api/integrations/[...all].js) — o código
- * exato que a Vercel vai correr — por isso só correm DEPOIS do bundle:
+ * Importam o BUNDLE REAL (api/router.js) — o código exato que a
+ * Vercel vai correr — por isso só correm DEPOIS do bundle:
  *   npm run build --workspace=@pink-logic/shared
  *   npm run build --workspace=@pink-logic/api
  *   node scripts/bundle-functions.mjs
@@ -15,8 +14,12 @@
  * Estratégia de prova (sem DB): cada ramo tem uma assinatura
  * distinguível SEM chegar ao serviço — 405 com mensagem própria,
  * 401 sem auth, 503 com auth de serviço mas sem dono/base configurados,
- * 200 público no health, 404 em rotas desconhecidas. Um dispatch errado
- * dá outro código/mensagem e o teste falha.
+ * 200 público no health/ping, 404 em rotas desconhecidas. Um dispatch
+ * errado dá outro código/mensagem e o teste falha.
+ *
+ * O router lê o caminho por ordem: query.__path (rewrite vercel.json),
+ * query.path, query.all e pathname do req.url. Os testes cobrem as
+ * vias __path e URL (as que a Vercel e o vercel dev usam).
  *
  * Auth de serviço em testes: PINK_LOGIC_SERVICE_KEY de teste (≥32
  * chars) + `Bearer` — o authenticate() aceita-a sem rede. As envs de
@@ -25,9 +28,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import postsIndex from '../api/posts/index.js';
-import postsRouter from '../api/posts/[...all].js';
-import integrationsRouter from '../api/integrations/[...all].js';
+import router from '../api/router.js';
 
 // --- ambiente determinístico (antes de qualquer invocação) -----------
 delete process.env.SUPABASE_URL;
@@ -37,21 +38,26 @@ delete process.env.SUPABASE_ANON_KEY;
 delete process.env.VITE_SUPABASE_ANON_KEY;
 delete process.env.PINK_LOGIC_OWNER_USER_ID;
 delete process.env.PINKLOGIC_ATHENA_API_KEY;
+delete process.env.CRON_SECRET;
 process.env.PINK_LOGIC_SERVICE_KEY = 'test-service-key-0123456789abcdef';
 
 const SERVICE_AUTH = { authorization: 'Bearer test-service-key-0123456789abcdef' };
 
 // --- mocks -------------------------------------------------------------
-function fakeReq({ method, segments, query = {}, headers = {}, body, url } = {}) {
+// fakeReq simula a Vercel: query já vem parseada do URL (como a
+// Vercel faz); `path` simula o rewrite (__path), `url` a invocação
+// direta, `segments` a compatibilidade query.all.
+function fakeReq({ method, path, url, segments, query = {}, headers = {}, body } = {}) {
   const q = { ...query };
+  if (path !== undefined) q.__path = path;
   if (segments !== undefined) q.all = segments;
-  return {
-    method,
-    query: q,
-    headers,
-    body,
-    url: url ?? '/api/posts',
-  };
+  let u = url ?? '/api/router';
+  if (u.includes('?')) {
+    const [base, qs] = u.split('?', 2);
+    u = base;
+    for (const [k, v] of new URLSearchParams(qs)) if (!(k in q)) q[k] = v;
+  }
+  return { method, query: q, headers, body, url: u };
 }
 
 function fakeRes() {
@@ -71,193 +77,225 @@ function fakeRes() {
   return r;
 }
 
-async function call(handler, req) {
+async function call(req) {
   const res = fakeRes();
-  await handler(req, res);
+  await router(req, res);
   return res;
 }
 
-// --- função posts/index (rota base exata) ------------------------------
-test('posts: base GET sem auth → 401 (index, auth primeiro)', async () => {
-  const res = await call(postsIndex, fakeReq({ method: 'GET' }));
+// --- posts: base -------------------------------------------------------
+test('router: posts base GET sem auth → 401 (via __path)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts' }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: base POST sem auth → 401', async () => {
-  const res = await call(postsIndex, fakeReq({ method: 'POST' }));
+test('router: posts base POST sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts' }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: base PUT com auth de serviço → 405 "Só GET ou POST"', async () => {
-  const res = await call(postsIndex, fakeReq({ method: 'PUT', headers: SERVICE_AUTH }));
+test('router: posts base PUT com auth → 405 "Só GET ou POST"', async () => {
+  const res = await call(fakeReq({ method: 'PUT', path: 'posts', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 405);
   assert.match(res.body.error, /Só GET ou POST/);
 });
 
-test('posts: base GET com auth de serviço → 503 (chega ao listPosts; sem dono/base)', async () => {
-  const res = await call(postsIndex, fakeReq({ method: 'GET', headers: SERVICE_AUTH }));
+test('router: posts base GET com auth → 503 (chega ao listPosts; sem dono/base)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: base GET com filtros válidos → 503 (query atravessa)', async () => {
-  const res = await call(postsIndex, fakeReq({
-    method: 'GET', headers: SERVICE_AUTH, query: { status: 'agendado', limit: '10' },
+test('router: posts base GET com filtros → 503 (query atravessa, menos __path)', async () => {
+  const res = await call(fakeReq({
+    method: 'GET', path: 'posts', headers: SERVICE_AUTH, query: { status: 'agendado', limit: '10' },
   }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: base só URL → 401 (index não depende de query.all)', async () => {
-  const res = await call(postsIndex, fakeReq({ method: 'GET', url: '/api/posts' }));
+test('router: posts base só URL → 401 (fallback do URL, sem __path)', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/posts' }));
   assert.equal(res.statusCode, 401);
 });
 
-// --- router posts/[...all] (1+ segmentos, SEM ramo base) ---------------
-test('posts: [...all] sem segmentos → 404 (base é o index, não o router)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [] }));
-  assert.equal(res.statusCode, 404);
+test('router: posts base URL com query → 503 (filtros do URL atravessam)', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/posts?status=agendado', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
 });
 
-test('posts: [...all] query.all [""] → 404 (segmentos vazios filtrados, sem base)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [''] }));
-  assert.equal(res.statusCode, 404);
-});
-
-test('posts: [...all] só URL /api/posts → 404 (fallback do URL sem base)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', url: '/api/posts' }));
-  assert.equal(res.statusCode, 404);
-});
-
-test('posts: [id] PUT com auth → 405 "Só GET, PATCH ou DELETE"', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'PUT', segments: ['abc-123'], headers: SERVICE_AUTH }));
+// --- posts: detalhe ------------------------------------------------------
+test('router: [id] PUT com auth → 405 "Só GET, PATCH ou DELETE"', async () => {
+  const res = await call(fakeReq({ method: 'PUT', path: 'posts/abc-123', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 405);
   assert.match(res.body.error, /Só GET, PATCH ou DELETE/);
 });
 
-test('posts: [id] GET com auth → 503 (chega ao getPost; sem dono/base)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123'], headers: SERVICE_AUTH }));
+test('router: [id] GET com auth → 503 (chega ao getPost; sem dono/base)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: [id] PATCH com body inválido → 400 (validação antes do serviço)', async () => {
-  const res = await call(postsRouter, fakeReq({
-    method: 'PATCH', segments: ['abc-123'], headers: SERVICE_AUTH, body: { status: 'invalido' },
+test('router: [id] PATCH com body inválido → 400 (validação antes do serviço)', async () => {
+  const res = await call(fakeReq({
+    method: 'PATCH', path: 'posts/abc-123', headers: SERVICE_AUTH, body: { status: 'invalido' },
   }));
   assert.equal(res.statusCode, 400);
 });
 
-test('posts: [id] PATCH com body válido → 503 (chega ao updatePost; sem dono)', async () => {
-  const res = await call(postsRouter, fakeReq({
-    method: 'PATCH', segments: ['abc-123'], headers: SERVICE_AUTH, body: { title: 'novo' },
+test('router: [id] PATCH com body válido → 503 (chega ao updatePost; sem dono)', async () => {
+  const res = await call(fakeReq({
+    method: 'PATCH', path: 'posts/abc-123', headers: SERVICE_AUTH, body: { title: 'novo' },
   }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: approve GET → 405 "Só POST" (método antes da auth, como antes)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123', 'approve'] }));
+test('router: [id] via URL → 503 (fallback do URL)', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/posts/abc-123', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+// --- posts: approve / publish / schedule (2 segmentos) -------------------
+test('router: approve GET → 405 "Só POST" (método antes da auth)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/approve' }));
   assert.equal(res.statusCode, 405);
   assert.match(res.body.error, /Só POST/);
 });
 
-test('posts: approve POST sem auth → 401 (gate de auth do ramo)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'POST', segments: ['abc-123', 'approve'] }));
+test('router: approve POST sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/approve' }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: approve POST com auth → 503 (chega ao approvePostHuman; sem dono)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'POST', segments: ['abc-123', 'approve'], headers: SERVICE_AUTH }));
+test('router: approve POST com auth → 503 (chega ao approvePostHuman; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/approve', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: approve via URL sem query.all → 405 (fallback do URL)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', url: '/api/posts/abc-123/approve' }));
+test('router: approve via URL sem __path → 405 (fallback do URL)', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/posts/abc-123/approve' }));
   assert.equal(res.statusCode, 405);
 });
 
-test('posts: publish GET → 405 "Só POST"', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123', 'publish'] }));
+test('router: __path tem prioridade sobre o URL /api/router (caso rewrite)', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/router', path: 'posts/abc-123/approve' }));
+  assert.equal(res.statusCode, 405);
+  assert.match(res.body.error, /Só POST/);
+});
+
+test('router: publish GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/publish' }));
   assert.equal(res.statusCode, 405);
 });
 
-test('posts: publish POST sem auth → 401', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'POST', segments: ['abc-123', 'publish'] }));
+test('router: publish POST sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/publish' }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: schedule GET → 405 "Só POST"', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123', 'schedule'] }));
+test('router: schedule GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/schedule' }));
   assert.equal(res.statusCode, 405);
 });
 
-test('posts: schedule POST sem auth → 401 (auth antes da validação do body)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'POST', segments: ['abc-123', 'schedule'], body: { scheduledAt: 'x' } }));
+test('router: schedule POST sem auth → 401 (auth antes da validação do body)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/schedule', body: { scheduledAt: 'x' } }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: schedule POST com auth e body inválido → 400', async () => {
-  const res = await call(postsRouter, fakeReq({
-    method: 'POST', segments: ['abc-123', 'schedule'], headers: SERVICE_AUTH, body: { scheduledAt: 'não-data' },
+test('router: schedule POST com auth e body inválido → 400', async () => {
+  const res = await call(fakeReq({
+    method: 'POST', path: 'posts/abc-123/schedule', headers: SERVICE_AUTH, body: { scheduledAt: 'não-data' },
   }));
   assert.equal(res.statusCode, 400);
 });
 
-test('posts: schedule POST com auth e body válido → 503 (chega ao serviço; sem dono)', async () => {
-  const res = await call(postsRouter, fakeReq({
-    method: 'POST', segments: ['abc-123', 'schedule'], headers: SERVICE_AUTH,
+test('router: schedule POST com auth e body válido → 503 (chega ao serviço; sem dono)', async () => {
+  const res = await call(fakeReq({
+    method: 'POST', path: 'posts/abc-123/schedule', headers: SERVICE_AUTH,
     body: { scheduledAt: '2030-01-01T09:00:00.000Z' },
   }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: ação desconhecida → 404 (como o 404 da Vercel antes)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123', 'unknown'], headers: SERVICE_AUTH }));
+// --- desconhecidos / vazios ----------------------------------------------
+test('router: ação desconhecida → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/unknown', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 404);
 });
 
-test('posts: caminho profundo → 404', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: ['abc-123', 'approve', 'extra'], headers: SERVICE_AUTH }));
+test('router: caminho profundo → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/approve/extra', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 404);
 });
 
-// --- router integrations ------------------------------------------------
-test('integrations: GET health → 200 público, contrato v1', async () => {
-  const res = await call(integrationsRouter, fakeReq({ method: 'GET', segments: ['health'], url: '/api/integrations/health' }));
+test('router: /api vazio → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api' }));
+  assert.equal(res.statusCode, 404);
+});
+
+test('router: /api/router direto sem __path → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', url: '/api/router' }));
+  assert.equal(res.statusCode, 404);
+});
+
+test('router: topo desconhecido → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'desconhecido', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 404);
+});
+
+test('router: integrations sem segmento → 404 (não há rota base)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'integrations' }));
+  assert.equal(res.statusCode, 404);
+});
+
+test('router: __path com barra final e segmentos vazios → ignora vazios', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: __path com encoding → descodifica (id com hífen)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'posts/abc%2D123', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+// --- integrations ----------------------------------------------------------
+test('router: integrations health GET → 200 público, contrato v1', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'integrations/health' }));
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.platform, 'PinkLogic');
   assert.equal(res.body.contract, 'v1');
   assert.equal(res.body.status, 'operational');
 });
 
-test('integrations: POST health → 200 (método ignorado, como antes)', async () => {
-  const res = await call(integrationsRouter, fakeReq({ method: 'POST', segments: ['health'], url: '/api/integrations/health' }));
+test('router: integrations health POST → 200 (método ignorado, como antes)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'integrations/health' }));
   assert.equal(res.statusCode, 200);
 });
 
-test('integrations: GET stats sem chave → 503 "Integração não configurada."', async () => {
+test('router: integrations stats sem chave → 503 "Integração não configurada."', async () => {
   delete process.env.PINKLOGIC_ATHENA_API_KEY;
-  const res = await call(integrationsRouter, fakeReq({ method: 'GET', segments: ['stats'], url: '/api/integrations/stats' }));
+  const res = await call(fakeReq({ method: 'GET', path: 'integrations/stats' }));
   assert.equal(res.statusCode, 503);
   assert.match(res.body.error, /Integração não configurada/);
 });
 
-test('integrations: POST stats → 405 "Só GET." (método antes da auth)', async () => {
-  const res = await call(integrationsRouter, fakeReq({ method: 'POST', segments: ['stats'], url: '/api/integrations/stats' }));
+test('router: integrations stats POST → 405 "Só GET." (método antes da auth)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'integrations/stats' }));
   assert.equal(res.statusCode, 405);
 });
 
-test('integrations: GET stats com chave e bearer errado → 401', async () => {
+test('router: integrations stats com chave e bearer errado → 401', async () => {
   process.env.PINKLOGIC_ATHENA_API_KEY = 'athena-test-key-0123456789abcdef';
-  const res = await call(integrationsRouter, fakeReq({
-    method: 'GET', segments: ['stats'], url: '/api/integrations/stats',
-    headers: { authorization: 'Bearer chave-errada' },
+  const res = await call(fakeReq({
+    method: 'GET', path: 'integrations/stats', headers: { authorization: 'Bearer chave-errada' },
   }));
   assert.equal(res.statusCode, 401);
   delete process.env.PINKLOGIC_ATHENA_API_KEY;
 });
 
-test('integrations: GET stats com bearer certo e sem base → 503 (não chega à rede)', async () => {
+test('router: integrations stats com bearer certo e sem base → 503 (não chega à rede)', async () => {
   process.env.PINKLOGIC_ATHENA_API_KEY = 'athena-test-key-0123456789abcdef';
-  const res = await call(integrationsRouter, fakeReq({
-    method: 'GET', segments: ['stats'], url: '/api/integrations/stats',
+  const res = await call(fakeReq({
+    method: 'GET', path: 'integrations/stats',
     headers: { authorization: 'Bearer athena-test-key-0123456789abcdef' },
   }));
   assert.equal(res.statusCode, 503);
@@ -265,7 +303,87 @@ test('integrations: GET stats com bearer certo e sem base → 503 (não chega à
   delete process.env.PINKLOGIC_ATHENA_API_KEY;
 });
 
-test('integrations: segmento desconhecido → 404', async () => {
-  const res = await call(integrationsRouter, fakeReq({ method: 'GET', segments: ['unknown'], url: '/api/integrations/unknown' }));
+test('router: integrations segmento desconhecido → 404', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'integrations/unknown' }));
   assert.equal(res.statusCode, 404);
+});
+
+// --- owner-status ------------------------------------------------------------
+test('router: owner-status GET sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'auth/owner-status' }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: owner-status POST → 405 "Só GET" (método antes da auth)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'auth/owner-status' }));
+  assert.equal(res.statusCode, 405);
+  assert.match(res.body.error, /Só GET/);
+});
+
+// --- cron ---------------------------------------------------------------------
+test('router: cron sem CRON_SECRET → 503 "CRON_SECRET não configurado."', async () => {
+  delete process.env.CRON_SECRET;
+  const res = await call(fakeReq({ method: 'GET', path: 'cron/publish' }));
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /CRON_SECRET não configurado/);
+});
+
+test('router: cron com segredo e sem auth → 401 (chega ao handler do cron)', async () => {
+  process.env.CRON_SECRET = 'cron-test-secret-0123456789abcdef';
+  const res = await call(fakeReq({ method: 'GET', path: 'cron/publish' }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: cron com segredo errado → 401', async () => {
+  process.env.CRON_SECRET = 'cron-test-secret-0123456789abcdef';
+  const res = await call(fakeReq({
+    method: 'GET', path: 'cron/publish', headers: { authorization: 'Bearer errado' },
+  }));
+  assert.equal(res.statusCode, 401);
+  delete process.env.CRON_SECRET;
+});
+
+test('router: cron via URL → 401 (fallback do URL, com segredo)', async () => {
+  process.env.CRON_SECRET = 'cron-test-secret-0123456789abcdef';
+  const res = await call(fakeReq({ method: 'GET', url: '/api/cron/publish' }));
+  assert.equal(res.statusCode, 401);
+  delete process.env.CRON_SECRET;
+});
+
+// --- health / ping / singles ---------------------------------------------------
+test('router: health GET → 200 público', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'health' }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+});
+
+test('router: ping GET → 200 pong', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'ping' }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ping, 'pong');
+});
+
+test('router: collect GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'collect' }));
+  assert.equal(res.statusCode, 405);
+});
+
+test('router: decide GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'decide' }));
+  assert.equal(res.statusCode, 405);
+});
+
+test('router: generate GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'generate' }));
+  assert.equal(res.statusCode, 405);
+});
+
+test('router: mockup GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'mockup' }));
+  assert.equal(res.statusCode, 405);
+});
+
+test('router: carousel/render GET → 405 "Só POST"', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'carousel/render' }));
+  assert.equal(res.statusCode, 405);
 });

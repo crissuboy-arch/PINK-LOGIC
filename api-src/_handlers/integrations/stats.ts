@@ -1,6 +1,6 @@
 /**
  * Handler GET /api/integrations/stats (autenticado, só leitura) —
- * servido pelo router integrations/[...all] (não é função direta).
+ * servido pelo front-controller api/router (não é função direta).
  * Código INTACTO da consolidação Opção B.
  *
  * Integração Pink Logic ↔ Athena Control — contrato v1.
