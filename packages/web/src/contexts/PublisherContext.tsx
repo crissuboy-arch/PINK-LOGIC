@@ -15,6 +15,7 @@ interface PublisherContextType {
   connectAccount: (platform: PublisherPlatform, name: string) => void;
   disconnectAccount: (id: string) => void;
   publishPostNow: (id: string) => Promise<void>;
+  refreshScheduledPosts: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -51,6 +52,9 @@ function mapToScheduledPost(p: PostStore): ScheduledPost {
     timezone: 'America/Sao_Paulo',
     status: mappedStatus,
     error_message: p.error_message,
+    approvedAt: p.approvedAt ?? null,
+    approvedBy: p.approvedBy ?? null,
+    decision: p.decision ?? null,
   };
 }
 
@@ -61,6 +65,7 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     createPost,
     updatePost,
     deletePost,
+    refreshPosts,
   } = useCentralStore();
 
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
@@ -163,6 +168,7 @@ export const PublisherProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         connectAccount,
         disconnectAccount,
         publishPostNow,
+        refreshScheduledPosts: refreshPosts,
         isLoading,
       }}
     >

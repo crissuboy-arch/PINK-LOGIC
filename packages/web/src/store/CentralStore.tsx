@@ -38,6 +38,9 @@ interface CentralStoreContextType {
   createPost: (data: Omit<Post, 'id' | 'reach' | 'engagement'>) => Promise<Post>;
   updatePost: (id: string, data: Partial<Post>) => Promise<void>;
   deletePost: (id: string) => Promise<void>;
+  // Releitura dos posts (ex.: após aprovar pelo endpoint, que não passa
+  // pelo savePosts da UI). Não escreve nada — só recarrega do Supabase.
+  refreshPosts: () => Promise<void>;
 
   // Products CRUD
   createProduct: (data: Omit<Product, 'id'>) => Promise<Product>;
@@ -302,6 +305,12 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setPosts(current => current.filter(item => item.id !== id));
   }, []);
 
+  // Releitura dos posts a partir do Supabase (após aprovar pelo endpoint).
+  const refreshPosts = useCallback(async (): Promise<void> => {
+    const pts = await apiService.getPosts();
+    setPosts(pts);
+  }, []);
+
   // Products CRUD
   const createProduct = useCallback(async (data: Omit<Product, 'id'>): Promise<Product> => {
     const id = crypto.randomUUID();
@@ -377,7 +386,7 @@ export const CentralStoreProvider: React.FC<{ children: React.ReactNode }> = ({ 
       createProject: reportError(createProject), updateProject: reportError(updateProject), deleteProject: reportError(deleteProject),
       createBrand: reportError(createBrand), updateBrand: reportError(updateBrand),
       createCampaign: reportError(createCampaign), updateCampaign: reportError(updateCampaign), deleteCampaign: reportError(deleteCampaign),
-      createPost: reportError(createPost), updatePost: reportError(updatePost), deletePost: reportError(deletePost),
+      createPost: reportError(createPost), updatePost: reportError(updatePost), deletePost: reportError(deletePost), refreshPosts: reportError(refreshPosts),
       createProduct: reportError(createProduct), updateProduct: reportError(updateProduct), deleteProduct: reportError(deleteProduct),
       addChecklistItem: reportError(addChecklistItem), toggleChecklistItem: reportError(toggleChecklistItem), deleteChecklistItem: reportError(deleteChecklistItem),
     }}>

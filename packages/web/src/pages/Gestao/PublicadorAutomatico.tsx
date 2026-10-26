@@ -17,6 +17,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePublisher } from '../../contexts/PublisherContext';
 import type { PublisherPlatform } from '../../types/publisher';
+import { supabase } from '../../lib/supabaseClient';
+import {
+  getPostApprovalState,
+  APPROVAL_STATE_LABELS,
+  APPROVAL_STATE_PILL_CLASS,
+  getApproveButtonState,
+} from '../../lib/postApprovalState';
 
 // Custom SVG Icons to avoid lucide-react version incompatibilities
 const InstagramIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -82,12 +89,65 @@ const PublicadorAutomatico: React.FC = () => {
   const { 
     scheduledPosts, 
     socialAccounts, 
-    createScheduledPost, 
-    deleteScheduledPost, 
-    connectAccount, 
-    disconnectAccount, 
-    publishPostNow 
+    createScheduledPost,
+    deleteScheduledPost,
+    connectAccount,
+    disconnectAccount,
+    publishPostNow,
+    refreshScheduledPosts
   } = usePublisher();
+
+  // Aprovação humana (correção Achado 1): só a proprietária vê o botão.
+  // A visibilidade é só UI — o endpoint impõe o dono no servidor.
+  const [isOwner, setIsOwner] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (!supabase) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/auth/owner-status', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => ({}));
+        if (alive && body.isOwner === true) setIsOwner(true);
+      } catch {
+        // Sem confirmação de dono, o botão fica escondido (fail-closed na UI).
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Aprovar NÃO publica: só regista approved_by/approved_at no servidor.
+  // Um post agendado aprovado fica elegível para a sua janela (cron) —
+  // isso não é publicação imediata.
+  const handleApprovePost = async (id: string) => {
+    setErrorFeedback(null);
+    setApprovingId(id);
+    try {
+      if (!supabase) throw new Error('Supabase não configurado.');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+      const res = await fetch(`/api/posts/${id}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Falha ao aprovar (${res.status}).`);
+      }
+      await refreshScheduledPosts();
+      setSuccessFeedback('Post aprovado. A publicação continua a depender do agendamento — nada foi publicado agora.');
+    } catch (error) {
+      setErrorFeedback(error instanceof Error ? error.message : 'Falha ao aprovar.');
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   // Composer Form State
   const [title, setTitle] = useState('');
@@ -202,28 +262,9 @@ const PublicadorAutomatico: React.FC = () => {
     setTimeout(() => setSuccessFeedback(null), 4000);
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'published': return 'status-pill posted';
-      case 'scheduled': return 'status-pill scheduled';
-      case 'publishing': return 'status-pill publishing';
-      case 'failed': return 'status-pill failed';
-      case 'draft': return 'status-pill draft';
-      default: return 'status-pill';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'published': return 'Publicado';
-      case 'scheduled': return 'Agendado';
-      case 'publishing': return 'Publicando...';
-      case 'failed': return 'Falhou';
-      case 'draft': return 'Rascunho';
-      default: return status;
-    }
-  };
-
+  // O estado exibido vem de getPostApprovalState (lib/postApprovalState):
+  // 6 estados inequívocos (Rascunho, Pendente de aprovação, Aprovado,
+  // Agendado, Publicado, Bloqueado) em vez do status cru da base.
   const formatDate = (isoString: string) => {
     const d = new Date(isoString);
     return d.toLocaleString('pt-BR', { 
@@ -669,9 +710,14 @@ const PublicadorAutomatico: React.FC = () => {
                     </td>
                     <td>
                       <div>
-                        <span className={getStatusBadgeClass(post.status)}>
-                          {getStatusLabel(post.status)}
-                        </span>
+                        {(() => {
+                          const approvalState = getPostApprovalState(post);
+                          return (
+                            <span className={APPROVAL_STATE_PILL_CLASS[approvalState]}>
+                              {APPROVAL_STATE_LABELS[approvalState]}
+                            </span>
+                          );
+                        })()}
                         {post.status === 'failed' && post.error_message && (
                           <div className="error-tooltip" title={post.error_message}>
                             <AlertTriangle size={12} style={{ color: '#ef4444', marginLeft: 4 }} />
@@ -682,9 +728,27 @@ const PublicadorAutomatico: React.FC = () => {
                     </td>
                     <td>
                       <div className="actions-cell">
+                        {(() => {
+                          const btnState = getApproveButtonState(post, isOwner);
+                          if (btnState === 'hidden') return null;
+                          const disabled = btnState === 'disabled-jev' || approvingId === post.id;
+                          return (
+                            <button
+                              type="button"
+                              className="btn-action-icon flex-center approve"
+                              disabled={disabled}
+                              onClick={() => handleApprovePost(post.id)}
+                              title={btnState === 'disabled-jev'
+                                ? 'O Jev reprovou este post — a aprovação não o desbloqueia. Reveja o conteúdo e reagende.'
+                                : 'Aprovar para publicação (não publica agora)'}
+                            >
+                              <CheckCircle2 size={14} />
+                            </button>
+                          );
+                        })()}
                         {post.status === 'scheduled' && (
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className="btn-action-icon flex-center"
                             onClick={() => publishPostNow(post.id).catch(error => setErrorFeedback(error.message))}
                             title="Publicar agora"
@@ -1562,6 +1626,17 @@ const PublicadorAutomatico: React.FC = () => {
           color: var(--text-secondary);
         }
 
+        .status-pill.pending {
+          background: rgba(168, 85, 247, 0.1);
+          color: #a855f7;
+        }
+
+        .status-pill.approved {
+          background: rgba(16, 185, 129, 0.05);
+          color: #10b981;
+          border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.6; }
@@ -1591,6 +1666,15 @@ const PublicadorAutomatico: React.FC = () => {
           color: #ef4444;
           background: rgba(239, 68, 68, 0.05);
           border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-action-icon.approve {
+          color: #10b981;
+        }
+
+        .btn-action-icon.approve:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
 
         .flex-center {

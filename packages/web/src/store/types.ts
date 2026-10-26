@@ -99,6 +99,12 @@ export interface Post {
   reach: string;
   engagement: string;
   error_message?: string | null;
+  // Aprovação humana (migration 20261025140000). Lidos da base, nunca
+  // escritos pelo savePosts da UI: a aprovação faz-se só pelo endpoint
+  // POST /api/posts/:id/approve, que impõe o dono no servidor.
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  decision?: { passed?: boolean; provider?: string } | null;
 }
 
 export interface ChecklistItem {

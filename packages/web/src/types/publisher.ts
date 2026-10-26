@@ -18,6 +18,11 @@ export interface ScheduledPost {
   status: PublishStatus;
   error_message?: string | null;
   published_at?: string | null;
+  // Aprovação humana (migration 20261025140000): null até a proprietária
+  // aprovar pelo endpoint. Alimenta o estado de aprovação e o botão.
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  decision?: { passed?: boolean } | null;
   created_at?: string;
   updated_at?: string;
 }

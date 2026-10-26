@@ -12,6 +12,7 @@ import { decide } from "../services/jev-decider.js";
 import { collect, aisaReady } from "../services/aisa.js";
 import { requireAuth } from "../services/auth.js";
 import { createPost, listPosts, getPost, updatePost, deletePost, schedulePost, publishPostNow, publishDuePosts, approvePostHuman } from "../services/posts.js";
+import { isOwner } from "../services/ownership.js";
 import { toPublicError } from "../services/http-errors.js";
 import { isCronSecretValid } from "../services/cron-auth.js";
 import { generalLimiter, generationLimiter, dailyQuota, rateLimitKey, enforceRateLimit } from "../services/rate-limit.js";
@@ -170,6 +171,16 @@ router.post("/posts/:id/approve", async (req, res) => {
   } catch (err: any) {
     const pub = toPublicError(err); res.status(pub.status).json({ error: pub.message });
   }
+});
+
+// ─── Aprovação humana na UI: só diz se QUEM CHAMA é a proprietária ───
+// Não revela o UUID do dono nem segredos. A decisão real continua no
+// servidor (approvePostHuman → requireOwner); esconder o botão nunca
+// substitui essa validação.
+router.get("/auth/owner-status", async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  res.json({ isOwner: isOwner(auth) });
 });
 
 // ─── Cron (produção: /api/cron/publish, protegido por CRON_SECRET) ───

@@ -160,6 +160,12 @@ export class SupabaseRepositoryAdapter implements IProjectRepository, IBrandRepo
             type: p.type || 'Post',
             reach: p.reach || '-',
             engagement: p.engagement || '-',
+            // Aprovação humana: só leitura aqui. O savePosts abaixo NÃO
+            // inclui estes campos de propósito — a UI nunca escreve
+            // approved_at/decision por upsert; só o endpoint de aprovar.
+            approvedAt: p.approved_at ?? null,
+            approvedBy: p.approved_by ?? null,
+            decision: p.decision ?? null,
     }));
   }
   async savePosts(items: Post[]): Promise<void> {
