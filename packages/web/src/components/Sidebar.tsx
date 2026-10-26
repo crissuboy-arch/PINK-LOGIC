@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
   Captions,
-  Settings, 
   Calendar, 
   Lightbulb, 
   CheckSquare, 
@@ -47,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
   const { t } = useLanguage();
   const [openMenus, setOpenMenus] = useState<string[]>(['criacao', 'assets', 'automacao', 'inteligencia']);
   
-  const { projects, activeProjectId, activeProject, setActiveProjectId, createProject } = useCentralStore();
+  const { projects, activeProjectId, activeProject, setActiveProjectId, createProject, isLoading: projectsLoading } = useCentralStore();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showNewProjModal, setShowNewProjModal] = useState(false);
   const [newProjName, setNewProjName] = useState('');
@@ -165,19 +164,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
         {showProjectDropdown && (
           <div className="project-dropdown-menu">
             <div className="project-list-container">
-              {projects.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setActiveProjectId(p.id);
-                    setShowProjectDropdown(false);
-                  }}
-                  className={`project-dropdown-item ${p.id === activeProjectId ? 'active' : ''}`}
-                >
-                  <span className={`project-indicator-dot ${p.id === activeProjectId ? 'active' : ''}`} />
-                  <span className="project-item-name">{p.name}</span>
-                </button>
-              ))}
+              {projectsLoading ? (
+                <div className="project-dropdown-empty">A carregar projetos…</div>
+              ) : projects.length === 0 ? (
+                <div className="project-dropdown-empty">
+                  Ainda não tens projetos nesta conta.
+                  Cria o primeiro com o botão abaixo.
+                </div>
+              ) : (
+                projects.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setActiveProjectId(p.id);
+                      setShowProjectDropdown(false);
+                    }}
+                    className={`project-dropdown-item ${p.id === activeProjectId ? 'active' : ''}`}
+                  >
+                    <span className={`project-indicator-dot ${p.id === activeProjectId ? 'active' : ''}`} />
+                    <span className="project-item-name">{p.name}</span>
+                  </button>
+                ))
+              )}
             </div>
             <button
               onClick={() => {
@@ -503,7 +511,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-lg), var(--shadow-glow-purple);
-          zIndex: 110;
+          z-index: 110;
           margin-top: 4px;
           overflow: hidden;
           animation: slideUp 0.15s ease-out;
@@ -518,6 +526,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
         .project-list-container {
           max-height: 160px;
           overflow-y: auto;
+        }
+
+        .project-dropdown-empty {
+          padding: 0.75rem 0.85rem;
+          color: var(--text-secondary);
+          font-size: 0.8rem;
+          line-height: 1.4;
         }
 
         .project-dropdown-item {
