@@ -1,6 +1,6 @@
 /**
  * Handler POST /api/posts/:id/approve — servido pelo router
- * posts/[[...all]] (não é função direta; vive em _handlers/).
+ * posts/[...all] (não é função direta; vive em _handlers/).
  * Código INTACTO da consolidação Opção B.
  * Aprovação humana (correção Achado 1): só a proprietária aprova, e só
  * rascunhos/agendados. É este registo (approved_by/approved_at) que

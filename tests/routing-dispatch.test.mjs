@@ -3,9 +3,9 @@
  * 12 funções) — provam que as rotas consolidadas chegam ao handler
  * certo, com os gates certos, sem base de dados nem rede real.
  *
- * Importam os BUNDLES REAIS (api/posts/[[...all]].js e
- * api/integrations/[...all].js) — o código exato que a Vercel vai
- * correr — por isso só correm DEPOIS do bundle:
+ * Importam os BUNDLES REAIS (api/posts/index.js,
+ * api/posts/[...all].js e api/integrations/[...all].js) — o código
+ * exato que a Vercel vai correr — por isso só correm DEPOIS do bundle:
  *   npm run build --workspace=@pink-logic/shared
  *   npm run build --workspace=@pink-logic/api
  *   node scripts/bundle-functions.mjs
@@ -25,7 +25,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import postsRouter from '../api/posts/[[...all]].js';
+import postsIndex from '../api/posts/index.js';
+import postsRouter from '../api/posts/[...all].js';
 import integrationsRouter from '../api/integrations/[...all].js';
 
 // --- ambiente determinístico (antes de qualquer invocação) -----------
@@ -76,43 +77,54 @@ async function call(handler, req) {
   return res;
 }
 
-// --- router posts ------------------------------------------------------
-test('posts: base GET sem auth → 401 (ramo index, auth primeiro)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [] }));
+// --- função posts/index (rota base exata) ------------------------------
+test('posts: base GET sem auth → 401 (index, auth primeiro)', async () => {
+  const res = await call(postsIndex, fakeReq({ method: 'GET' }));
   assert.equal(res.statusCode, 401);
 });
 
 test('posts: base POST sem auth → 401', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'POST', segments: [] }));
+  const res = await call(postsIndex, fakeReq({ method: 'POST' }));
   assert.equal(res.statusCode, 401);
 });
 
 test('posts: base PUT com auth de serviço → 405 "Só GET ou POST"', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'PUT', segments: [], headers: SERVICE_AUTH }));
+  const res = await call(postsIndex, fakeReq({ method: 'PUT', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 405);
   assert.match(res.body.error, /Só GET ou POST/);
 });
 
 test('posts: base GET com auth de serviço → 503 (chega ao listPosts; sem dono/base)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [], headers: SERVICE_AUTH }));
+  const res = await call(postsIndex, fakeReq({ method: 'GET', headers: SERVICE_AUTH }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: base GET com filtros válidos → 503 (query atravessa o router)', async () => {
-  const res = await call(postsRouter, fakeReq({
-    method: 'GET', segments: [], headers: SERVICE_AUTH, query: { status: 'agendado', limit: '10' },
+test('posts: base GET com filtros válidos → 503 (query atravessa)', async () => {
+  const res = await call(postsIndex, fakeReq({
+    method: 'GET', headers: SERVICE_AUTH, query: { status: 'agendado', limit: '10' },
   }));
   assert.equal(res.statusCode, 503);
 });
 
-test('posts: base sem query.all (só URL) → ramo index (fallback do URL)', async () => {
-  const res = await call(postsRouter, fakeReq({ method: 'GET', url: '/api/posts' }));
+test('posts: base só URL → 401 (index não depende de query.all)', async () => {
+  const res = await call(postsIndex, fakeReq({ method: 'GET', url: '/api/posts' }));
   assert.equal(res.statusCode, 401);
 });
 
-test('posts: query.all [""] → ramo index (segmentos vazios filtrados)', async () => {
+// --- router posts/[...all] (1+ segmentos, SEM ramo base) ---------------
+test('posts: [...all] sem segmentos → 404 (base é o index, não o router)', async () => {
+  const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [] }));
+  assert.equal(res.statusCode, 404);
+});
+
+test('posts: [...all] query.all [""] → 404 (segmentos vazios filtrados, sem base)', async () => {
   const res = await call(postsRouter, fakeReq({ method: 'GET', segments: [''] }));
-  assert.equal(res.statusCode, 401);
+  assert.equal(res.statusCode, 404);
+});
+
+test('posts: [...all] só URL /api/posts → 404 (fallback do URL sem base)', async () => {
+  const res = await call(postsRouter, fakeReq({ method: 'GET', url: '/api/posts' }));
+  assert.equal(res.statusCode, 404);
 });
 
 test('posts: [id] PUT com auth → 405 "Só GET, PATCH ou DELETE"', async () => {

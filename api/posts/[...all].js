@@ -26393,74 +26393,6 @@ async function publishToPlatforms(platforms, input) {
 var JEV_API_URL = process.env.JEV_API_URL || "https://api.typesafe.ai/v1/systemone";
 var JEV_API_KEY = process.env.JEV_API_KEY || "";
 var JEV_MODEL = process.env.JEV_MODEL || "jev-latest";
-async function decide(req) {
-  if (!JEV_API_KEY) {
-    return {
-      value: false,
-      confidence: 0,
-      passed: false,
-      provider: "manual"
-    };
-  }
-  let res;
-  try {
-    res = await fetch(JEV_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${JEV_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: JEV_MODEL,
-        state: req.context,
-        questions: {
-          decision: req.options ? {
-            type: "choice",
-            instructions: `A\xE7\xE3o "${req.action}": qual op\xE7\xE3o se aplica ao conte\xFAdo?`,
-            criteria: Object.fromEntries(req.options.map((o) => [o, null]))
-          } : {
-            type: "noul",
-            instructions: `A\xE7\xE3o "${req.action}": o conte\xFAdo deve ser aprovado?`
-          }
-        }
-      })
-    });
-  } catch (e) {
-    return { value: false, confidence: 0, passed: false, provider: "manual", error: `Jev inacess\xEDvel: ${e?.message}` };
-  }
-  if (!res.ok) {
-    let detail = "";
-    try {
-      detail = (await res.text()).slice(0, 300);
-    } catch {
-    }
-    return { value: false, confidence: 0, passed: false, provider: "manual", error: `Jev HTTP ${res.status} ${detail}` };
-  }
-  const data = await res.json();
-  const a = data.answers?.decision ?? {};
-  if (a.type === "noul" && typeof a.noul === "number") {
-    const value = a.noul >= 0.5;
-    const confidence = value ? a.noul : 1 - a.noul;
-    return { value, confidence, passed: value && confidence >= req.threshold, provider: "jev" };
-  }
-  if (a.type === "choice" && typeof a.choice === "string") {
-    const confidence = typeof a.confidence === "number" ? a.confidence : 0;
-    return { value: a.choice, confidence, passed: confidence >= req.threshold, provider: "jev" };
-  }
-  return { value: false, confidence: 0, passed: false, provider: "manual", error: "Jev: resposta sem answers.decision v\xE1lido" };
-}
-async function approvePost(post2, threshold = 0.7) {
-  const result = await decide({
-    action: "approve_post",
-    context: {
-      caption: post2.caption,
-      hashtags: post2.hashtags,
-      hasImage: !!post2.imageUrl
-    },
-    threshold
-  });
-  return result;
-}
 
 // packages/api/dist/services/ownership.js
 function httpError(status, message) {
@@ -26513,23 +26445,6 @@ async function resolveOwnerId(auth) {
   }
   return ownerId;
 }
-async function resolveProjectId(ownerId, projectId) {
-  const db = admin();
-  if (projectId) {
-    const { data: data2, error: error2 } = await db.from("projects").select("id").eq("id", projectId).eq("user_id", ownerId).maybeSingle();
-    if (error2)
-      throw httpError2(500, "Falha ao validar o projeto.");
-    if (!data2)
-      throw httpError2(404, "Projeto n\xE3o encontrado (ou n\xE3o pertence a esta conta).");
-    return data2.id;
-  }
-  const { data, error } = await db.from("projects").select("id").eq("user_id", ownerId).order("created_at", { ascending: true }).limit(1).maybeSingle();
-  if (error)
-    throw httpError2(500, "Falha ao procurar um projeto.");
-  if (!data)
-    throw httpError2(422, "Esta conta ainda n\xE3o tem nenhum projeto \u2014 crie um no site antes de criar posts.");
-  return data.id;
-}
 async function validateBrandAndCampaign(projectId, brandId, campaignId) {
   const db = admin();
   if (brandId) {
@@ -26573,56 +26488,6 @@ function rowToApi(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
-}
-async function createPost(auth, input) {
-  const ownerId = await resolveOwnerId(auth);
-  const projectId = await resolveProjectId(ownerId, input.projectId);
-  await validateBrandAndCampaign(projectId, input.brandId, input.campaignId);
-  let status = input.scheduledAt ? "agendado" : "rascunho";
-  let decision = input.decision ?? null;
-  if (input.scheduledAt && !input.decision) {
-    const result = await approvePost({ caption: input.caption, hashtags: input.hashtags, imageUrl: input.mediaUrl });
-    decision = { ...result, error: result.error ? "Jev indispon\xEDvel; revis\xE3o manual necess\xE1ria." : void 0 };
-    if (!result.passed)
-      status = "rascunho";
-  }
-  if (status === "agendado" && auth.kind === "user" && !isOwner(auth))
-    status = "rascunho";
-  const { data, error } = await admin().from("scheduled_posts").insert({
-    user_id: ownerId,
-    project_id: projectId,
-    brand_id: input.brandId ?? null,
-    campaign_id: input.campaignId ?? null,
-    title: input.title,
-    caption: input.caption,
-    hashtags: input.hashtags ?? [],
-    media_url: input.mediaUrl ?? null,
-    aspect_ratio: input.aspectRatio ?? null,
-    platforms: input.platforms,
-    scheduled_at: input.scheduledAt ?? null,
-    status,
-    source: auth.kind === "service" ? "mcp" : "web",
-    decision
-  }).select().single();
-  if (error)
-    throw httpError2(500, "Falha ao criar o post.");
-  return rowToApi(data);
-}
-async function listPosts(auth, query) {
-  const ownerId = await resolveOwnerId(auth);
-  let q = admin().from("scheduled_posts").select("*").eq("user_id", ownerId).order("scheduled_at", { ascending: true }).limit(query.limit);
-  if (query.status)
-    q = q.eq("status", query.status);
-  if (query.projectId)
-    q = q.eq("project_id", query.projectId);
-  if (query.from)
-    q = q.gte("scheduled_at", query.from);
-  if (query.to)
-    q = q.lte("scheduled_at", query.to);
-  const { data, error } = await q;
-  if (error)
-    throw httpError2(500, "Falha ao listar posts.");
-  return (data || []).map(rowToApi);
 }
 async function getOwnedPost(ownerId, id) {
   const { data, error } = await admin().from("scheduled_posts").select("*").eq("id", id).eq("user_id", ownerId).maybeSingle();
@@ -26737,45 +26602,6 @@ async function publishRow(post2) {
   return rowToApi(data);
 }
 
-// packages/api/dist/services/rate-limit.js
-var RateLimiter = class {
-  max;
-  windowMs;
-  hits = /* @__PURE__ */ new Map();
-  constructor(max, windowMs) {
-    this.max = max;
-    this.windowMs = windowMs;
-  }
-  check(key, now = Date.now()) {
-    const cutoff = now - this.windowMs;
-    const arr = (this.hits.get(key) || []).filter((t) => t > cutoff);
-    if (arr.length >= this.max) {
-      this.hits.set(key, arr);
-      const retryAfterSec = Math.max(1, Math.ceil((arr[0] + this.windowMs - now) / 1e3));
-      return { allowed: false, retryAfterSec };
-    }
-    arr.push(now);
-    this.hits.set(key, arr);
-    return { allowed: true, retryAfterSec: 0 };
-  }
-  reset() {
-    this.hits.clear();
-  }
-};
-var generalLimiter = new RateLimiter(60, 6e4);
-var generationLimiter = new RateLimiter(30, 6e4);
-var dailyQuota = new RateLimiter(200, 24 * 60 * 6e4);
-function rateLimitKey(auth) {
-  return auth.kind === "service" ? "service" : `user:${auth.userId}`;
-}
-function enforceRateLimit(limiter, key, res) {
-  const r = limiter.check(key);
-  if (r.allowed)
-    return true;
-  res.status(429).json({ error: "Demasiados pedidos. Tente novamente mais tarde.", retryAfterSec: r.retryAfterSec });
-  return false;
-}
-
 // packages/api/dist/services/http-errors.js
 function toPublicError(err) {
   const status = typeof err?.status === "number" ? err.status : 500;
@@ -26789,31 +26615,8 @@ function toPublicError(err) {
   return { status: 500, message: "Erro interno. Tente novamente." };
 }
 
-// api-src/posts/_handlers/index.ts
-async function handler(req, res) {
-  const auth = await requireAuth(req, res);
-  if (!auth) return;
-  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
-  try {
-    if (req.method === "GET") {
-      const parsed = ScheduledPostListQuerySchema.safeParse(req.query);
-      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-      return res.status(200).json({ posts: await listPosts(auth, parsed.data) });
-    }
-    if (req.method === "POST") {
-      const parsed = ScheduledPostCreateSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-      return res.status(201).json({ post: await createPost(auth, parsed.data) });
-    }
-    return res.status(405).json({ error: "S\xF3 GET ou POST" });
-  } catch (err) {
-    const pub = toPublicError(err);
-    res.status(pub.status).json({ error: pub.message });
-  }
-}
-
 // api-src/posts/_handlers/[id].ts
-async function handler2(req, res) {
+async function handler(req, res) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
   const id = String(req.query.id || "");
@@ -26837,7 +26640,7 @@ async function handler2(req, res) {
 }
 
 // api-src/posts/_handlers/approve.ts
-async function handler3(req, res) {
+async function handler2(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -26851,7 +26654,7 @@ async function handler3(req, res) {
 }
 
 // api-src/posts/_handlers/publish.ts
-async function handler4(req, res) {
+async function handler3(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -26866,7 +26669,7 @@ async function handler4(req, res) {
 
 // api-src/posts/_handlers/schedule.ts
 var BodySchema = external_exports.object({ scheduledAt: external_exports.string().datetime() });
-async function handler5(req, res) {
+async function handler4(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -26880,7 +26683,7 @@ async function handler5(req, res) {
   }
 }
 
-// api-src/posts/[[...all]].ts
+// api-src/posts/[...all].ts
 function segmentsOf(req) {
   const raw = req.query?.all;
   const fromQuery = Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? [raw] : null;
@@ -26901,28 +26704,27 @@ function segmentsOf(req) {
     return [];
   }
 }
-async function handler6(req, res) {
+async function handler5(req, res) {
   const segments = segmentsOf(req);
   const query = { ...req.query };
   delete query.all;
   if (segments.length === 0) {
-    req.query = query;
-    return handler(req, res);
+    return res.status(404).json({ error: "Rota n\xE3o encontrada." });
   }
   const [id, action, ...extra] = segments;
   if (segments.length === 1) {
     req.query = { ...query, id };
-    return handler2(req, res);
+    return handler(req, res);
   }
   if (segments.length === 2 && extra.length === 0) {
     req.query = { ...query, id };
-    if (action === "approve") return handler3(req, res);
-    if (action === "publish") return handler4(req, res);
-    if (action === "schedule") return handler5(req, res);
+    if (action === "approve") return handler2(req, res);
+    if (action === "publish") return handler3(req, res);
+    if (action === "schedule") return handler4(req, res);
   }
   return res.status(404).json({ error: "Rota n\xE3o encontrada." });
 }
 export {
-  handler6 as default,
+  handler5 as default,
   segmentsOf
 };

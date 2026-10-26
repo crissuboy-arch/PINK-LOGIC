@@ -1,21 +1,23 @@
 /**
- * Vercel serverless (router único, catch-all opcional): /api/posts,
- * /api/posts/:id, /api/posts/:id/approve, /api/posts/:id/publish,
- * /api/posts/:id/schedule.
+ * Vercel serverless (router, catch-all OBRIGATÓRIO): /api/posts/:id,
+ * /api/posts/:id/approve, /api/posts/:id/publish,
+ * /api/posts/:id/schedule (1+ segmentos).
  *
- * CONSOLIDAÇÃO Opção B (limite Hobby: 12 funções): as 5 rotas posts
- * viviam em 5 ficheiros/funções; passam a 1 função com dispatch interno.
- * Os handlers originais NÃO mudaram — vivem em ./_handlers/ (o script
- * de bundle ignora diretórios com prefixo `_`) e o router só delega,
- * preservando método, auth, gates e códigos de erro de cada rota:
- *  - base (GET/POST): requireAuth + rate limit geral (só aqui);
+ * CORREÇÃO FINAL (limite Hobby: 12 funções): o router opcional
+ * posts/[[...all]] NÃO casa 0 nem 2+ segmentos no router de funções
+ * da Vercel (provado ao vivo), por isso a base exata vive em
+ * posts/index.ts e este ficheiro é o catch-all OBRIGATÓRIO
+ * (1+ segmentos — já provado ao vivo pelo router integrations).
+ * NÃO tem ramo base: sem segmentos → 404 (a base é o index.ts).
+ * Os handlers originais NÃO mudaram — vivem em ./_handlers/ (o
+ * script de bundle ignora diretórios com prefixo `_`) e o router só
+ * delega, preservando método, auth, gates e códigos de erro:
  *  - :id (GET/PATCH/DELETE): requireAuth;
  *  - approve/publish/schedule (POST): 405 antes da auth, depois
  *    requireAuth; schedule valida o body antes do serviço.
- * Rotas desconhecidas → 404, como o 404 da Vercel antes (sem função).
+ * Rotas desconhecidas → 404, como o 404 da Vercel antes.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import indexHandler from "./_handlers/index.js";
 import detailHandler from "./_handlers/[id].js";
 import approveHandler from "./_handlers/approve.js";
 import publishHandler from "./_handlers/publish.js";
@@ -54,9 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const query = { ...(req.query as Record<string, unknown>) };
   delete query.all;
 
+  // SEM ramo base: a rota exata /api/posts é posts/index.ts.
   if (segments.length === 0) {
-    req.query = query as VercelRequest["query"];
-    return indexHandler(req, res);
+    return res.status(404).json({ error: "Rota não encontrada." });
   }
   const [id, action, ...extra] = segments;
   if (segments.length === 1) {
