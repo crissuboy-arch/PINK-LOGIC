@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard,
@@ -48,6 +49,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
   
   const { projects, activeProjectId, activeProject, setActiveProjectId, createProject, isLoading: projectsLoading } = useCentralStore();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const projectTriggerRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 240 });
+  const toggleProjectDropdown = () => {
+    const rect = projectTriggerRef.current?.getBoundingClientRect();
+    if (rect) setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 200) });
+    setShowProjectDropdown(open => !open);
+  };
   const [showNewProjModal, setShowNewProjModal] = useState(false);
   const [newProjName, setNewProjName] = useState('');
 
@@ -140,7 +148,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
       {/* Project Switcher Selector */}
       <div className="project-switcher-wrap">
         <button 
-          onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+          ref={projectTriggerRef}
+          type="button"
+          aria-expanded={showProjectDropdown}
+          aria-haspopup="menu"
+          onClick={toggleProjectDropdown}
           className="project-trigger-btn"
           data-tooltip={isCollapsed ? (activeProject ? activeProject.name : 'Projetos') : undefined}
         >
@@ -161,8 +173,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
           {!isCollapsed && <ChevronDown size={14} className="dropdown-arrow" />}
         </button>
 
-        {showProjectDropdown && (
-          <div className="project-dropdown-menu">
+        {showProjectDropdown && createPortal(
+          <div className="project-dropdown-menu" style={{ position: 'fixed', top: dropdownPosition.top, left: dropdownPosition.left, right: 'auto', width: dropdownPosition.width, zIndex: 99999, marginTop: 0, transform: 'none' }}>
             <div className="project-list-container">
               {projectsLoading ? (
                 <div className="project-dropdown-empty">A carregar projetos…</div>
@@ -197,7 +209,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
               <Plus size={14} />
               <span>Criar Novo Projeto</span>
             </button>
-          </div>
+          </div>, document.body
         )}
       </div>
 
