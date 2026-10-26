@@ -1,5 +1,7 @@
 /**
- * Vercel serverless: GET /api/integrations/stats (autenticado, só leitura)
+ * Handler GET /api/integrations/stats (autenticado, só leitura) —
+ * servido pelo router integrations/[...all] (não é função direta).
+ * Código INTACTO da consolidação Opção B.
  *
  * Integração Pink Logic ↔ Athena Control — contrato v1.
  * Mesmo padrão da integração VitrinePro ↔ Athena.

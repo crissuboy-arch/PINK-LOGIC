@@ -1,5 +1,7 @@
 /**
- * Vercel serverless: POST /api/posts/:id/schedule
+ * Handler POST /api/posts/:id/schedule — servido pelo router
+ * posts/[[...all]] (não é função direta; vive em _handlers/).
+ * Código INTACTO da consolidação Opção B.
  * Body: { scheduledAt: string (ISO datetime) }
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";

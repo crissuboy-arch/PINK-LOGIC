@@ -1,5 +1,7 @@
 /**
- * Vercel serverless: GET/POST /api/posts
+ * Handler GET/POST /api/posts — servido pelo router posts/[[...all]]
+ * (não é função direta; vive em _handlers/ por isso o bundle ignora-o).
+ * Código INTACTO da consolidação Opção B.
  * Lista ou cria posts na mesma tabela (scheduled_posts) que o site usa.
  * Segurança (branch fix/pink-logic-seguranca-achados-1-5): rate limit por
  * chamador e erros seguros (sem detalhe interno no cliente).

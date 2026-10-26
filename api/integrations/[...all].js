@@ -5902,7 +5902,7 @@ var require_helpers = __commonJS({
       crypto.getRandomValues(array);
       return Array.from(array, dec2hex).join("");
     }
-    async function sha2562(randomString) {
+    async function sha256(randomString) {
       const encoder = new TextEncoder();
       const encodedData = encoder.encode(randomString);
       const hash = await crypto.subtle.digest("SHA-256", encodedData);
@@ -5915,7 +5915,7 @@ var require_helpers = __commonJS({
         console.warn("WebCrypto API is not supported. Code challenge method will default to use plain instead of sha256.");
         return verifier;
       }
-      const hashed = await sha2562(verifier);
+      const hashed = await sha256(verifier);
       return btoa(hashed).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     }
     var PKCE_FLOW_ID_PATTERN = /^[a-zA-Z0-9_-]{8,64}$/;
@@ -13904,8 +13904,19 @@ var require_main3 = __commonJS({
   }
 });
 
-// packages/api/dist/services/auth.js
-import { createHash, timingSafeEqual } from "node:crypto";
+// api-src/integrations/_handlers/health.ts
+var PLATFORM = "PinkLogic";
+var CONTRACT = "v1";
+var VERSION = "2.0.0";
+async function handler(_req, res) {
+  res.status(200).json({
+    platform: PLATFORM,
+    status: "operational",
+    version: VERSION,
+    contract: CONTRACT,
+    capabilities: ["integrations:health", "integrations:stats"]
+  });
+}
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
 var dist_exports = {};
@@ -21419,10 +21430,10 @@ function matchStringTarget(hostname, target) {
   }
   return false;
 }
-function getDefaultPropagationTargets(supabaseUrl2) {
+function getDefaultPropagationTargets(supabaseUrl) {
   const targets = [];
   try {
-    const url = new URL(supabaseUrl2);
+    const url = new URL(supabaseUrl);
     targets.push(url.hostname);
   } catch (error) {
   }
@@ -21499,12 +21510,12 @@ var checkApiKeyFormat = (key) => {
   warnedKeySubtypes.add(subtype);
   console.warn("@supabase/supabase-js: Unrecognized Supabase API key format. The client will proceed and send this key as-is; if you see authentication errors you may need to upgrade @supabase/supabase-js to a version that recognizes this key type.");
 };
-var fetchWithAuth = (supabaseKey, supabaseUrl2, getAccessToken, customFetch, tracePropagationOptions, options) => {
+var fetchWithAuth = (supabaseKey, supabaseUrl, getAccessToken, customFetch, tracePropagationOptions, options) => {
   const fetch$1 = resolveFetch2(customFetch);
   const HeadersConstructor = resolveHeadersConstructor();
   const traceEnabled = (tracePropagationOptions === null || tracePropagationOptions === void 0 ? void 0 : tracePropagationOptions.enabled) === true;
   const respectSampling = (tracePropagationOptions === null || tracePropagationOptions === void 0 ? void 0 : tracePropagationOptions.respectSamplingDecision) !== false;
-  const traceTargets = traceEnabled ? getDefaultPropagationTargets(supabaseUrl2) : null;
+  const traceTargets = traceEnabled ? getDefaultPropagationTargets(supabaseUrl) : null;
   const allowKeyAsBearer = !((options === null || options === void 0 ? void 0 : options.omitApiKeyAsBearer) && isNewApiKey(supabaseKey));
   return async (input, init) => {
     const realToken = await getAccessToken();
@@ -21588,8 +21599,8 @@ function applySettingDefaults(options, defaults) {
   else delete result.accessToken;
   return result;
 }
-function validateSupabaseUrl(supabaseUrl2) {
-  const trimmedUrl = supabaseUrl2 === null || supabaseUrl2 === void 0 ? void 0 : supabaseUrl2.trim();
+function validateSupabaseUrl(supabaseUrl) {
+  const trimmedUrl = supabaseUrl === null || supabaseUrl === void 0 ? void 0 : supabaseUrl.trim();
   if (!trimmedUrl) throw new Error("supabaseUrl is required.");
   if (!trimmedUrl.match(/^https?:\/\//i)) throw new Error("Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.");
   try {
@@ -21818,11 +21829,11 @@ var SupabaseClient = class {
   * })
   * ```
   */
-  constructor(supabaseUrl2, supabaseKey, options) {
+  constructor(supabaseUrl, supabaseKey, options) {
     var _settings$auth$storag, _settings$global$head;
-    this.supabaseUrl = supabaseUrl2;
+    this.supabaseUrl = supabaseUrl;
     this.supabaseKey = supabaseKey;
-    const baseUrl = validateSupabaseUrl(supabaseUrl2);
+    const baseUrl = validateSupabaseUrl(supabaseUrl);
     if (!supabaseKey) throw new Error("supabaseKey is required.");
     checkApiKeyFormat(supabaseKey);
     checkTopLevelSchemaOption(options);
@@ -21852,8 +21863,8 @@ var SupabaseClient = class {
         throw new Error(`@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase.auth.${String(prop)} is not possible`);
       } });
     }
-    this.fetch = fetchWithAuth(supabaseKey, supabaseUrl2, this._getSessionToken.bind(this), settings.global.fetch, settings.tracePropagation);
-    this.functionsFetch = fetchWithAuth(supabaseKey, supabaseUrl2, this._getSessionToken.bind(this), settings.global.fetch, settings.tracePropagation, { omitApiKeyAsBearer: true });
+    this.fetch = fetchWithAuth(supabaseKey, supabaseUrl, this._getSessionToken.bind(this), settings.global.fetch, settings.tracePropagation);
+    this.functionsFetch = fetchWithAuth(supabaseKey, supabaseUrl, this._getSessionToken.bind(this), settings.global.fetch, settings.tracePropagation, { omitApiKeyAsBearer: true });
     this.realtime = this._initRealtimeClient(_objectSpread23({
       headers: this.headers,
       accessToken: this._getAccessToken.bind(this),
@@ -22065,8 +22076,8 @@ var SupabaseClient = class {
     }
   }
 };
-var createClient = (supabaseUrl2, supabaseKey, options) => {
-  return new SupabaseClient(supabaseUrl2, supabaseKey, options);
+var createClient = (supabaseUrl, supabaseKey, options) => {
+  return new SupabaseClient(supabaseUrl, supabaseKey, options);
 };
 function shouldShowDeprecationWarning() {
   if (typeof window !== "undefined" || globalThis["Deno"] !== void 0) return false;
@@ -22080,275 +22091,149 @@ function shouldShowDeprecationWarning() {
 }
 if (shouldShowDeprecationWarning()) console.warn("\u26A0\uFE0F  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715");
 
-// packages/api/dist/services/auth.js
-var sha256 = (s) => createHash("sha256").update(s).digest();
-function supabaseUrl() {
-  for (const raw of [process.env.SUPABASE_URL, process.env.VITE_SUPABASE_URL]) {
-    const v = (raw || "").trim();
-    if (/^https?:\/\/\S+$/i.test(v))
-      return v;
-  }
-  return null;
+// api-src/integrations/_handlers/stats.ts
+import { createHash, timingSafeEqual } from "node:crypto";
+var PLATFORM2 = "PinkLogic";
+var CONTRACT2 = "v1";
+var API_KEY_ENV = "PINKLOGIC_ATHENA_API_KEY";
+var POST_STATUSES = [
+  "DRAFT",
+  "PENDING_REVIEW",
+  "SCHEDULED",
+  "PUBLISHING",
+  "PUBLISHED",
+  "FAILED"
+];
+function unauthorized(res) {
+  return res.status(401).json({ error: "N\xE3o autorizado." });
 }
-function isServiceKey(token) {
-  const key = process.env.PINK_LOGIC_SERVICE_KEY || "";
-  if (key.length < 32)
-    return false;
-  return timingSafeEqual(sha256(token), sha256(key));
+function bearerMatches(header, expected) {
+  if (!header || !expected) return false;
+  const m = /^Bearer\s+(.+)$/i.exec(header.trim());
+  if (!m) return false;
+  const a = createHash("sha256").update(m[1]).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return a.length === b.length && timingSafeEqual(a, b);
 }
-async function authenticate(authorization) {
-  const match = /^Bearer\s+(.+)$/i.exec(authorization || "");
-  const token = match?.[1]?.trim();
-  if (!token)
-    return { ok: false, status: 401, error: "N\xE3o autenticado: fa\xE7a login." };
-  if (isServiceKey(token))
-    return { ok: true, ctx: { kind: "service" } };
-  const url = supabaseUrl();
-  const anonKey = (process.env.SUPABASE_ANON_KEY || "").trim() || (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
-  if (!url || !anonKey) {
-    return { ok: false, status: 503, error: "Autentica\xE7\xE3o n\xE3o configurada no servidor." };
-  }
+async function countUsers(supabase) {
   try {
-    const supabase = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user)
-      return { ok: false, status: 401, error: "Sess\xE3o inv\xE1lida ou expirada: fa\xE7a login novamente." };
-    return { ok: true, ctx: { kind: "user", userId: data.user.id, email: data.user.email ?? null } };
+    let total = 0;
+    let page = 1;
+    const perPage = 1e3;
+    for (; ; ) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+      if (error) return null;
+      const users = data?.users ?? [];
+      total += users.length;
+      if (users.length < perPage) break;
+      page += 1;
+    }
+    return total;
   } catch {
-    return { ok: false, status: 503, error: "N\xE3o foi poss\xEDvel validar a sess\xE3o agora." };
-  }
-}
-async function requireAuth(req, res) {
-  const header = req.headers["authorization"];
-  const result = await authenticate(Array.isArray(header) ? header[0] : header);
-  if (!result.ok) {
-    res.status(result.status).json({ error: result.error });
     return null;
   }
-  return result.ctx;
 }
-
-// packages/api/dist/services/meta-graph.js
-var GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
-var GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
-function creds() {
-  const token = process.env.META_PAGE_ACCESS_TOKEN || "";
-  const pageId = process.env.META_PAGE_ID || "";
-  const igAccountId = process.env.META_INSTAGRAM_ACCOUNT_ID || "";
-  return { token, pageId, igAccountId, ready: token.length > 0 };
-}
-async function graphCall(path, params) {
-  const url = new URL(`${GRAPH_BASE}/${path}`);
-  for (const [k, v] of Object.entries(params))
-    url.searchParams.set(k, v);
-  const res = await fetch(url, { method: "POST" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) {
-    const msg = data.error?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data;
-}
-async function publishToInstagram(input) {
-  const { token, igAccountId, ready } = creds();
-  if (!ready)
-    return { ok: false, error: "Meta (Instagram) n\xE3o configurado: falta META_PAGE_ACCESS_TOKEN." };
-  if (!igAccountId)
-    return { ok: false, error: "Falta META_INSTAGRAM_ACCOUNT_ID." };
-  if (!input.imageUrl)
-    return { ok: false, error: "O Instagram exige uma imagem (URL p\xFAblica)." };
+async function countByStatus(supabase) {
   try {
-    const container = await graphCall(`${igAccountId}/media`, {
-      image_url: input.imageUrl,
-      caption: input.caption,
-      access_token: token
-    });
-    const published = await graphCall(`${igAccountId}/media_publish`, {
-      creation_id: container.id,
-      access_token: token
-    });
-    return { ok: true, id: published.id };
-  } catch (e) {
-    return { ok: false, error: `Instagram: ${e.message}` };
+    const out = {};
+    for (const s of POST_STATUSES) {
+      const { count, error } = await supabase.from("pl_posts").select("id", { count: "exact", head: true }).eq("status", s);
+      if (error) return null;
+      out[s.toLowerCase()] = count ?? 0;
+    }
+    return out;
+  } catch {
+    return null;
   }
 }
-async function publishToFacebookPage(input) {
-  const { token, pageId, ready } = creds();
-  if (!ready)
-    return { ok: false, error: "Meta (Facebook) n\xE3o configurado: falta META_PAGE_ACCESS_TOKEN." };
-  if (!pageId)
-    return { ok: false, error: "Falta META_PAGE_ID." };
-  try {
-    const result = input.imageUrl ? await graphCall(`${pageId}/photos`, { url: input.imageUrl, caption: input.caption, access_token: token }) : await graphCall(`${pageId}/feed`, { message: input.caption, access_token: token });
-    return { ok: true, id: result.post_id || result.id };
-  } catch (e) {
-    return { ok: false, error: `Facebook: ${e.message}` };
-  }
-}
-async function publishToPlatforms(platforms, input) {
-  const results = {};
-  for (const platform of platforms) {
-    if (platform === "Instagram")
-      results.instagram = await publishToInstagram(input);
-    else if (platform === "Facebook")
-      results.facebook = await publishToFacebookPage(input);
-    else
-      results[platform.toLowerCase()] = { ok: false, error: `Publica\xE7\xE3o em "${platform}" ainda n\xE3o implementada.` };
-  }
-  return results;
-}
-
-// packages/api/dist/services/jev-decider.js
-var JEV_API_URL = process.env.JEV_API_URL || "https://api.typesafe.ai/v1/systemone";
-var JEV_API_KEY = process.env.JEV_API_KEY || "";
-var JEV_MODEL = process.env.JEV_MODEL || "jev-latest";
-
-// packages/api/dist/services/ownership.js
-function httpError(status, message) {
-  return Object.assign(new Error(message), { status });
-}
-function getOwnerUserId() {
-  const id = (process.env.PINK_LOGIC_OWNER_USER_ID || "").trim();
-  return id || null;
-}
-function isOwner(auth) {
-  const ownerId = getOwnerUserId();
-  if (!ownerId)
-    return false;
-  if (auth.kind === "service")
-    return true;
-  return auth.userId === ownerId;
-}
-function requireOwner(auth) {
-  const ownerId = getOwnerUserId();
-  if (!ownerId) {
-    throw httpError(503, "PINK_LOGIC_OWNER_USER_ID n\xE3o configurado \u2014 publica\xE7\xE3o e agendamento est\xE3o bloqueados at\xE9 definir a propriet\xE1ria.");
-  }
-  if (!isOwner(auth)) {
-    throw httpError(403, "S\xF3 a propriet\xE1ria pode publicar ou agendar nas p\xE1ginas partilhadas.");
-  }
-  return ownerId;
-}
-
-// packages/api/dist/services/posts.js
-function httpError2(status, message) {
-  return Object.assign(new Error(message), { status });
-}
-var adminClient = null;
-function admin() {
-  if (adminClient)
-    return adminClient;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key)
-    throw httpError2(503, "Falta SUPABASE_SERVICE_ROLE_KEY nas vari\xE1veis de ambiente da Vercel.");
-  adminClient = createClient(url, key, { auth: { persistSession: false } });
-  return adminClient;
-}
-function rowToApi(row) {
+async function collectStats(supabase) {
+  const [usersTotal, byStatus] = await Promise.all([countUsers(supabase), countByStatus(supabase)]);
+  const postsTotal = byStatus ? Object.values(byStatus).reduce((a, b) => a + b, 0) : null;
   return {
-    id: row.id,
-    projectId: row.project_id,
-    brandId: row.brand_id,
-    campaignId: row.campaign_id,
-    title: row.title,
-    caption: row.caption,
-    hashtags: row.hashtags || [],
-    mediaUrl: row.media_url,
-    aspectRatio: row.aspect_ratio,
-    platforms: row.platforms || [],
-    scheduledAt: row.scheduled_at,
-    status: row.status,
-    source: row.source,
-    errorMessage: row.error_message,
-    igMediaId: row.ig_media_id,
-    fbPostId: row.fb_post_id,
-    publishResults: row.publish_results,
-    decision: row.decision,
-    // Aprovação humana (migration 20261025140000): null até a proprietária aprovar.
-    approvedBy: row.approved_by ?? null,
-    approvedAt: row.approved_at ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    platform: PLATFORM2,
+    contract: CONTRACT2,
+    users: usersTotal === null ? null : { total: usersTotal },
+    posts: byStatus === null ? null : {
+      total: postsTotal,
+      draft: byStatus.draft,
+      pending_review: byStatus.pending_review,
+      scheduled: byStatus.scheduled,
+      publishing: byStatus.publishing,
+      published: byStatus.published,
+      failed: byStatus.failed
+    },
+    // Sem tabela de assinaturas/planos no banco — informado, não inventado.
+    subscriptions: null,
+    // Sem tabela de utilização das funcionalidades de IA — informado, não inventado.
+    ai_usage: null,
+    errors: byStatus === null ? null : { failed_posts: byStatus.failed },
+    unavailable: ["subscriptions", "ai_usage"],
+    notes: {
+      subscriptions: "Sem tabela de assinaturas/planos no banco.",
+      ai_usage: "Sem registo de utiliza\xE7\xE3o das funcionalidades de IA no banco."
+    }
   };
 }
-async function getOwnedPost(ownerId, id) {
-  const { data, error } = await admin().from("scheduled_posts").select("*").eq("id", id).eq("user_id", ownerId).maybeSingle();
-  if (error)
-    throw httpError2(500, "Falha ao procurar o post.");
-  if (!data)
-    throw httpError2(404, "Post n\xE3o encontrado.");
-  return data;
+function createHandler(deps) {
+  return async function handler3(req, res) {
+    if (req.method !== "GET") return res.status(405).json({ error: "S\xF3 GET." });
+    const expected = deps.env[API_KEY_ENV];
+    if (!expected) {
+      return res.status(503).json({ error: "Integra\xE7\xE3o n\xE3o configurada." });
+    }
+    const header = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
+    if (!bearerMatches(header, expected)) return unauthorized(res);
+    const pickUrl = (v) => {
+      const t = (v || "").trim();
+      return /^https?:\/\/\S+$/i.test(t) ? t : null;
+    };
+    const url = pickUrl(deps.env.SUPABASE_URL) || pickUrl(deps.env.VITE_SUPABASE_URL);
+    const serviceKey = (deps.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+    if (!url || !serviceKey) {
+      return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
+    }
+    try {
+      const supabase = deps.makeClient(url, serviceKey);
+      const stats = await collectStats(supabase);
+      return res.status(200).json(stats);
+    } catch {
+      return res.status(500).json({ error: "Falha ao consultar os indicadores." });
+    }
+  };
 }
-function canPublishPost(post2, ownerId) {
-  if (post2.user_id !== ownerId)
-    return { ok: false, error: "S\xF3 a propriet\xE1ria pode publicar." };
-  if (post2.status !== "agendado")
-    return { ok: false, error: "S\xF3 posts agendados podem ser publicados." };
-  if (!post2.approved_at)
-    return { ok: false, error: "O post precisa de aprova\xE7\xE3o humana antes de publicar." };
-  if (post2.decision && post2.decision.passed === false)
-    return { ok: false, error: "O Jev reprovou este post." };
-  return { ok: true };
-}
-async function publishPostNow(auth, id) {
-  const ownerId = requireOwner(auth);
-  const post2 = await getOwnedPost(ownerId, id);
-  const gate = canPublishPost(post2, ownerId);
-  if (!gate.ok)
-    throw httpError2(409, gate.error);
-  return publishRow(post2);
-}
-async function publishRow(post2) {
-  const db = admin();
-  await db.from("scheduled_posts").update({ status: "publicando" }).eq("id", post2.id);
-  const results = await publishToPlatforms(post2.platforms || [], {
-    imageUrl: post2.media_url || void 0,
-    caption: [post2.caption, ...post2.hashtags || []].filter(Boolean).join("\n\n")
-  });
-  const allOk = Object.values(results).every((r) => r.ok);
-  const anyOk = Object.values(results).some((r) => r.ok);
-  const status = anyOk ? "publicado" : "falhou";
-  const errorMessage = allOk ? null : Object.entries(results).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.error}`).join(" | ");
-  const { data, error } = await db.from("scheduled_posts").update({
-    status,
-    error_message: errorMessage,
-    published_at: anyOk ? (/* @__PURE__ */ new Date()).toISOString() : null,
-    ig_media_id: results.instagram?.id ?? null,
-    fb_post_id: results.facebook?.id ?? null,
-    publish_results: results
-  }).eq("id", post2.id).select().single();
-  if (error)
-    throw httpError2(500, "Publicou mas falhou ao gravar o resultado.");
-  return rowToApi(data);
-}
+var stats_default = createHandler({
+  env: process.env,
+  makeClient: (url, key) => createClient(url, key)
+});
 
-// packages/api/dist/services/http-errors.js
-function toPublicError(err) {
-  const status = typeof err?.status === "number" ? err.status : 500;
-  if (status >= 400 && status < 500) {
-    return { status, message: err?.message || "Pedido inv\xE1lido." };
-  }
-  if (status === 503) {
-    return { status, message: err?.message || "Servi\xE7o indispon\xEDvel." };
-  }
-  console.error("[pink-logic] erro interno:", err?.message || err);
-  return { status: 500, message: "Erro interno. Tente novamente." };
-}
-
-// api-src/posts/[id]/publish.ts
-async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
-  const auth = await requireAuth(req, res);
-  if (!auth) return;
-  const id = String(req.query.id || "");
+// api-src/integrations/[...all].ts
+function segmentsOf(req) {
+  const raw = req.query?.all;
+  const fromQuery = Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? [raw] : null;
+  const decode = (s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  if (fromQuery) return fromQuery.map(decode).filter((s) => s.length > 0);
   try {
-    res.status(200).json({ post: await publishPostNow(auth, id) });
-  } catch (err) {
-    const pub = toPublicError(err);
-    res.status(pub.status).json({ error: pub.message });
+    const path = new URL(req.url || "", "http://localhost").pathname;
+    const rest = path.replace(/^\/api\/integrations\/?/, "");
+    if (!rest) return [];
+    return rest.split("/").map(decode).filter((s) => s.length > 0);
+  } catch {
+    return [];
   }
+}
+async function handler2(req, res) {
+  const segments = segmentsOf(req);
+  if (segments.length === 1 && segments[0] === "health") return handler(req, res);
+  if (segments.length === 1 && segments[0] === "stats") return stats_default(req, res);
+  return res.status(404).json({ error: "Rota n\xE3o encontrada." });
 }
 export {
-  handler as default
+  handler2 as default,
+  segmentsOf
 };

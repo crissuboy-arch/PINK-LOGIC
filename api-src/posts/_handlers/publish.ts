@@ -1,5 +1,7 @@
 /**
- * Vercel serverless: POST /api/posts/:id/publish
+ * Handler POST /api/posts/:id/publish — servido pelo router
+ * posts/[[...all]] (não é função direta; vive em _handlers/).
+ * Código INTACTO da consolidação Opção B.
  * Publica imediatamente (fora do cron) no Instagram e/ou Facebook, conforme
  * `platforms` do post. Desde a correção de segurança: SÓ a proprietária,
  * SÓ posts agendados COM aprovação humana (ver publishPostNow). Sem

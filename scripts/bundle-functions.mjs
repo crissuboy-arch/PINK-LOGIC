@@ -4,6 +4,12 @@
  * O nft da Vercel não segue symlinks de workspaces npm, por isso o código
  * de @pink-logic/* é bundled PARA DENTRO de cada função.
  * Deps nativas (resvg) ficam external — o nft rastreia pacotes npm reais.
+ *
+ * REGRA DE CONSOLIDAÇÃO (Opção B, limite Hobby: 12 funções): cada ficheiro
+ * .ts em api-src/ vira UMA função em api/. Entradas com prefixo `_`
+ * (ficheiros ou diretórios, ex.: api-src/posts/_handlers/) são MÓDULOS
+ * partilhados — importados pelos routers, NUNCA funções próprias. Sem
+ * esta regra, mover handlers para _handlers/ não reduziria a contagem.
  */
 import { buildSync } from "esbuild";
 import { readdirSync, statSync, mkdirSync, rmSync } from "node:fs";
@@ -18,6 +24,8 @@ mkdirSync(OUT, { recursive: true });
 function collect(dir, base = "") {
   const out = [];
   for (const e of readdirSync(dir)) {
+    // Prefixo `_` = módulo partilhado, não função (ver cabeçalho).
+    if (e.startsWith("_")) continue;
     const full = join(dir, e);
     const rel = base ? `${base}/${e}` : e;
     if (statSync(full).isDirectory()) out.push(...collect(full, rel));

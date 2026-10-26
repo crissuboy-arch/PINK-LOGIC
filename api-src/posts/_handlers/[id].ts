@@ -1,5 +1,7 @@
 /**
- * Vercel serverless: GET/PATCH/DELETE /api/posts/:id
+ * Handler GET/PATCH/DELETE /api/posts/:id — servido pelo router
+ * posts/[[...all]] (não é função direta; vive em _handlers/).
+ * Código INTACTO da consolidação Opção B.
  * Erros seguros (sem detalhe interno no cliente).
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";

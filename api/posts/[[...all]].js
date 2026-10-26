@@ -26322,6 +26322,72 @@ var PlatformPublishResultSchema = external_exports.object({
 // packages/api/dist/services/meta-graph.js
 var GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
 var GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+function creds() {
+  const token = process.env.META_PAGE_ACCESS_TOKEN || "";
+  const pageId = process.env.META_PAGE_ID || "";
+  const igAccountId = process.env.META_INSTAGRAM_ACCOUNT_ID || "";
+  return { token, pageId, igAccountId, ready: token.length > 0 };
+}
+async function graphCall(path, params) {
+  const url = new URL(`${GRAPH_BASE}/${path}`);
+  for (const [k, v] of Object.entries(params))
+    url.searchParams.set(k, v);
+  const res = await fetch(url, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    const msg = data.error?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+async function publishToInstagram(input) {
+  const { token, igAccountId, ready } = creds();
+  if (!ready)
+    return { ok: false, error: "Meta (Instagram) n\xE3o configurado: falta META_PAGE_ACCESS_TOKEN." };
+  if (!igAccountId)
+    return { ok: false, error: "Falta META_INSTAGRAM_ACCOUNT_ID." };
+  if (!input.imageUrl)
+    return { ok: false, error: "O Instagram exige uma imagem (URL p\xFAblica)." };
+  try {
+    const container = await graphCall(`${igAccountId}/media`, {
+      image_url: input.imageUrl,
+      caption: input.caption,
+      access_token: token
+    });
+    const published = await graphCall(`${igAccountId}/media_publish`, {
+      creation_id: container.id,
+      access_token: token
+    });
+    return { ok: true, id: published.id };
+  } catch (e) {
+    return { ok: false, error: `Instagram: ${e.message}` };
+  }
+}
+async function publishToFacebookPage(input) {
+  const { token, pageId, ready } = creds();
+  if (!ready)
+    return { ok: false, error: "Meta (Facebook) n\xE3o configurado: falta META_PAGE_ACCESS_TOKEN." };
+  if (!pageId)
+    return { ok: false, error: "Falta META_PAGE_ID." };
+  try {
+    const result = input.imageUrl ? await graphCall(`${pageId}/photos`, { url: input.imageUrl, caption: input.caption, access_token: token }) : await graphCall(`${pageId}/feed`, { message: input.caption, access_token: token });
+    return { ok: true, id: result.post_id || result.id };
+  } catch (e) {
+    return { ok: false, error: `Facebook: ${e.message}` };
+  }
+}
+async function publishToPlatforms(platforms, input) {
+  const results = {};
+  for (const platform of platforms) {
+    if (platform === "Instagram")
+      results.instagram = await publishToInstagram(input);
+    else if (platform === "Facebook")
+      results.facebook = await publishToFacebookPage(input);
+    else
+      results[platform.toLowerCase()] = { ok: false, error: `Publica\xE7\xE3o em "${platform}" ainda n\xE3o implementada.` };
+  }
+  return results;
+}
 
 // packages/api/dist/services/jev-decider.js
 var JEV_API_URL = process.env.JEV_API_URL || "https://api.typesafe.ai/v1/systemone";
@@ -26397,6 +26463,9 @@ async function approvePost(post2, threshold = 0.7) {
 }
 
 // packages/api/dist/services/ownership.js
+function httpError(status, message) {
+  return Object.assign(new Error(message), { status });
+}
 function getOwnerUserId() {
   const id = (process.env.PINK_LOGIC_OWNER_USER_ID || "").trim();
   return id || null;
@@ -26409,9 +26478,19 @@ function isOwner(auth) {
     return true;
   return auth.userId === ownerId;
 }
+function requireOwner(auth) {
+  const ownerId = getOwnerUserId();
+  if (!ownerId) {
+    throw httpError(503, "PINK_LOGIC_OWNER_USER_ID n\xE3o configurado \u2014 publica\xE7\xE3o e agendamento est\xE3o bloqueados at\xE9 definir a propriet\xE1ria.");
+  }
+  if (!isOwner(auth)) {
+    throw httpError(403, "S\xF3 a propriet\xE1ria pode publicar ou agendar nas p\xE1ginas partilhadas.");
+  }
+  return ownerId;
+}
 
 // packages/api/dist/services/posts.js
-function httpError(status, message) {
+function httpError2(status, message) {
   return Object.assign(new Error(message), { status });
 }
 var adminClient = null;
@@ -26421,7 +26500,7 @@ function admin() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key)
-    throw httpError(503, "Falta SUPABASE_SERVICE_ROLE_KEY nas vari\xE1veis de ambiente da Vercel.");
+    throw httpError2(503, "Falta SUPABASE_SERVICE_ROLE_KEY nas vari\xE1veis de ambiente da Vercel.");
   adminClient = createClient(url, key, { auth: { persistSession: false } });
   return adminClient;
 }
@@ -26430,7 +26509,7 @@ async function resolveOwnerId(auth) {
     return auth.userId;
   const ownerId = process.env.PINK_LOGIC_OWNER_USER_ID || "";
   if (!ownerId) {
-    throw httpError(503, "PINK_LOGIC_OWNER_USER_ID n\xE3o configurado \u2014 a Athena n\xE3o sabe em nome de quem criar o post. Defina-o com o UUID da sua conta (Supabase \u2192 Authentication \u2192 Users).");
+    throw httpError2(503, "PINK_LOGIC_OWNER_USER_ID n\xE3o configurado \u2014 a Athena n\xE3o sabe em nome de quem criar o post. Defina-o com o UUID da sua conta (Supabase \u2192 Authentication \u2192 Users).");
   }
   return ownerId;
 }
@@ -26439,16 +26518,16 @@ async function resolveProjectId(ownerId, projectId) {
   if (projectId) {
     const { data: data2, error: error2 } = await db.from("projects").select("id").eq("id", projectId).eq("user_id", ownerId).maybeSingle();
     if (error2)
-      throw httpError(500, "Falha ao validar o projeto.");
+      throw httpError2(500, "Falha ao validar o projeto.");
     if (!data2)
-      throw httpError(404, "Projeto n\xE3o encontrado (ou n\xE3o pertence a esta conta).");
+      throw httpError2(404, "Projeto n\xE3o encontrado (ou n\xE3o pertence a esta conta).");
     return data2.id;
   }
   const { data, error } = await db.from("projects").select("id").eq("user_id", ownerId).order("created_at", { ascending: true }).limit(1).maybeSingle();
   if (error)
-    throw httpError(500, "Falha ao procurar um projeto.");
+    throw httpError2(500, "Falha ao procurar um projeto.");
   if (!data)
-    throw httpError(422, "Esta conta ainda n\xE3o tem nenhum projeto \u2014 crie um no site antes de criar posts.");
+    throw httpError2(422, "Esta conta ainda n\xE3o tem nenhum projeto \u2014 crie um no site antes de criar posts.");
   return data.id;
 }
 async function validateBrandAndCampaign(projectId, brandId, campaignId) {
@@ -26456,16 +26535,16 @@ async function validateBrandAndCampaign(projectId, brandId, campaignId) {
   if (brandId) {
     const { data, error } = await db.from("brands").select("id, project_id").eq("id", brandId).maybeSingle();
     if (error)
-      throw httpError(500, "Falha ao validar a marca.");
+      throw httpError2(500, "Falha ao validar a marca.");
     if (!data || data.project_id !== projectId)
-      throw httpError(403, "Marca n\xE3o pertence a este projeto.");
+      throw httpError2(403, "Marca n\xE3o pertence a este projeto.");
   }
   if (campaignId) {
     const { data, error } = await db.from("campaigns").select("id, project_id").eq("id", campaignId).maybeSingle();
     if (error)
-      throw httpError(500, "Falha ao validar a campanha.");
+      throw httpError2(500, "Falha ao validar a campanha.");
     if (!data || data.project_id !== projectId)
-      throw httpError(403, "Campanha n\xE3o pertence a este projeto.");
+      throw httpError2(403, "Campanha n\xE3o pertence a este projeto.");
   }
 }
 function rowToApi(row) {
@@ -26526,7 +26605,7 @@ async function createPost(auth, input) {
     decision
   }).select().single();
   if (error)
-    throw httpError(500, "Falha ao criar o post.");
+    throw httpError2(500, "Falha ao criar o post.");
   return rowToApi(data);
 }
 async function listPosts(auth, query) {
@@ -26542,8 +26621,120 @@ async function listPosts(auth, query) {
     q = q.lte("scheduled_at", query.to);
   const { data, error } = await q;
   if (error)
-    throw httpError(500, "Falha ao listar posts.");
+    throw httpError2(500, "Falha ao listar posts.");
   return (data || []).map(rowToApi);
+}
+async function getOwnedPost(ownerId, id) {
+  const { data, error } = await admin().from("scheduled_posts").select("*").eq("id", id).eq("user_id", ownerId).maybeSingle();
+  if (error)
+    throw httpError2(500, "Falha ao procurar o post.");
+  if (!data)
+    throw httpError2(404, "Post n\xE3o encontrado.");
+  return data;
+}
+async function getPost(auth, id) {
+  const ownerId = await resolveOwnerId(auth);
+  return rowToApi(await getOwnedPost(ownerId, id));
+}
+async function updatePost(auth, id, input) {
+  const ownerId = await resolveOwnerId(auth);
+  const current = await getOwnedPost(ownerId, id);
+  if (input.status === "agendado" || input.scheduledAt !== void 0 && current.status === "agendado") {
+    requireOwner(auth);
+  }
+  await validateBrandAndCampaign(current.project_id, input.brandId, input.campaignId);
+  const patch = {};
+  if (input.title !== void 0)
+    patch.title = input.title;
+  if (input.caption !== void 0)
+    patch.caption = input.caption;
+  if (input.hashtags !== void 0)
+    patch.hashtags = input.hashtags;
+  if (input.mediaUrl !== void 0)
+    patch.media_url = input.mediaUrl;
+  if (input.aspectRatio !== void 0)
+    patch.aspect_ratio = input.aspectRatio;
+  if (input.platforms !== void 0)
+    patch.platforms = input.platforms;
+  if (input.scheduledAt !== void 0)
+    patch.scheduled_at = input.scheduledAt;
+  if (input.status !== void 0)
+    patch.status = input.status;
+  if (input.brandId !== void 0)
+    patch.brand_id = input.brandId;
+  if (input.campaignId !== void 0)
+    patch.campaign_id = input.campaignId;
+  const { data, error } = await admin().from("scheduled_posts").update(patch).eq("id", id).eq("user_id", ownerId).select().single();
+  if (error)
+    throw httpError2(500, "Falha ao atualizar o post.");
+  return rowToApi(data);
+}
+async function deletePost(auth, id) {
+  const ownerId = await resolveOwnerId(auth);
+  await getOwnedPost(ownerId, id);
+  const { error } = await admin().from("scheduled_posts").delete().eq("id", id).eq("user_id", ownerId);
+  if (error)
+    throw httpError2(500, "Falha ao apagar o post.");
+}
+async function schedulePost(auth, id, scheduledAt) {
+  return updatePost(auth, id, { scheduledAt, status: "agendado" });
+}
+function canPublishPost(post2, ownerId) {
+  if (post2.user_id !== ownerId)
+    return { ok: false, error: "S\xF3 a propriet\xE1ria pode publicar." };
+  if (post2.status !== "agendado")
+    return { ok: false, error: "S\xF3 posts agendados podem ser publicados." };
+  if (!post2.approved_at)
+    return { ok: false, error: "O post precisa de aprova\xE7\xE3o humana antes de publicar." };
+  if (post2.decision && post2.decision.passed === false)
+    return { ok: false, error: "O Jev reprovou este post." };
+  return { ok: true };
+}
+async function approvePostHuman(auth, id) {
+  const ownerId = requireOwner(auth);
+  const post2 = await getOwnedPost(ownerId, id);
+  if (post2.status !== "rascunho" && post2.status !== "agendado") {
+    throw httpError2(409, "S\xF3 rascunhos ou agendados podem ser aprovados.");
+  }
+  const { data, error } = await admin().from("scheduled_posts").update({ approved_by: ownerId, approved_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("id", id).eq("user_id", ownerId).select().single();
+  if (error) {
+    if (/approved_by|approved_at|column/i.test(error.message)) {
+      throw httpError2(503, "Aprova\xE7\xE3o humana ainda n\xE3o configurada na base \u2014 aplique a migration de aprova\xE7\xE3o.");
+    }
+    throw httpError2(500, "Falha ao registar a aprova\xE7\xE3o.");
+  }
+  return rowToApi(data);
+}
+async function publishPostNow(auth, id) {
+  const ownerId = requireOwner(auth);
+  const post2 = await getOwnedPost(ownerId, id);
+  const gate = canPublishPost(post2, ownerId);
+  if (!gate.ok)
+    throw httpError2(409, gate.error);
+  return publishRow(post2);
+}
+async function publishRow(post2) {
+  const db = admin();
+  await db.from("scheduled_posts").update({ status: "publicando" }).eq("id", post2.id);
+  const results = await publishToPlatforms(post2.platforms || [], {
+    imageUrl: post2.media_url || void 0,
+    caption: [post2.caption, ...post2.hashtags || []].filter(Boolean).join("\n\n")
+  });
+  const allOk = Object.values(results).every((r) => r.ok);
+  const anyOk = Object.values(results).some((r) => r.ok);
+  const status = anyOk ? "publicado" : "falhou";
+  const errorMessage = allOk ? null : Object.entries(results).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.error}`).join(" | ");
+  const { data, error } = await db.from("scheduled_posts").update({
+    status,
+    error_message: errorMessage,
+    published_at: anyOk ? (/* @__PURE__ */ new Date()).toISOString() : null,
+    ig_media_id: results.instagram?.id ?? null,
+    fb_post_id: results.facebook?.id ?? null,
+    publish_results: results
+  }).eq("id", post2.id).select().single();
+  if (error)
+    throw httpError2(500, "Publicou mas falhou ao gravar o resultado.");
+  return rowToApi(data);
 }
 
 // packages/api/dist/services/rate-limit.js
@@ -26598,7 +26789,7 @@ function toPublicError(err) {
   return { status: 500, message: "Erro interno. Tente novamente." };
 }
 
-// api-src/posts/index.ts
+// api-src/posts/_handlers/index.ts
 async function handler(req, res) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -26620,6 +26811,118 @@ async function handler(req, res) {
     res.status(pub.status).json({ error: pub.message });
   }
 }
+
+// api-src/posts/_handlers/[id].ts
+async function handler2(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const id = String(req.query.id || "");
+  if (!id) return res.status(400).json({ error: "id em falta" });
+  try {
+    if (req.method === "GET") return res.status(200).json({ post: await getPost(auth, id) });
+    if (req.method === "PATCH") {
+      const parsed = ScheduledPostUpdateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      return res.status(200).json({ post: await updatePost(auth, id, parsed.data) });
+    }
+    if (req.method === "DELETE") {
+      await deletePost(auth, id);
+      return res.status(204).end();
+    }
+    return res.status(405).json({ error: "S\xF3 GET, PATCH ou DELETE" });
+  } catch (err) {
+    const pub = toPublicError(err);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/posts/_handlers/approve.ts
+async function handler3(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const id = String(req.query.id || "");
+  try {
+    res.status(200).json({ post: await approvePostHuman(auth, id) });
+  } catch (err) {
+    const pub = toPublicError(err);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/posts/_handlers/publish.ts
+async function handler4(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const id = String(req.query.id || "");
+  try {
+    res.status(200).json({ post: await publishPostNow(auth, id) });
+  } catch (err) {
+    const pub = toPublicError(err);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/posts/_handlers/schedule.ts
+var BodySchema = external_exports.object({ scheduledAt: external_exports.string().datetime() });
+async function handler5(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const id = String(req.query.id || "");
+  const parsed = BodySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    res.status(200).json({ post: await schedulePost(auth, id, parsed.data.scheduledAt) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
+// api-src/posts/[[...all]].ts
+function segmentsOf(req) {
+  const raw = req.query?.all;
+  const fromQuery = Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? [raw] : null;
+  const decode = (s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  if (fromQuery) return fromQuery.map(decode).filter((s) => s.length > 0);
+  try {
+    const path = new URL(req.url || "", "http://localhost").pathname;
+    const rest = path.replace(/^\/api\/posts\/?/, "");
+    if (!rest) return [];
+    return rest.split("/").map(decode).filter((s) => s.length > 0);
+  } catch {
+    return [];
+  }
+}
+async function handler6(req, res) {
+  const segments = segmentsOf(req);
+  const query = { ...req.query };
+  delete query.all;
+  if (segments.length === 0) {
+    req.query = query;
+    return handler(req, res);
+  }
+  const [id, action, ...extra] = segments;
+  if (segments.length === 1) {
+    req.query = { ...query, id };
+    return handler2(req, res);
+  }
+  if (segments.length === 2 && extra.length === 0) {
+    req.query = { ...query, id };
+    if (action === "approve") return handler3(req, res);
+    if (action === "publish") return handler4(req, res);
+    if (action === "schedule") return handler5(req, res);
+  }
+  return res.status(404).json({ error: "Rota n\xE3o encontrada." });
+}
 export {
-  handler as default
+  handler6 as default,
+  segmentsOf
 };

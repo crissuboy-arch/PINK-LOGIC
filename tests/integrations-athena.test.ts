@@ -7,13 +7,13 @@
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import healthHandler from "../api-src/integrations/health.ts";
+import healthHandler from "../api-src/integrations/_handlers/health.ts";
 import {
   createHandler,
   collectStats,
   bearerMatches,
   API_KEY_ENV,
-} from "../api-src/integrations/stats.ts";
+} from "../api-src/integrations/_handlers/stats.ts";
 
 // ── fakes ──────────────────────────────────────────────────────────────
 function fakeReq(method = "GET", headers: Record<string, string> = {}): any {
