@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePublisher } from '../../contexts/PublisherContext';
 import type { PublisherPlatform } from '../../types/publisher';
 import { supabase } from '../../lib/supabaseClient';
+import { apiUrl } from '../../lib/apiClient';
 import {
   getPostApprovalState,
   APPROVAL_STATE_LABELS,
@@ -109,7 +110,7 @@ const PublicadorAutomatico: React.FC = () => {
         if (!supabase) return;
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const res = await fetch('/api/auth/owner-status', {
+        const res = await fetch(apiUrl('/api/auth/owner-status'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!res.ok) return;
@@ -132,7 +133,7 @@ const PublicadorAutomatico: React.FC = () => {
       if (!supabase) throw new Error('Supabase não configurado.');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-      const res = await fetch(`/api/posts/${id}/approve`, {
+      const res = await fetch(apiUrl(`/api/posts/${id}/approve`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
       });

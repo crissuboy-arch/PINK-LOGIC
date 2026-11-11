@@ -4,6 +4,26 @@
  */
 import { authService } from '../services/authService';
 
+/**
+ * Base da API serverless (/api/*).
+ *
+ * - `VITE_API_URL` quando definida (ex.: desktop empacotado, preview).
+ * - Em `vite dev` (import.meta.env.DEV): '' (relativo) para o proxy /api → localhost:3002 continuar a funcionar.
+ * - Nos builds (web em produção e desktop por file://): a API Vercel já hospedada.
+ * O desktop NÃO tem backend local — continua a falar com a API hospedada.
+ */
+export const API_BASE_URL: string = (() => {
+  const fromEnv = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  if (import.meta.env.DEV) return '';
+  return 'https://pink-logic.vercel.app';
+})();
+
+/** Junta um caminho /api/* à base da API. */
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 export interface ApiResult<T> {
   ok: boolean;
   status: number;
@@ -14,7 +34,7 @@ export interface ApiResult<T> {
 export async function apiPost<T = any>(path: string, body: unknown): Promise<ApiResult<T>> {
   try {
     const token = await authService.getAccessToken();
-    const res = await fetch(path, {
+    const res = await fetch(apiUrl(path), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
