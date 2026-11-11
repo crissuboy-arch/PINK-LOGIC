@@ -56,3 +56,5 @@ A tentativa completa de aceitação desktop desta corrida chegou às ações, ma
 Não houve inferência real, consumo de créditos pagos, alteração de produção, envio de formulário ou extração de segredos.
 
 Diagnóstico real no Electron, via preload/IPC: packages/desktop/test-evidence/chatgpt-own-session.json, exit 0. connected=false; subscriptionAuthorized=false; textGenerationVerified=false; textRequestAvailable=false; status=approval-required; sessionOwnedBy=Pink Logic. A versão instalada observada do Carrossell é 0.10.1 (ProductVersion 0.10.1.0). Lint da tela AIConnection passou.
+
+Instalador atualizado: 128759018 bytes, SHA256 0CAF348B7B88BCC92D5D9971444AAD47437935DF6B983F7F6E859C50991CC7CC, NotSigned. Instalação silenciosa de teste exit 0 em %LOCALAPPDATA%\Programs\PinkLogic-OAuth-Test-20261111. Diagnóstico do executável instalado exit 0, prova packages/desktop/test-evidence/chatgpt-installed-session.json: sessão própria desconectada; autorização do plano e texto real não verificados. A captura visual completa continua pendente nesta corrida, conforme erro registado acima.
