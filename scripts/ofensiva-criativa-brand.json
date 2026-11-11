@@ -1,1 +1,64 @@
-{"avatar":null,"brand_dna":{"logo_missing":true,"logo_note":"Não existe ficheiro oficial de logótipo da Ofensiva Criativa no repo (só o logo do PinkLogic, que NÃO pode ser usado aqui). O campo logo fica vazio até a Cristiane fornecer o ficheiro oficial.","slogan":"Marketing sem filtro. Resultados sem desculpa.","website":"www.ofensivacriativa.com.br"},"colors":{"accent":"#D4AF37","background":"#FFFFFF","glow":"#D4AF37","primary":"#103B78","secondary":"#071D3A","text":"#071D3A"},"cta":"Marketing sem filtro. Resultados sem desculpa.","fonts":{"body":"Inter","heading":"Outfit"},"hashtags":["#OfensivaCriativa"],"logo":null,"name":"Ofensiva Criativa","overlays":[],"secondary_colors":["#F5F7FA"],"social_links":{"email":"contato@ofensivacriativa.com.br","website":"https://www.ofensivacriativa.com.br"},"style":"Identidade azul-escuro e dourado; comunicação direta, sem floreados.","tone":"Direto e sem filtro — linguagem franca, sem jargão nem desculpas, focada em resultados."}
+{
+  "avatar": null,
+  "brand_dna": {
+    "logo_missing": true,
+    "logo_note": "Não existe ficheiro oficial de logótipo da Ofensiva Criativa no repo (só o logo do PinkLogic, que NÃO pode ser usado aqui). O campo logo fica vazio até a Cristiane fornecer o ficheiro oficial.",
+    "slogan": "Marketing sem filtro. Resultados sem desculpa.",
+    "website": "www.ofensivacriativa.com.br",
+    "context": {
+      "audience": "Pequenas empresas que querem vender mais sem complicação",
+      "pains": [
+        "a agenda vazia apesar do bom trabalho",
+        "não serem encontradas online",
+        "falta de tempo para criar conteúdo"
+      ],
+      "goals": [
+        "encher a agenda com clientes certos",
+        "ser encontrada por quem procura",
+        "vender sem complicação"
+      ],
+      "themes": [
+        "IA nas pequenas empresas",
+        "marketing sem filtro",
+        "vendas directas"
+      ],
+      "avoid": [
+        "promessas de resultados garantidos",
+        "linguagem de guru"
+      ],
+      "default_cta": "Comenta LINK",
+      "hashtags": [
+        "#OfensivaCriativa"
+      ],
+      "note": "Contexto persistente da marca (Fase 2): alimenta o radar de pautas, a copy por templates e o replicador. Conteúdo escrito localmente, sem IA."
+    }
+  },
+  "colors": {
+    "accent": "#D4AF37",
+    "background": "#FFFFFF",
+    "glow": "#D4AF37",
+    "primary": "#103B78",
+    "secondary": "#071D3A",
+    "text": "#071D3A"
+  },
+  "cta": "Marketing sem filtro. Resultados sem desculpa.",
+  "fonts": {
+    "body": "Inter",
+    "heading": "Outfit"
+  },
+  "hashtags": [
+    "#OfensivaCriativa"
+  ],
+  "logo": null,
+  "name": "Ofensiva Criativa",
+  "overlays": [],
+  "secondary_colors": [
+    "#F5F7FA"
+  ],
+  "social_links": {
+    "email": "contato@ofensivacriativa.com.br",
+    "website": "https://www.ofensivacriativa.com.br"
+  },
+  "style": "Identidade azul-escuro e dourado; comunicação direta, sem floreados.",
+  "tone": "Direto e sem filtro — linguagem franca, sem jargão nem desculpas, focada em resultados."
+}

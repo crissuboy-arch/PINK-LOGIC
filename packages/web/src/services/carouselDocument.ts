@@ -300,3 +300,57 @@ export function buildCaptionText(input: {
   lines.push('', '—', 'Conteúdo de demonstração composto a partir de templates locais (sem IA).');
   return lines.filter((l, i) => !(i < 2 && l === '')).join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// (h) Consistência visual por marca (Fase 2): verifica que TODOS os slides
+// usam só as cores e as fontes do Brand Kit. Devolve a lista de violações
+// (vazia = consistente). Não gera imagens — só verifica.
+// ---------------------------------------------------------------------------
+
+export interface BrandConsistencyViolation {
+  slideIndex: number;
+  elementId: string;
+  kind: 'color' | 'font' | 'background';
+  value: string;
+  expected: string;
+}
+
+export function checkBrandConsistency(
+  slides: Slide[],
+  brand: BrandSchema | null,
+): BrandConsistencyViolation[] {
+  if (!brand) return [];
+  const colors = new Set(
+    [brand.palette.primary, brand.palette.secondary, brand.palette.accent,
+     brand.palette.background, brand.palette.text, brand.palette.surface]
+      .filter((c): c is string => Boolean(c)).map((c) => c.toUpperCase()),
+  );
+  const fonts = new Set(
+    [brand.typography.heading, brand.typography.body].filter(Boolean),
+  );
+  const violations: BrandConsistencyViolation[] = [];
+  slides.forEach((slide, slideIndex) => {
+    if (slide.background.type === 'color' && !colors.has(slide.background.value.toUpperCase())) {
+      violations.push({
+        slideIndex, elementId: slide.id, kind: 'background',
+        value: slide.background.value, expected: [...colors].join(', '),
+      });
+    }
+    for (const el of slide.elements) {
+      if (el.type === 'image') continue; // imagens (ex.: logótipo) não têm cor de marca
+      if (el.color && !colors.has(el.color.toUpperCase())) {
+        violations.push({
+          slideIndex, elementId: el.id, kind: 'color',
+          value: el.color, expected: [...colors].join(', '),
+        });
+      }
+      if (el.type === 'text' && el.fontFamily && !fonts.has(el.fontFamily)) {
+        violations.push({
+          slideIndex, elementId: el.id, kind: 'font',
+          value: el.fontFamily, expected: [...fonts].join(', '),
+        });
+      }
+    }
+  });
+  return violations;
+}
