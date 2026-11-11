@@ -36,7 +36,7 @@ export interface AiConnectionPublicState {
   storage: AiKeyStorageKind;
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
-  spend: { month: string; spentUsd: number };
+  spend: { month: string; spentUsd: number; reservedUsd?: number };
 }
 
 export interface AiSaveKeyResult {
@@ -57,6 +57,7 @@ export interface AiTestResult {
 export interface AiGenerateCopyInput {
   topic: string;
   architectureId: string;
+  slideCount?: number | 'auto';
   brandName: string;
   tone: string;
   defaultCta: string;
@@ -78,6 +79,10 @@ export interface ChatGPTConnectionStatus {
   textRequestAvailable: boolean; lastTextAt: string | null;
 }
 export interface PinkLogicDesktopApi {
+  saveDraftSync(draft: {id:string;title:string;data:unknown}): {ok:boolean;error?:string};
+  listDraftVersions(id: string): Promise<{id: string; updatedAt: string}[]>;
+  restoreDraftVersion(id: string,version: string): Promise<{id: string; title: string; updatedAt: string}>;
+
   beginChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
   cancelChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
   disconnectChatGPT(): Promise<ChatGPTConnectionStatus>;
@@ -113,6 +118,9 @@ export interface PinkLogicDesktopApi {
 }
 
 const api: PinkLogicDesktopApi = {
+  saveDraftSync: draft => ipcRenderer.sendSync('pink-logic:save-draft-sync',draft),
+  listDraftVersions: id => ipcRenderer.invoke('pink-logic:list-versions',id),
+  restoreDraftVersion: (id,version) => ipcRenderer.invoke('pink-logic:restore-version',id,version),
   beginChatGPTLogin: () => ipcRenderer.invoke('pink-logic:chatgpt-begin'),
   cancelChatGPTLogin: () => ipcRenderer.invoke('pink-logic:chatgpt-cancel'),
   disconnectChatGPT: () => ipcRenderer.invoke('pink-logic:chatgpt-disconnect'),

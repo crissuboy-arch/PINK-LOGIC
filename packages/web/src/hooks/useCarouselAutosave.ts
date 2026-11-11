@@ -6,7 +6,7 @@
 // Browser (sem desktop): fallback honesto para localStorage, com o estado
 // a dizer onde guardou. Nenhum dos dois finge guardar no Supabase.
 // ---------------------------------------------------------------------------
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CarouselProject } from '../services/carouselFlow';
 import { parseProject, serializeProject } from '../services/carouselFlow';
 
@@ -40,7 +40,7 @@ export function useCarouselAutosave(project: CarouselProject | null, delayMs = 1
   const [storage, setStorage] = useState<'desktop' | 'browser' | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const projectRef = useRef(project);
-  projectRef.current = project;
+  useLayoutEffect(() => { projectRef.current = project; }, [project]);
 
   const saveNow = useCallback(async () => {
     const current = projectRef.current;
@@ -83,6 +83,17 @@ export function useCarouselAutosave(project: CarouselProject | null, delayMs = 1
       setError(e instanceof Error ? e.message : 'Falha ao recuperar o projecto.');
       return null;
     }
+  }, []);
+
+  // The close event waits for the main process to persist the latest state.
+  useEffect(() => {
+    const flush = (event?: BeforeUnloadEvent) => {
+      const current=projectRef.current;if(!current || !window.pinkLogicDesktop?.saveDraftSync) return;
+      const result=window.pinkLogicDesktop.saveDraftSync({id:`carousel-${current.id}`,title:current.title,data:JSON.parse(serializeProject(current))});
+      if(!result.ok && event) {event.preventDefault();event.returnValue='';setError(result.error || 'Falha ao guardar antes de fechar.');}
+    };
+    window.addEventListener('beforeunload',flush);
+    return () => {window.removeEventListener('beforeunload',flush);flush();};
   }, []);
 
   // Autosave com debounce a cada mudança do projecto.

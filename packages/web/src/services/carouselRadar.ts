@@ -178,12 +178,20 @@ export function getArchitecture(id: string): CarouselArchitecture {
 
 export interface CopyInput {
   topic: string;
+  slideCount?: number | 'auto';
   architectureId: ArchitectureId;
   context: BrandContext;
   brandName: string;
   tone: string;
 }
 
+export const CARD_COUNTS = [4, 5, 6, 7, 8, 10] as const;
+export function resolveSlideCount(architectureId: string, requested?: number | 'auto'): number {
+  const fallback = getArchitecture(architectureId).slideCount;
+  if(requested === undefined || requested === 'auto') return fallback;
+  if(!CARD_COUNTS.some(n => n === requested)) throw new Error('Escolhe 4, 5, 6, 7, 8 ou 10 cards, ou automático.');
+  return requested;
+}
 export interface GeneratedCopy {
   slides: { title: string; body: string }[];
   caption: string;
@@ -208,6 +216,7 @@ export function generateCopy(input: CopyInput): GeneratedCopy {
   const topic = input.topic.trim();
   if (!topic) throw new Error('A copy precisa de um tema.');
   const arch = getArchitecture(input.architectureId);
+  const count = resolveSlideCount(input.architectureId, input.slideCount);
   const ctx = input.context;
   const cta = ctx.defaultCta || 'Guarda este post';
   const opener = openerFor(input.tone);
@@ -249,9 +258,14 @@ export function generateCopy(input: CopyInput): GeneratedCopy {
     body: `${cta}. ${ctx.defaultCta ? '' : 'Comenta o que achaste deste carrossel.'}`.trim(),
   };
 
-  const slides = [cover, ...bodyByArch[input.architectureId], closing];
-  if (slides.length !== arch.slideCount) {
-    throw new Error(`Arquitetura ${arch.id}: esperados ${arch.slideCount} slides, gerados ${slides.length}.`);
+  const original = bodyByArch[input.architectureId];
+  const body = Array.from({length: count - 2}, (_, i) => original[i] ?? {
+    title: input.architectureId === 'passo-a-passo' ? `Passo ${i + 1}` : `${i + 1}. ${topic}`,
+    body: `Adapta este ponto sobre ${topic} à tua rotina. Define uma ação concreta, o responsável e como vais rever o resultado.`,
+  });
+  const slides = [cover, ...body, closing];
+  if (slides.length !== count) {
+    throw new Error(`Arquitetura ${arch.id}: esperados ${count} slides, gerados ${slides.length}.`);
   }
   const caption = `${topic}\n\n${opener}${pain}${goal}\n\n${cta}.`;
   return { slides, caption: caption.trim(), hashtags: ctx.hashtags };

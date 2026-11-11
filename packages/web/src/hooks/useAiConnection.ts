@@ -201,6 +201,7 @@ export function useAiConnection(): AiConnectionHook {
       const result = await window.pinkLogicDesktop!.generateAiCopy({
         topic: input.topic,
         architectureId: input.architectureId,
+        slideCount: input.slideCount,
         brandName: input.brandName,
         tone: input.tone,
         defaultCta: input.context.defaultCta,

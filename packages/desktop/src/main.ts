@@ -10,13 +10,14 @@ import { startTransfer, stopTransfer } from './localTransfer';
 import { app, BrowserWindow, dialog, ipcMain, shell, clipboard, safeStorage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { deleteDraft, draftsDir, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
+import { deleteDraft, draftsDir, listDrafts, loadDraft, saveDraft, listDraftVersions, restoreDraftVersion, type Draft } from './drafts';
 import {
   clearApiKey, encryptionAvailable, keyHintFromStored, loadDiskConfig,
   saveDiskConfig, storeApiKey, type AiConnectionDiskConfig,
 } from './secrets';
 import { generateCopyMain, testAiConnectionMain, type MainCopyInput } from './aiApi';
 
+if(process.env.PINK_DESKTOP_OFFSCREEN_TEST === '1') app.disableHardwareAcceleration();
 const isSelfTest = process.env.PINK_DESKTOP_SELFTEST === '1';
 const selfTestOut = process.env.PINK_DESKTOP_SELFTEST_OUT || '';
 
@@ -25,6 +26,11 @@ if (process.env.PINK_DESKTOP_USER_DATA) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+if(!isSelfTest && !process.env.PINK_DESKTOP_ACCEPTANCE && !process.env.PINK_CHATGPT_DIAGNOSTIC_OUT) {
+  if(!app.requestSingleInstanceLock()) app.exit(0);
+  app.on('second-instance',()=>{if(mainWindow?.isMinimized()) mainWindow.restore();mainWindow?.focus();});
+}
+
 let chatgptConnection: PinkChatGPTOAuth | null = null;
 
 function webEntry(): { url?: string; file?: string } {
@@ -42,11 +48,13 @@ function createWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 640,
     title: 'Pink Logic',
+    show: process.env.PINK_DESKTOP_OFFSCREEN_TEST !== '1',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      offscreen: process.env.PINK_DESKTOP_OFFSCREEN_TEST === '1',
     },
   });
 
@@ -60,7 +68,7 @@ function createWindow(): BrowserWindow {
   win.webContents.on('did-finish-load', () => {
     console.log(`[desktop] SPA carregada: ${win.webContents.getURL()} | título: ${win.webContents.getTitle()}`);
     if (process.env.PINK_CHATGPT_DIAGNOSTIC_OUT) { void win.webContents.executeJavaScript('window.pinkLogicDesktop.getChatGPTStatus()').then(status => { const ok = status.sessionOwnedBy === 'Pink Logic' && status.connected === false && status.subscriptionAuthorized === false && status.textGenerationVerified === false && status.status === 'approval-required'; fs.writeFileSync(process.env.PINK_CHATGPT_DIAGNOSTIC_OUT!, JSON.stringify({ok, ...status}, null, 2)); app.exit(ok ? 0 : 1); }); }
-    else if (process.env.PINK_DESKTOP_ACCEPTANCE) void runAcceptance(win).then(() => app.exit(0)).catch(err => { console.error(err); app.exit(1); });
+    else if (process.env.PINK_DESKTOP_ACCEPTANCE) void runAcceptance(win).then(() => win.close()).catch(err => { console.error(err); app.exit(1); });
     else if (isSelfTest) void runSelfTest(win).catch((err) => failSelfTest(err));
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
@@ -72,6 +80,8 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
+  ipcMain.on('pink-logic:save-draft-sync', (event,draft: Draft) => { try {saveDraft(app.getPath('userData'),draft);event.returnValue={ok:true};}catch {event.returnValue={ok:false,error:'Não foi possível guardar o projeto no disco.'};} });
+
   chatgptConnection = new PinkChatGPTOAuth({
     userData: app.getPath('userData'),
     clientId: process.env.PINK_CHATGPT_COMMERCIAL_CLIENT_ID,
@@ -107,6 +117,8 @@ function registerIpc(): void {
 
   ipcMain.handle('pink-logic:save-draft', (_e, draft: Draft) => saveDraft(app.getPath('userData'), draft));
   ipcMain.handle('pink-logic:load-draft', (_e, id: string) => loadDraft(app.getPath('userData'), id));
+  ipcMain.handle('pink-logic:list-versions', (_e,id:string) => listDraftVersions(app.getPath('userData'),id));
+  ipcMain.handle('pink-logic:restore-version', (_e,id:string,version:string) => restoreDraftVersion(app.getPath('userData'),id,version));
   ipcMain.handle('pink-logic:list-drafts', () => listDrafts(app.getPath('userData')));
   ipcMain.handle('pink-logic:delete-draft', (_e, id: string) => deleteDraft(app.getPath('userData'), id));
 
@@ -173,7 +185,7 @@ function registerIpc(): void {
     if (!Number.isFinite(perCall) || perCall <= 0 || perCall > 10) throw new Error('O máximo por chamada tem de estar entre 0 e 10 USD.');
     if (perCall > monthly) throw new Error('O máximo por chamada não pode ser maior que o teto mensal.');
     if (!['teste', 'api', 'desligada'].includes(settings?.mode)) throw new Error('Modo de IA desconhecido.');
-    if (!['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'].includes(settings?.model)) throw new Error('Modelo desconhecido.');
+    if (!['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-5.4-mini'].includes(settings?.model)) throw new Error('Modelo desconhecido.');
     config.settings = {
       mode: settings.mode,
       apiEnabled: settings.apiEnabled === true,

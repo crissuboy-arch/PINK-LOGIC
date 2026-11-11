@@ -83,6 +83,7 @@ export interface ReplicationInput {
   source: ReferenceModel | { slides: { title: string; body: string }[]; architectureId?: string };
   newTopic: string;
   architectureId: ArchitectureId;
+  slideCount?: number | 'auto';
   context: BrandContext;
   brandName: string;
   tone: string;
@@ -106,6 +107,7 @@ export function replicateContent(input: ReplicationInput): ReplicationResult {
   const generated = generateCopy({
     topic,
     architectureId: input.architectureId,
+    slideCount: input.slideCount,
     context: input.context,
     brandName: input.brandName,
     tone: input.tone,

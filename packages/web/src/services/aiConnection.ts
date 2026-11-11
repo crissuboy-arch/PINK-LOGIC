@@ -24,7 +24,7 @@
 //   - Os limites (teto mensal em USD + máximo por chamada) são verificados
 //     ANTES de qualquer chamada paga; o gasto é registado por mês.
 // ---------------------------------------------------------------------------
-import { generateCopy, getArchitecture, type CopyInput, type GeneratedCopy } from './carouselRadar';
+import { generateCopy, getArchitecture, resolveSlideCount, type CopyInput, type GeneratedCopy } from './carouselRadar';
 
 export type { CopyInput, GeneratedCopy } from './carouselRadar';
 
@@ -60,6 +60,7 @@ export const OPENAI_IMAGES_URL = 'https://api.openai.com/v1/images/generations';
 
 /** Preços aproximados por 1M tokens (USD) — só para estimar o teto. */
 export const OPENAI_PRICING_PER_MILLION: Record<string, { input: number; output: number }> = {
+  'gpt-5.4-mini': { input: 0.75, output: 4.5 },
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
   'gpt-4o': { input: 2.5, output: 10 },
   'gpt-4.1-mini': { input: 0.4, output: 1.6 },
@@ -69,6 +70,7 @@ export interface AiSpend {
   /** Mês a que o gasto pertence, 'AAAA-MM'. */
   month: string;
   spentUsd: number;
+  reservedUsd?: number;
 }
 
 /** Estado completo da ligação. A chave NUNCA está aqui — só `keyHint`. */
@@ -240,7 +242,7 @@ export function checkApiGate(state: AiConnectionState, estimatedCostUsd: number,
       reason: `Custo estimado $${estimatedCostUsd.toFixed(4)} acima do máximo por chamada ($${state.settings.maxPerCallUsd.toFixed(2)}).`,
     };
   }
-  const spent = state.spend.month === monthKey(now) ? state.spend.spentUsd : 0;
+  const spent = state.spend.month === monthKey(now) ? state.spend.spentUsd + (state.spend.reservedUsd || 0) : 0;
   if (spent + estimatedCostUsd > state.settings.monthlyCapUsd) {
     return {
       allowed: false,
@@ -344,13 +346,14 @@ export async function generateCarouselCopy(opts: {
   const gate = checkApiGate(state, preEstimate);
   if (!gate.allowed) throw new Error(gate.reason ?? 'Chamada à API recusada pelo gate de custo.');
   const arch = getArchitecture(input.architectureId);
+  const slideCount = resolveSlideCount(input.architectureId, input.slideCount);
   const res = await opts.fetchFn(OPENAI_CHAT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: state.settings.model,
-      temperature: 0.7,
-      max_tokens: 1500,
+      ...(state.settings.model.startsWith('gpt-5') ? {} : {temperature: 0.7}),
+      max_completion_tokens: 4096,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -359,7 +362,7 @@ export async function generateCarouselCopy(opts: {
         },
         {
           role: 'user',
-          content: `Marca: ${input.brandName}. Tom: ${input.tone}. Tema: ${input.topic}. Arquitetura: ${arch.label} com exactamente ${arch.slideCount} slides (primeiro = capa com o tema, último = fecho com a CTA «${input.context.defaultCta || 'Guarda este post'}»). Dores: ${input.context.pains.join('; ') || 'nenhuma'}. Objectivos: ${input.context.goals.join('; ') || 'nenhum'}. Evitar: ${input.context.avoid.join('; ') || 'nada'}.`,
+          content: `Marca: ${input.brandName}. Tom: ${input.tone}. Tema: ${input.topic}. Arquitetura: ${arch.label} com exactamente ${slideCount} slides (primeiro = capa com o tema, último = fecho com a CTA «${input.context.defaultCta || 'Guarda este post'}»). Dores: ${input.context.pains.join('; ') || 'nenhuma'}. Objectivos: ${input.context.goals.join('; ') || 'nenhum'}. Evitar: ${input.context.avoid.join('; ') || 'nada'}.`,
         },
       ],
     }),
@@ -380,8 +383,8 @@ export async function generateCarouselCopy(opts: {
     throw new Error('A API devolveu copy num formato inválido — nada foi aplicado. Tenta de novo ou usa o modo de teste.');
   }
   const d = data as Partial<GeneratedCopy>;
-  if (!Array.isArray(d.slides) || d.slides.length !== arch.slideCount || typeof d.caption !== 'string' || !Array.isArray(d.hashtags)) {
-    throw new Error(`A API devolveu ${Array.isArray(d.slides) ? d.slides.length : 0} slides (esperados ${arch.slideCount}) — nada foi aplicado.`);
+  if (!Array.isArray(d.slides) || d.slides.length !== slideCount || typeof d.caption !== 'string' || !Array.isArray(d.hashtags)) {
+    throw new Error(`A API devolveu ${Array.isArray(d.slides) ? d.slides.length : 0} slides (esperados ${slideCount}) — nada foi aplicado.`);
   }
   for (const s of d.slides) {
     if (!s || typeof s.title !== 'string' || typeof s.body !== 'string' || !s.title.trim() || !s.body.trim()) {

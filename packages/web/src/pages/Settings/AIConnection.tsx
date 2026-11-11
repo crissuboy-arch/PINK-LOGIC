@@ -195,7 +195,7 @@ export default function AIConnectionPage() {
           </span>
         </label>
         <p style={{ fontSize: '0.85rem', margin: 0 }}>
-          Gasto este mês ({state.spend.month}): <strong>${state.spend.spentUsd.toFixed(4)}</strong> de ${state.settings.monthlyCapUsd.toFixed(2)}.
+          Consumo estimado este mês ({state.spend.month}): <strong>${state.spend.spentUsd.toFixed(4)}</strong> + reservas por confirmar <strong>${(state.spend.reservedUsd || 0).toFixed(4)}</strong> de ${state.settings.monthlyCapUsd.toFixed(2)}.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 180px' }}>
@@ -208,14 +208,14 @@ export default function AIConnectionPage() {
           </div>
           <div style={{ flex: '1 1 180px' }}>
             <label style={label}>Modelo de texto — actual: {state.settings.model}</label>
-            <input style={inputStyle} value={model} placeholder="gpt-4o-mini" onChange={(e) => setModel(e.target.value)} />
+            <input style={inputStyle} value={model} placeholder="gpt-5.4-mini (ou modelo legado configurado)" onChange={(e) => setModel(e.target.value)} />
           </div>
         </div>
         <div>
           <button className="btn-primary" onClick={saveLimits}>Guardar limites</button>
         </div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-          Valores predefinidos conservadores: teto $5/mês, máximo $0.10 por chamada, modelo gpt-4o-mini.
+          Os limites são estimativas locais; configure também limites na conta OpenAI. Pedidos sem cobrança confirmada mantêm reserva. GPT-5.4 Mini disponível (preços verificados em 11/11/2026). Valores predefinidos conservadores: teto $5/mês, máximo $0.10 por chamada, modelo gpt-4o-mini.
           Acima do teto, o adaptador recusa a chamada antes de gastar — e o fluxo volta ao modo de teste.
         </p>
       </div>

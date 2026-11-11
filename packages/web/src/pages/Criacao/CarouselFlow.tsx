@@ -1,3 +1,5 @@
+import CarouselPreview from '../../components/CarouselPreview';
+import {validateCopy,packSlideDocument,unpackSlideDocument,replaceSlideText,prepareLogo} from '../../services/carouselWorkflow';
 import ofensivaLogo from '../../assets/ofensiva-criativa-logo.png?inline';
 // ---------------------------------------------------------------------------
 // Fluxo completo de criação de carrosséis — Fase 2 (passos a–o).
@@ -17,12 +19,12 @@ import AIStatusBadge from '../../components/AIStatusBadge';
 import { generateTestCopy } from '../../services/aiConnection';
 import {
   INTERVIEW_QUESTIONS, buildBrandFromInterview, extractBrandFromWebsiteHtml,
-  normalizeBrandContext, mergeBrandContext, newCarouselProject, approveProject as approveProjectFn,
+  normalizeBrandContext, newCarouselProject, approveProject as approveProjectFn,
   serializeProject, parseProject, FLOW_STEPS, type BrandContext, type BrandInterviewAnswers,
   type BrandLike, type CarouselFlowStep, type CarouselProject,
 } from '../../services/carouselFlow';
 import {
-  generateRadar, selectPautas, topPautas, ARCHITECTURES,
+  generateRadar, selectPautas, topPautas, ARCHITECTURES, CARD_COUNTS, resolveSlideCount,
   type ArchitectureId, type RadarResult,
 } from '../../services/carouselRadar';
 import { modelReference, replicateContent, type ReferenceModel } from '../../services/carouselReference';
@@ -32,7 +34,7 @@ import {
 } from '../../services/carouselDelivery';
 import { disabledAdapter, checkScheduleGate, evaluateChannel } from '../../services/carouselPublish';
 import {
-  applyBrandTemplate, buildCoverVariants, applyCoverVariant, correctSlide,
+  applyBrandTemplate, buildCoverVariants, applyCoverVariant,
   setSlideReviewStatus, checkBrandConsistency, slideTextContents, buildCaptionText,
   type CoverVariantId,
 } from '../../services/carouselDocument';
@@ -111,6 +113,10 @@ export default function CarouselFlowPage() {
   const [radar, setRadar] = useState<RadarResult | null>(null);
   const [architectureId, setArchitectureId] = useState<ArchitectureId>('lista');
   const [slides, setSlides] = useState<Slide[]>([]);
+  const [cardCount, setCardCount] = useState<number | 'auto'>('auto');
+  const [copyApproved, setCopyApproved] = useState(false);
+  const [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
+  const [versions,setVersions] = useState<{id:string;updatedAt:string}[]>([]);
   const [coverVariant, setCoverVariant] = useState<CoverVariantId>('classica');
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
@@ -133,6 +139,7 @@ export default function CarouselFlowPage() {
   const [reference, setReference] = useState<ReferenceModel | null>(null);
 
   const brandSchema = useMemo(() => (brand ? toBrandSchema(brand, context) : null), [brand, context]);
+  const coverOptions = useMemo(()=>buildCoverVariants(brandSchema,slides.length ? slideTextContents(slides[0]) : {title:topic,body:''},slides.length || 1),[brandSchema,slides,topic]);
 
   const project: CarouselProject | null = useMemo(() => {
     if (!brand) return null;
@@ -146,9 +153,9 @@ export default function CarouselFlowPage() {
     p.approvedAt = approvedAt;
     p.referenceId = reference?.id ?? null;
     p.pautaId = radar?.selectedIds[0] ?? null;
-    Object.assign(p, { brandSnapshot: brand, contentOrigin });
+    Object.assign(p, { brandSnapshot: brand, contentOrigin, requestedCardCount: cardCount, copyApproved, slideDocument: packSlideDocument(slides,brand), createdAt });
     return p;
-  }, [projectId, brand, context, topic, architectureId, coverVariant, slides, caption, hashtags, approvedBy, approvedAt, reference, radar, contentOrigin]);
+  }, [projectId, brand, context, topic, architectureId, coverVariant, slides, caption, hashtags, approvedBy, approvedAt, reference, radar, contentOrigin, cardCount, copyApproved, createdAt]);
 
   const autosave = useCarouselAutosave(project);
   useEffect(() => { void window.pinkLogicDesktop?.listDrafts().then(d => { setSavedDrafts(d.filter(x => x.id.startsWith('carousel-'))); setSavedBrands(d.filter(x => x.id.startsWith('brand-'))); }); }, []);
@@ -157,17 +164,18 @@ export default function CarouselFlowPage() {
       const draft = await window.pinkLogicDesktop?.loadDraft(id);
       if (!draft) throw new Error('Projeto não encontrado.');
       const restored = parseProject(JSON.stringify(draft.data));
-      const extra = draft.data as { brandSnapshot?: BrandLike; contentOrigin?: string };
+      const extra = draft.data as { brandSnapshot?: BrandLike; contentOrigin?: string; requestedCardCount?: number | 'auto'; copyApproved?: boolean; slideDocument?: unknown[] };
       if (!extra.brandSnapshot) throw new Error('Este rascunho antigo não contém a identidade. Reabra com a marca original.');
       setProjectId(restored.id); setBrand(extra.brandSnapshot); setContext(restored.context); setTopic(restored.topic);
       setArchitectureId(restored.architectureId as ArchitectureId); setCoverVariant(restored.coverVariant);
-      setSlides(applyBrandTemplate(toBrandSchema(extra.brandSnapshot, restored.context), restored.slides, { coverVariant: restored.coverVariant }));
-      setCaption(restored.caption); setHashtags(restored.hashtags); setApprovedBy(''); setApprovedAt(null);
+      setSlides(unpackSlideDocument(extra.slideDocument,extra.brandSnapshot,restored.slides.length) || applyBrandTemplate(toBrandSchema(extra.brandSnapshot, restored.context), restored.slides, { coverVariant: restored.coverVariant }));
+      setCardCount(extra.requestedCardCount ?? 'auto'); setCopyApproved(extra.copyApproved === true); setCreatedAt(restored.createdAt);
+      setCaption(restored.caption); setHashtags(restored.hashtags); setApprovedBy(restored.approvedBy || ''); setApprovedAt(restored.approvedAt);
       setContentOrigin(extra.contentOrigin || 'origem não registada'); setStep('copy'); setNotice('Projeto e marca recuperados do disco.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   };
   const loadOfensivaExample = async () => {
-    const b: BrandLike = { id: 'ofensiva-criativa', projectId: 'ofensiva-local', name: 'Ofensiva Criativa', palette: {primary: '#103B78', secondary: '#071D3A', accent: '#D4AF37', background: '#FFFFFF', text: '#071D3A', surface: '#F5F7FA'}, typography: {heading: 'Arial', body: 'Arial'}, tone: 'Direto e sem filtro', visualStyle: 'Editorial azul e dourado', logo: ofensivaLogo, colors: ['#103B78', '#D4AF37'] };
+    const b: BrandLike = { id: 'ofensiva-criativa', projectId: 'ofensiva-local', name: 'Ofensiva Criativa', palette: {primary: '#103B78', secondary: '#071D3A', accent: '#D4AF37', background: '#FFFFFF', text: '#071D3A', surface: '#F5F7FA'}, typography: {heading: 'Arial', body: 'Arial'}, tone: 'Direto e sem filtro', visualStyle: 'Editorial azul e dourado', logo: await prepareLogo(ofensivaLogo), colors: ['#103B78', '#D4AF37'] };
     const theme = '5 tarefas que a tua empresa pode automatizar com inteligência artificial.';
     const texts = [
       {title: '1. Responder às perguntas frequentes', body: 'Organiza respostas sobre horários, serviços e prazos. A IA prepara uma resposta; a equipa revê os casos sensíveis.'},
@@ -176,7 +184,7 @@ export default function CarouselFlowPage() {
       {title: '4. Transformar conteúdos próprios', body: 'Converte um artigo num rascunho de carrossel ou legenda. Revê os factos e mantém a voz da marca.'},
       {title: '5. Resumir relatórios de rotina', body: 'Reúne indicadores e destaca pontos para revisão humana. Marketing sem filtro. Resultados sem desculpa. Comenta LINK.'},
     ];
-    setProjectId(crypto.randomUUID()); setBrand(b); setContext(OFENSIVA_CONTEXT); setTopic(theme); setArchitectureId('lista'); setCoverVariant('classica');
+    setProjectId(crypto.randomUUID()); setCreatedAt(new Date().toISOString()); setCardCount(5); setCopyApproved(false); setBrand(b); setContext(OFENSIVA_CONTEXT); setTopic(theme); setArchitectureId('lista'); setCoverVariant('classica');
     setSlides(applyBrandTemplate(toBrandSchema(b, OFENSIVA_CONTEXT), texts, {coverVariant: 'classica'}));
     setCaption('Começa por uma tarefa repetitiva e mantém a revisão humana. Estas cinco ideias são um ponto de partida. Marketing sem filtro. Resultados sem desculpa. Comenta LINK.'); setHashtags(['#OfensivaCriativa', '#InteligenciaArtificial']); setContentOrigin('texto de exemplo escrito localmente; sem geração de IA'); setApprovedAt(null); setApprovedBy(''); setStep('copy');
     if (window.pinkLogicDesktop) { await window.pinkLogicDesktop.saveDraft({ id: 'brand-ofensiva-criativa', title: b.name, data: {brand: b, context: OFENSIVA_CONTEXT, slogan: 'Marketing sem filtro. Resultados sem desculpa.'} }); setSavedBrands((await window.pinkLogicDesktop.listDrafts()).filter(x => x.id.startsWith('brand-'))); }
@@ -191,7 +199,8 @@ export default function CarouselFlowPage() {
     try {
       if (!brandSchema) throw new Error('Configure a marca.');
       const parsed = JSON.parse(manualCopy) as { slides: {title: string; body: string}[]; caption: string; hashtags: string[] };
-      if (!Array.isArray(parsed.slides) || parsed.slides.length !== 5 || !parsed.slides.every(x => typeof x.title === 'string' && typeof x.body === 'string') || typeof parsed.caption !== 'string' || !Array.isArray(parsed.hashtags) || !parsed.hashtags.every(x => typeof x === 'string')) throw new Error('Esperado JSON com 5 slides (title/body), caption e hashtags.');
+      if (!Array.isArray(parsed.slides) || parsed.slides.length !== resolveSlideCount(architectureId,cardCount) || !parsed.slides.every(x => typeof x.title === 'string' && typeof x.body === 'string') || typeof parsed.caption !== 'string' || !Array.isArray(parsed.hashtags) || !parsed.hashtags.every(x => typeof x === 'string')) throw new Error('A quantidade de cards deve corresponder à arquitetura/quantidade escolhida; inclua title/body, caption e hashtags.');
+      setCopyApproved(false); setApprovedAt(null);
       setSlides(applyBrandTemplate(brandSchema, parsed.slides, {coverVariant})); setCaption(parsed.caption); setHashtags(parsed.hashtags);
       setContentOrigin('texto importado manualmente — origem declarada pelo utilizador'); setNotice('Texto importado. Arte por templates locais; revise antes de exportar.'); setStep('copy');
     } catch(e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -209,6 +218,7 @@ export default function CarouselFlowPage() {
     setInterviewErrors(errors);
     if (Object.keys(errors).length) return;
     if (brand?.id !== built.id) { setProjectId(crypto.randomUUID()); setSlides([]); setCaption(''); setHashtags([]); setApprovedAt(null); setApprovedBy(''); }
+    setContext(c=>normalizeBrandContext({...c,audience:answers.audience || c.audience,defaultCta:answers.cta || c.defaultCta}));
     setBrand(built);
     setNotice(`Marca «${built.name}» configurada por entrevista (logo vazio — sem ficheiro oficial).`);
   });
@@ -278,7 +288,8 @@ export default function CarouselFlowPage() {
     setNotice(null);
     if (!brand) { setError('Configura primeiro a marca.'); return; }
     try {
-      const result = await ai.generateCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
+      const result = await ai.generateCopy({ topic, architectureId, slideCount: cardCount, context, brandName: brand.name, tone: brand.tone });
+      setCopyApproved(false); setApprovedAt(null);
       setContentOrigin(result.source === "api" ? "OpenAI API" : "templates locais");
       setCaption(result.copy.caption);
       setHashtags(result.copy.hashtags);
@@ -287,31 +298,26 @@ export default function CarouselFlowPage() {
         ? `Copy gerada pela API da OpenAI (${result.copy.slides.length} slides, custo ~$${result.costUsd.toFixed(4)}) — revê cada card antes de aprovar.`
         : `Copy gerada por templates (${result.copy.slides.length} slides) — conteúdo de demonstração, modo de teste. Revê cada card antes de aprovar.`);
     } catch (e) {
-      // A API falhou (ou o gate recusou): volta aos templates locais, a dizer —
-      // excepto com a IA desligada, onde gerar seria desrespeitar a escolha.
-      if (ai.state.settings.mode === 'desligada') {
-        setError(e instanceof Error ? e.message : String(e));
-        return;
-      }
-      try {
-        setContentOrigin('templates locais'); setApprovedAt(null);
-        const fallback = generateTestCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
-        setCaption(fallback.copy.caption);
-        setHashtags(fallback.copy.hashtags);
-        setSlides(applyBrandTemplate(brandSchema, fallback.copy.slides, { coverVariant }));
-        setNotice(`A API não gerou a copy (${e instanceof Error ? e.message : String(e)}). Gerada por templates locais (modo de teste) — nada foi gasto.`);
-      } catch (e2) {
-        setError(e2 instanceof Error ? e2.message : String(e2));
-      }
+      await ai.refresh();
+      setError(`${e instanceof Error ? e.message : String(e)} O conteúdo anterior foi preservado. Para continuar sem API, escolhe explicitamente os templates locais.`);
     }
   };
+  const runLocalCopy = () => run(() => {
+    if(!brand) throw new Error('Configura primeiro a marca.');
+    const result=generateTestCopy({topic,architectureId,slideCount:cardCount,context,brandName:brand.name,tone:brand.tone});
+    setCopyApproved(false);setApprovedAt(null);setContentOrigin('templates locais');setCaption(result.copy.caption);setHashtags(result.copy.hashtags);setSlides(applyBrandTemplate(brandSchema,result.copy.slides,{coverVariant}));setStep('copy');setNotice('Copy por templates locais, sem chamadas pagas. Revê e aprova o texto.');
+  });
+  const approveCopy = () => run(() => {
+    validateCopy({slides:slides.map(slideTextContents),caption,hashtags},resolveSlideCount(architectureId,cardCount));
+    setCopyApproved(true);setStep('slides');setNotice('Texto aprovado. Escolhe uma das três capas locais.');
+  });
 
   const runReplicate = () => run(() => {
     setContentOrigin('templates locais'); setApprovedAt(null);
     if (!brand) throw new Error('Configura primeiro a marca.');
     if (!reference) throw new Error('Modela primeiro uma referência.');
     const result = replicateContent({
-      source: reference, newTopic: topic, architectureId, context, brandName: brand.name, tone: brand.tone,
+      source: reference, newTopic: topic, architectureId, slideCount: cardCount, context, brandName: brand.name, tone: brand.tone,
     });
     setCaption(result.caption);
     setHashtags(result.hashtags);
@@ -327,7 +333,8 @@ export default function CarouselFlowPage() {
 
   const editSlide = (index: number, patch: { title?: string; body?: string }) => run(() => {
     setApprovedAt(null);
-    setSlides(correctSlide(slides, index, patch, brandSchema));
+    setCopyApproved(false);
+    setSlides(replaceSlideText(slides, index, patch));
   });
 
   const approveSlide = (index: number) => run(() => {
@@ -437,8 +444,10 @@ export default function CarouselFlowPage() {
       </div>
       {window.pinkLogicDesktop && <section className="card" style={{padding: 16, marginBottom: 16}}>
         <h3>Projetos neste computador</h3>
+        <button onClick={async()=>{await autosave.saveNow();setVersions(await window.pinkLogicDesktop!.listDraftVersions(`carousel-${projectId}`));}}>Ver versões guardadas</button>
+        <select aria-label="Versões do projeto" value="" onChange={async e=>{try{await window.pinkLogicDesktop!.restoreDraftVersion(`carousel-${projectId}`,e.target.value);await restoreDraft(`carousel-${projectId}`);setVersions([]);}catch(e){setError(e instanceof Error?e.message:String(e));}}}><option value="">Recuperar versão anterior…</option>{versions.map(v=><option key={v.id} value={v.id}>{new Date(v.updatedAt).toLocaleString()}</option>)}</select>
         <button data-testid="load-ofensiva-example" onClick={() => void loadOfensivaExample()}>Carregar exemplo Ofensiva Criativa — 5 cards locais</button>
-        <select aria-label="Brand Kits locais" value="" onChange={async e => { const d = await window.pinkLogicDesktop!.loadDraft(e.target.value); if(d) { const kit = d.data as {brand: BrandLike; context: BrandContext}; setProjectId(crypto.randomUUID()); setBrand(kit.brand); setContext(kit.context); setSlides([]); setCaption(''); setHashtags([]); setApprovedAt(null); setApprovedBy(''); setTopic(''); setRadar(null); setReference(null); setContentOrigin('templates locais'); setStep('marca'); } }}><option value="">Abrir Brand Kit local…</option>{savedBrands.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select>
+        <select aria-label="Brand Kits locais" value="" onChange={async e => { const d = await window.pinkLogicDesktop!.loadDraft(e.target.value); if(d) { const kit = d.data as {brand: BrandLike; context: BrandContext}; setProjectId(crypto.randomUUID()); setCreatedAt(new Date().toISOString()); setCopyApproved(false); setCardCount('auto'); setBrand(kit.brand); setContext(kit.context); setSlides([]); setCaption(''); setHashtags([]); setApprovedAt(null); setApprovedBy(''); setTopic(''); setRadar(null); setReference(null); setContentOrigin('templates locais'); setStep('marca'); } }}><option value="">Abrir Brand Kit local…</option>{savedBrands.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select>
         <button onClick={async () => { await autosave.saveNow(); setSavedDrafts((await window.pinkLogicDesktop!.listDrafts()).filter(x => x.id.startsWith('carousel-'))); }}>Guardar e atualizar lista</button>
         <select aria-label="Recuperar projeto" value="" onChange={e => void restoreDraft(e.target.value)}><option value="">Recuperar projeto guardado…</option>{savedDrafts.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select>
         <p>Origem: {contentOrigin}. Capas e cards: templates locais editáveis.</p>
@@ -446,8 +455,8 @@ export default function CarouselFlowPage() {
       <details style={{marginBottom: 16}}><summary>Usar texto do meu ChatGPT sem API — transferência manual</summary>
         <p>Na Ligação de IA, abra o ChatGPT e copie o pedido. Cole aqui a resposta JSON. Isto não liga nem verifica a sua assinatura.</p>
         <textarea aria-label="Resposta JSON do ChatGPT" value={manualCopy} onChange={e => setManualCopy(e.target.value)} rows={6} style={inputStyle}/>
-        <button onClick={() => void window.pinkLogicDesktop?.openChatGPTManual(`Cria 5 cards em português de Portugal sobre: ${topic}. Marca: ${brand?.name || 'não definida'}. Tom: ${brand?.tone || ''}. Contexto: ${JSON.stringify(context)}. Devolve apenas JSON, sem markdown: {"slides":[{"title":"...","body":"..."}],"caption":"...","hashtags":["..."]}. Exatamente 5 slides. Não inventes resultados, provas ou tendências.`)}>Copiar pedido e abrir ChatGPT</button>
-        <button onClick={importChatGPTCopy}>Importar e rever os 5 cards</button>
+        <button onClick={() => void window.pinkLogicDesktop?.openChatGPTManual(`Cria ${resolveSlideCount(architectureId,cardCount)} cards em português de Portugal sobre: ${topic}. Marca: ${brand?.name || 'não definida'}. Tom: ${brand?.tone || ''}. Contexto: ${JSON.stringify(context)}. Devolve apenas JSON, sem markdown: {"slides":[{"title":"...","body":"..."}],"caption":"...","hashtags":["..."]}. Exatamente ${resolveSlideCount(architectureId,cardCount)} slides. Não inventes resultados, provas ou tendências.`)}>Copiar pedido e abrir ChatGPT</button>
+        <button onClick={importChatGPTCopy}>Importar e rever os cards</button>
       </details>
       <details style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
         <summary style={{ cursor: 'pointer' }}>Fluxo completo — 15 passos (onde está cada um)</summary>
@@ -484,10 +493,11 @@ export default function CarouselFlowPage() {
             </button>
           )}
           <h4 style={{ margin: '0.4rem 0 0' }}>Entrevista guiada</h4>
+          {brand?.logo && <img data-testid="brand-logo-preview" src={brand.logo} alt="Logótipo da marca" style={{maxWidth:160,maxHeight:100,objectFit:'contain'}}/>}
           {INTERVIEW_QUESTIONS.map((q) => (
             <div key={q.id}>
-              <label style={label}>{q.label} {q.required ? '*' : ''} <span style={{ color: 'var(--text-secondary)' }}>— {q.hint}</span></label>
-              <input style={inputStyle} value={(answers[q.id] as string) ?? ''} placeholder={q.examples.join(' · ')}
+              <label htmlFor={`interview-${q.id}`} style={label}>{q.label} {q.required ? '*' : ''} <span style={{ color: 'var(--text-secondary)' }}>— {q.hint}</span></label>
+              <input id={`interview-${q.id}`} aria-label={q.label} style={inputStyle} value={(answers[q.id] as string) ?? ''} placeholder={q.examples.join(' · ')}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))} />
               {interviewErrors[q.id] && <span style={{ color: '#b00020', fontSize: '0.8rem' }}>{interviewErrors[q.id]}</span>}
             </div>
@@ -513,9 +523,15 @@ export default function CarouselFlowPage() {
           <label style={label}>Público</label>
           <input style={inputStyle} value={context.audience} onChange={(e) => setContext((c) => ({ ...c, audience: e.target.value }))} />
           <label style={label}>Dores (uma por linha)</label>
-          <textarea style={inputStyle} rows={3} value={context.pains.join('\n')} onChange={(e) => setContext((c) => mergeBrandContext(c, { pains: e.target.value.split('\n') }))} />
+          <textarea style={inputStyle} rows={3} value={context.pains.join('\n')} onChange={(e) => setContext((c) => normalizeBrandContext({...c, pains: e.target.value.split('\n')}))} />
           <label style={label}>Objectivos (um por linha)</label>
-          <textarea style={inputStyle} rows={3} value={context.goals.join('\n')} onChange={(e) => setContext((c) => mergeBrandContext(c, { goals: e.target.value.split('\n') }))} />
+          <textarea style={inputStyle} rows={3} value={context.goals.join('\n')} onChange={(e) => setContext((c) => normalizeBrandContext({...c, goals: e.target.value.split('\n')}))} />
+          <label style={label}>Temas recorrentes (um por linha)</label>
+          <textarea style={inputStyle} value={context.themes.join('\n')} onChange={e=>setContext(c=>normalizeBrandContext({...c,themes:e.target.value.split('\n')}))}/>
+          <label style={label}>Expressões e promessas a evitar (uma por linha)</label>
+          <textarea style={inputStyle} value={context.avoid.join('\n')} onChange={e=>setContext(c=>normalizeBrandContext({...c,avoid:e.target.value.split('\n')}))}/>
+          <label style={label}>Logótipo da marca (PNG/JPG/WebP, até 4 MB)</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const f=e.target.files?.[0];if(!f || !brand)return;if(f.size>4*1024*1024){setError('O logótipo deve ter até 4 MB.');return;}const r=new FileReader();r.onload=()=>{void prepareLogo(String(r.result)).then(logo=>{setBrand({...brand,logo});setApprovedAt(null);setCopyApproved(false);}).catch(e=>setError(String(e)));};r.readAsDataURL(f);}}/>
           <label style={label}>CTA por omissão</label>
           <input style={inputStyle} value={context.defaultCta} onChange={(e) => setContext((c) => ({ ...c, defaultCta: e.target.value }))} />
           <label style={label}>Hashtags (separadas por espaço)</label>
@@ -528,7 +544,7 @@ export default function CarouselFlowPage() {
         <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           <h3 style={{ margin: 0 }}>2. Radar — 30 pautas → 10 prioritárias</h3>
           <label style={label}>Tema</label>
-          <input style={inputStyle} value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <input aria-label="Tema do carrossel" style={inputStyle} value={topic} onChange={(e) => setTopic(e.target.value)} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-primary" onClick={runRadar}>Gerar 30 pautas (templates locais)</button>
             <button onClick={pickTop10} disabled={!radar}>Escolher as 10 com maior pontuação</button>
@@ -559,6 +575,7 @@ export default function CarouselFlowPage() {
       {step === 'arquitetura' && (
         <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           <h3 style={{ margin: 0 }}>3. Arquitetura do carrossel</h3>
+          <label>Quantidade de cards <select aria-label="Quantidade de cards" value={cardCount} onChange={e => {setCardCount(e.target.value === 'auto' ? 'auto' : Number(e.target.value));setCopyApproved(false);setApprovedAt(null);}}><option value="auto">Automático</option>{CARD_COUNTS.map(n=><option key={n} value={n}>{n} cards</option>)}</select></label>
           {ARCHITECTURES.map((a) => (
             <label key={a.id} style={{ border: architectureId === a.id ? '2px solid #103B78' : '1px solid #ddd', borderRadius: 8, padding: '0.6rem', cursor: 'pointer' }}>
               <input type="radio" name="arch" checked={architectureId === a.id} onChange={() => setArchitectureId(a.id)} />{' '}
@@ -577,6 +594,7 @@ export default function CarouselFlowPage() {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={() => { void runCopy().then(() => setStep('copy')); }}>Gerar copy →</button>
+            <button onClick={runLocalCopy}>Gerar por templates locais — sem API</button>
             <button onClick={() => { runReplicate(); setStep('copy'); }} disabled={!reference}>Replicar da referência →</button>
           </div>
         </div>
@@ -590,17 +608,19 @@ export default function CarouselFlowPage() {
             const { title, body } = slideTextContents(s);
             return (
               <div key={s.id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: '0.6rem' }}>
-                <strong>Card {i + 1}</strong> <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({s.reviewStatus ?? 'pendente'})</span>
-                <input style={{ ...inputStyle, marginTop: 6 }} value={title} onChange={(e) => editSlide(i, { title: e.target.value })} />
+                <CarouselPreview slide={s} label={`Prévia do card ${i + 1}`} width={140}/><strong>Card {i + 1}</strong> <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({s.reviewStatus ?? 'pendente'})</span>
+                <input data-testid={`card-title-${i}`} aria-label={`Título do card ${i+1}`} style={{ ...inputStyle, marginTop: 6 }} value={title} onChange={(e) => editSlide(i, { title: e.target.value })} />
                 <textarea style={{ ...inputStyle, marginTop: 6 }} rows={3} value={body} onChange={(e) => editSlide(i, { body: e.target.value })} />
+                <button onClick={() => void renderSlideToBlob(s,'png').then(blob=>download(`card-${i+1}.png`,blob)).catch(e=>setError(String(e)))}>Exportar PNG</button>
                 <button onClick={() => approveSlide(i)} style={{ marginTop: 6 }}>Aprovar card</button>
               </div>
             );
           })}
           {!slides.length && <p style={{ fontSize: '0.85rem' }}>Ainda sem slides — volta à Arquitetura e gera a copy.</p>}
+          <p role="status">Texto: {copyApproved ? 'aprovado' : 'aguarda revisão e aprovação'}. Editar um card ou a legenda invalida a aprovação.</p>
           <label style={label}>Legenda</label>
-          <textarea style={inputStyle} rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} />
-          <button className="btn-primary" onClick={() => setStep('slides')} disabled={!slides.length}>Continuar para os Slides →</button>
+          <textarea style={inputStyle} rows={4} value={caption} onChange={(e) => {setCaption(e.target.value); setCopyApproved(false); setApprovedAt(null);}} />
+          <button className="btn-primary" onClick={() => approveCopy()} disabled={!slides.length}>Continuar para os Slides →</button>
         </div>
       )}
 
@@ -609,9 +629,9 @@ export default function CarouselFlowPage() {
           <h3 style={{ margin: 0 }}>5. Slides — capas e consistência da marca</h3>
           <div>
             <span style={{ fontSize: '0.85rem' }}>Capa: </span>
-            {buildCoverVariants(brandSchema, slides.length ? slideTextContents(slides[0]) : { title: topic, body: '' }, slides.length || 1).map((v) => (
+            {coverOptions.map((v) => (
               <button key={v.variant} onClick={() => changeCover(v.variant)} style={{ marginRight: 6, background: coverVariant === v.variant ? '#103B78' : '#fff', color: coverVariant === v.variant ? '#fff' : 'inherit', borderRadius: 6, border: '1px solid #ccc', padding: '0.3rem 0.6rem', cursor: 'pointer' }}>
-                {v.label}
+                <CarouselPreview slide={v.slide} label={`Prévia da capa ${v.label}`} width={160}/><span>{v.label}</span>
               </button>
             ))}
           </div>
@@ -623,7 +643,7 @@ export default function CarouselFlowPage() {
               const { title, body } = slideTextContents(s);
               return (
                 <div key={s.id} style={{ background: s.background.value, color: '#fff', borderRadius: 10, padding: '0.8rem', minHeight: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ color: '#D4AF37', fontSize: '0.7rem', fontWeight: 700 }}>{brand?.name.toUpperCase()} · {i + 1}/{slides.length}</span>
+                  <CarouselPreview slide={s} label={`Prévia final do card ${i + 1}`} width={180}/><span style={{ color: '#D4AF37', fontSize: '0.7rem', fontWeight: 700 }}>{brand?.name.toUpperCase()} · {i + 1}/{slides.length}</span>
                   <strong style={{ fontSize: '0.95rem' }}>{title}</strong>
                   <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>{body}</span>
                   <span style={{ marginTop: 'auto', fontSize: '0.7rem' }}>{s.reviewStatus ?? 'pendente'}{s.correctedAt ? ' · corrigido' : ''}</span>
@@ -631,7 +651,7 @@ export default function CarouselFlowPage() {
               );
             })}
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Pré-visualização simples (cores e texto reais). A exportação inclui os PNG/JPG dos slides (botão «Exportar ZIP de entrega» na Entrega).</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Pré-visualização renderizada pelo mesmo motor da exportação. A exportação inclui os PNG/JPG dos slides (botão «Exportar ZIP de entrega» na Entrega).</p>
           <button className="btn-primary" onClick={() => setStep('entrega')} disabled={!slides.length}>Continuar para a Entrega →</button>
         </div>
       )}

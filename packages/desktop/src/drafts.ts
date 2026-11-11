@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 /**
  * Rascunhos de projecto guardados como JSON em <userData>/drafts/<id>.json.
  * Lógica pura (fs) para o processo main; o renderer só chega aqui via
@@ -41,6 +42,15 @@ export function saveDraft(userDataPath: string, draft: Draft): DraftMeta {
     updatedAt: new Date().toISOString(),
   };
   const payload: Draft = { ...meta, data: draft.data ?? null };
+  const previous=loadDraft(userDataPath,meta.id);
+  const comparable=(v: unknown)=>JSON.stringify(v && typeof v==='object' && !Array.isArray(v)?{...v,updatedAt:undefined}:v);
+  if(previous && (previous.title!==payload.title || comparable(previous.data)!==comparable(payload.data))) {
+    const history=path.join(userDataPath,'draft-versions',meta.id);fs.mkdirSync(history,{recursive:true});
+    fs.writeFileSync(path.join(history,`${Date.now()}-${randomUUID()}.json`),JSON.stringify(previous),'utf8');
+    const versions=fs.readdirSync(history).filter(n=>n.endsWith('.json')).sort().reverse();
+    for(const name of versions.slice(10)) fs.unlinkSync(path.join(history,name));
+  }
+
   // Escrita atómica: ficheiro temporário + rename (não deixar JSON a meio).
   const tmp = `${draftPath(userDataPath, meta.id)}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8');
@@ -75,4 +85,16 @@ export function deleteDraft(userDataPath: string, id: string): boolean {
   if (!fs.existsSync(file)) return false;
   fs.unlinkSync(file);
   return true;
+}
+
+export function listDraftVersions(userDataPath: string, id: string): {id:string;updatedAt:string}[] {
+  const dir=path.join(userDataPath,'draft-versions',sanitizeDraftId(id));if(!fs.existsSync(dir))return [];
+  return fs.readdirSync(dir).filter(n=>/^\d{13}-[0-9a-f-]{36}\.json$/.test(n)).sort().reverse().map(name=>({id:name.slice(0,-5),updatedAt:(JSON.parse(fs.readFileSync(path.join(dir,name),'utf8')) as Draft).updatedAt}));
+}
+export function restoreDraftVersion(userDataPath: string, id: string, version: string): DraftMeta {
+  if(!/^\d{13}-[0-9a-f-]{36}$/.test(version))throw new Error('Versão inválida.');
+  const file=path.join(userDataPath,'draft-versions',sanitizeDraftId(id),version+'.json');
+  if(!fs.existsSync(file))throw new Error('Versão não encontrada.');
+  const saved=JSON.parse(fs.readFileSync(file,'utf8')) as Draft;
+  return saveDraft(userDataPath,{...saved,id:sanitizeDraftId(id)});
 }

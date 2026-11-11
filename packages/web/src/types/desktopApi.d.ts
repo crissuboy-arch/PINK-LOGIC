@@ -22,6 +22,10 @@ export interface ChatGPTConnectionStatus {
   textRequestAvailable: boolean; lastTextAt: string | null;
 }
 export interface PinkLogicDesktopApi {
+  saveDraftSync(draft: {id:string;title:string;data:unknown}): {ok:boolean;error?:string};
+  listDraftVersions(id: string): Promise<{id: string; updatedAt: string}[]>;
+  restoreDraftVersion(id: string,version: string): Promise<{id: string; title: string; updatedAt: string}>;
+
   beginChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
   cancelChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
   disconnectChatGPT(): Promise<ChatGPTConnectionStatus>;
@@ -52,6 +56,7 @@ export interface PinkLogicDesktopApi {
   generateAiCopy(input: {
     topic: string;
     architectureId: string;
+    slideCount?: number | 'auto';
     brandName: string;
     tone: string;
     defaultCta: string;

@@ -1,0 +1,19 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);const {createPaidCopyAdapter}=require('../packages/desktop/dist/paidCopy.js');
+function fixture(fetchFn) {
+ const state={settings:{mode:'api',apiEnabled:true,model:'gpt-5.4-mini',monthlyCapUsd:5,maxPerCallUsd:0.1},spend:{month:new Date().toISOString().slice(0,7),spentUsd:0,reservedUsd:0}};
+ let calls=0;
+ const adapter=createPaidCopyAdapter({read:()=>state,key:()=> 'fixture-key-not-a-real-credential',reserve:n=>{state.spend.reservedUsd+=n;},settle:(r,n)=>{state.spend.reservedUsd-=r;state.spend.spentUsd+=n;},fetch:async(...args)=>{calls++;return fetchFn(...args);}});
+ return {state,adapter,calls:()=>calls};
+}
+const input={topic:'Automatizar tarefas',architectureId:'lista',slideCount:7,brandName:'Ofensiva Criativa',tone:'Direto',defaultCta:'Comenta LINK',pains:['tempo'],goals:['organização'],avoid:['promessas']};
+const copy=n=>({slides:Array.from({length:n},(_,i)=>({title:`Card ${i+1}`,body:'Texto editável e original.'})),caption:'Legenda para revisão.',hashtags:['#OfensivaCriativa']});
+const response=(n=7)=>Response.json({usage:{prompt_tokens:200,completion_tokens:400},choices:[{finish_reason:'stop',message:{content:JSON.stringify(copy(n))}}]});
+test('API desativada não reserva nem chama rede',async()=>{const f=fixture(()=>response());f.state.settings.apiEnabled=false;await assert.rejects(()=>f.adapter(input),/desativada/);assert.equal(f.calls(),0);assert.equal(f.state.spend.reservedUsd,0);});
+test('limite por chamada e orçamento mensal incluem reservas',async()=>{const f=fixture(()=>response());f.state.settings.maxPerCallUsd=0.000001;await assert.rejects(()=>f.adapter(input),/máximo por chamada/);f.state.settings.maxPerCallUsd=0.1;f.state.spend.reservedUsd=5;await assert.rejects(()=>f.adapter(input),/mensal/);assert.equal(f.calls(),0);});
+test('sete cards respeitados, tokens limitados e gasto registado',async()=>{const f=fixture((_u,init)=>{const b=JSON.parse(init.body);assert.equal(b.max_completion_tokens,8192);assert.equal(b.store,false);assert.equal(b.temperature,undefined);assert.match(b.messages[1].content,/"slideCount":7/);return response();});const r=await f.adapter(input);assert.equal(r.copy.slides.length,7);assert.equal(r.demo,false);assert.ok(f.state.spend.spentUsd>0);assert.equal(f.state.spend.reservedUsd,0);});
+test('copy inválida ainda contabiliza consumo comunicado pelo fornecedor',async()=>{const f=fixture(()=>response(4));await assert.rejects(()=>f.adapter(input),/7 cards/);assert.ok(f.state.spend.spentUsd>0);assert.equal(f.state.spend.reservedUsd,0);});
+test('timeout mantém reserva e impede novo pedido sem saldo',async()=>{const f=fixture(()=>{throw new Error('timeout de fixture');});await assert.rejects(()=>f.adapter(input),/timeout/);assert.ok(f.state.spend.reservedUsd>0);f.state.settings.monthlyCapUsd=f.state.spend.reservedUsd;await assert.rejects(()=>f.adapter(input),/mensal/);assert.equal(f.calls(),1);});
+test('chamadas simultâneas são rejeitadas antes de gastar',async()=>{let finish;const pending=new Promise(r=>{finish=r;});const f=fixture(()=>pending);const first=f.adapter(input);await assert.rejects(()=>f.adapter(input),/em curso/);finish(response());await first;assert.equal(f.calls(),1);});
+test('consumo ausente nunca é apresentado como custo zero',async()=>{const f=fixture(()=>Response.json({choices:[{message:{content:JSON.stringify(copy(7))}}]}));const r=await f.adapter(input);assert.equal(r.costEstimated,true);assert.ok(r.costUsd>0);assert.ok(f.state.spend.reservedUsd>0);});
+test('modelo sem preço e quantidade inválida não chamam a rede',async()=>{const f=fixture(()=>response());f.state.settings.model='desconhecido';await assert.rejects(()=>f.adapter(input),/preço/);f.state.settings.model='gpt-5.4-mini';await assert.rejects(()=>f.adapter({...input,slideCount:9}),/Quantidade/);assert.equal(f.calls(),0);});

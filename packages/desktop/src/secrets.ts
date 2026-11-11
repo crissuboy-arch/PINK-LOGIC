@@ -37,6 +37,7 @@ export interface AiConnectionSettings {
 export interface AiSpend {
   month: string;
   spentUsd: number;
+  reservedUsd?: number;
 }
 
 export interface AiConnectionDiskConfig {
