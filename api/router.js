@@ -26202,7 +26202,7 @@ var init_zod = __esm({
 });
 
 // packages/shared/dist/index.js
-var BrandSchema, GenerateModuleSchema, MockupTypeSchema, MockupRequestSchema, CarouselRenderSchema, CarouselStyleSchema, GenerateRequestSchema, GenerateResultSchema, CarouselBriefSchema, CarouselDocumentSchema, PostStatusSchema, PostSchema, DecideRequestSchema, DecideResultSchema, CollectRequestSchema, PublisherPlatformSchema, ScheduledPostStatusSchema, ScheduledPostCreateSchema, ScheduledPostUpdateSchema, ScheduledPostListQuerySchema, BrandCreateSchema, BrandUpdateSchema, BrandListQuerySchema, CampaignCreateSchema, CampaignListQuerySchema, MediaImportRequestSchema, PlatformPublishResultSchema;
+var BrandSchema, GenerateModuleSchema, MockupTypeSchema, MockupRequestSchema, CarouselSizeSchema, CarouselBrandColorsSchema, CarouselRenderSchema, CarouselStyleSchema, GenerateRequestSchema, GenerateResultSchema, CarouselBriefSchema, CarouselDocumentSchema, PostStatusSchema, PostSchema, DecideRequestSchema, DecideResultSchema, CollectRequestSchema, PublisherPlatformSchema, ScheduledPostStatusSchema, ScheduledPostCreateSchema, ScheduledPostUpdateSchema, ScheduledPostListQuerySchema, BrandCreateSchema, BrandUpdateSchema, BrandListQuerySchema, CampaignCreateSchema, CampaignListQuerySchema, MediaImportRequestSchema, PlatformPublishResultSchema;
 var init_dist5 = __esm({
   "packages/shared/dist/index.js"() {
     "use strict";
@@ -26236,12 +26236,20 @@ var init_dist5 = __esm({
       projectName: external_exports.string().max(100).optional(),
       idempotencyKey: external_exports.string().max(100).optional()
     });
+    CarouselSizeSchema = external_exports.enum(["1:1", "4:5"]);
+    CarouselBrandColorsSchema = external_exports.object({
+      background: external_exports.string().max(20).optional(),
+      text: external_exports.string().max(20).optional(),
+      accent: external_exports.string().max(20).optional()
+    });
     CarouselRenderSchema = external_exports.object({
       title: external_exports.string().min(1).max(200),
       items: external_exports.array(external_exports.object({ title: external_exports.string().max(110).optional(), body: external_exports.string().max(350).optional() }).passthrough()).max(10).default([]),
       footer: external_exports.string().max(200).optional(),
       handle: external_exports.string().max(200).optional(),
-      counter: external_exports.string().max(200).optional()
+      counter: external_exports.string().max(200).optional(),
+      size: CarouselSizeSchema.default("1:1"),
+      brand: CarouselBrandColorsSchema.optional()
     });
     CarouselStyleSchema = external_exports.enum(["maestro", "clean", "bold"]);
     GenerateRequestSchema = external_exports.object({
@@ -47174,6 +47182,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
 // packages/api/dist/services/carousel-render.js
 var carousel_render_exports = {};
 __export(carousel_render_exports, {
+  CAROUSEL_SIZES: () => CAROUSEL_SIZES,
   renderCarousel: () => renderCarousel,
   renderSlide: () => renderSlide
 });
@@ -47199,6 +47208,18 @@ function loadFonts() {
     }
   ];
   return fontsCache;
+}
+function resolveTheme(options) {
+  const c2 = options.colors;
+  if (!c2 || !c2.background && !c2.text && !c2.accent) {
+    return { background: paperBackground(), ink: BLUE, accent: BLUE };
+  }
+  const ink = c2.text ?? BRAND_TEXT_DEFAULT;
+  return {
+    background: { backgroundColor: c2.background ?? "#FFFFFF" },
+    ink,
+    accent: c2.accent ?? ink
+  };
 }
 function paperBackground() {
   return {
@@ -47233,13 +47254,17 @@ function wrapText(text, maxChars) {
     lines.push(cur);
   return lines;
 }
-function slideToElement(slide) {
+function slideToElement(slide, options = {}) {
   const { title, items = [], footer, handle, counter } = slide;
+  const { width, height } = CAROUSEL_SIZES[options.size ?? "1:1"];
+  const S3 = height / 1080;
+  const theme = resolveTheme(options);
+  const { ink, accent } = theme;
   const titleLines = wrapText(title.toUpperCase(), 12);
-  const TITLE_Y = 200;
+  const TITLE_Y = Math.round(200 * S3);
   const TITLE_FS = 88;
   const TITLE_LH = 140;
-  const FOOTER_Y = 880;
+  const FOOTER_Y = Math.round(880 * S3);
   const ITEMS_TOP = TITLE_Y + titleLines.length * TITLE_LH + 24;
   const AVAIL_H = FOOTER_Y - 40 - ITEMS_TOP;
   let itemFs = 46;
@@ -47276,7 +47301,7 @@ function slideToElement(slide) {
           {
             type: "div",
             props: {
-              style: { fontFamily: "Gochi Hand", fontSize: "44px", color: BLUE },
+              style: { fontFamily: "Gochi Hand", fontSize: "44px", color: ink },
               children: handle || ""
             }
           },
@@ -47309,7 +47334,7 @@ function slideToElement(slide) {
           textAlign: "center",
           fontFamily: "Permanent Marker",
           fontSize: `${TITLE_FS}px`,
-          color: BLUE
+          color: ink
         },
         children: line
       }
@@ -47325,7 +47350,7 @@ function slideToElement(slide) {
           right: "80px",
           fontFamily: "Gochi Hand",
           fontSize: `${itemFs}px`,
-          color: BLUE
+          color: ink
         },
         children: line || " "
       }
@@ -47345,8 +47370,8 @@ function slideToElement(slide) {
             textAlign: "center",
             fontFamily: "Permanent Marker",
             fontSize: "58px",
-            color: BLUE,
-            ...i2 === 0 ? { borderTop: `6px solid ${BLUE}`, paddingTop: "24px" } : {}
+            color: accent,
+            ...i2 === 0 ? { borderTop: `6px solid ${accent}`, paddingTop: "24px" } : {}
           },
           children: line
         }
@@ -47357,35 +47382,36 @@ function slideToElement(slide) {
     type: "div",
     props: {
       style: {
-        width: "1080px",
-        height: "1080px",
+        width: `${width}px`,
+        height: `${height}px`,
         position: "relative",
         display: "flex",
         // exigido pelo satori p/ múltiplos filhos (filhos são absolutos)
-        ...paperBackground()
+        ...theme.background
       },
       children
     }
   };
 }
-async function renderSlide(slide) {
-  const svg = await Op(slideToElement(slide), {
-    width: 1080,
-    height: 1080,
+async function renderSlide(slide, options = {}) {
+  const { width, height } = CAROUSEL_SIZES[options.size ?? "1:1"];
+  const svg = await Op(slideToElement(slide, options), {
+    width,
+    height,
     fonts: loadFonts()
   });
   const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: 1080 }
+    fitTo: { mode: "width", value: width }
   });
   return Buffer.from(resvg.render().asPng());
 }
-async function renderCarousel(slides) {
+async function renderCarousel(slides, options = {}) {
   const out = [];
   for (const s of slides)
-    out.push(await renderSlide(s));
+    out.push(await renderSlide(s, options));
   return out;
 }
-var __dirname2, FONTS_DIR, fontsCache, BLUE, PAPER;
+var __dirname2, FONTS_DIR, fontsCache, CAROUSEL_SIZES, BLUE, PAPER, BRAND_TEXT_DEFAULT;
 var init_carousel_render = __esm({
   "packages/api/dist/services/carousel-render.js"() {
     "use strict";
@@ -47397,8 +47423,13 @@ var init_carousel_render = __esm({
       join2(process.cwd(), "packages", "api", "src", "fonts")
     ].find((d2) => existsSync2(join2(d2, "PermanentMarker-Regular.ttf"))) ?? join2(__dirname2, "..", "fonts");
     fontsCache = null;
+    CAROUSEL_SIZES = {
+      "1:1": { width: 1080, height: 1080 },
+      "4:5": { width: 1080, height: 1350 }
+    };
     BLUE = "#1e3fae";
     PAPER = "#f5eeda";
+    BRAND_TEXT_DEFAULT = "#071D3A";
   }
 });
 
@@ -48879,13 +48910,16 @@ async function handler19(req, res) {
   const parsed = CarouselRenderSchema.safeParse(req.body || {});
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
-    const png = await renderSlide({
-      title: parsed.data.title,
-      items: parsed.data.items,
-      footer: parsed.data.footer,
-      handle: parsed.data.handle || "",
-      counter: parsed.data.counter || ""
-    });
+    const png = await renderSlide(
+      {
+        title: parsed.data.title,
+        items: parsed.data.items,
+        footer: parsed.data.footer,
+        handle: parsed.data.handle || "",
+        counter: parsed.data.counter || ""
+      },
+      { size: parsed.data.size, colors: parsed.data.brand }
+    );
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Content-Length", png.length);
     res.status(200).send(png);

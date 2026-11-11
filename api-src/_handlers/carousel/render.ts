@@ -1,8 +1,11 @@
 /**
  * Vercel serverless: POST /api/carousel/render
- * Renderer híbrido estilo "maestro" — devolve PNG 1080×1080.
+ * Renderer híbrido estilo "maestro" — devolve PNG 1080×1080 por defeito.
  * Segurança: schema com tetos (antes sem schema nenhum), rate limit
  * por chamador e erros seguros.
+ * Opcional (Fase 1): `size` ("1:1" | "4:5", default "1:1") e `brand`
+ * ({ background, text, accent } do Brand Kit) — sem eles o render é
+ * exactamente o de antes.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "@pink-logic/api/services/auth.js";
@@ -19,13 +22,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const parsed = CarouselRenderSchema.safeParse(req.body || {});
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
-    const png = await renderSlide({
-      title: parsed.data.title,
-      items: parsed.data.items,
-      footer: parsed.data.footer,
-      handle: parsed.data.handle || "",
-      counter: parsed.data.counter || "",
-    });
+    const png = await renderSlide(
+      {
+        title: parsed.data.title,
+        items: parsed.data.items,
+        footer: parsed.data.footer,
+        handle: parsed.data.handle || "",
+        counter: parsed.data.counter || "",
+      },
+      { size: parsed.data.size, colors: parsed.data.brand },
+    );
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Content-Length", png.length);
     res.status(200).send(png);

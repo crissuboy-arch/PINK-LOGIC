@@ -57,8 +57,53 @@ export interface CarouselSlide {
   counter?: string;
 }
 
+/** Tamanhos suportados: 1:1 (1080×1080, o de sempre) e 4:5 (1080×1350). */
+export type CarouselSize = "1:1" | "4:5";
+export const CAROUSEL_SIZES: Record<CarouselSize, { width: number; height: number }> = {
+  "1:1": { width: 1080, height: 1080 },
+  "4:5": { width: 1080, height: 1350 },
+};
+
+/** Cores de marca (vindas do Brand Kit) — qualquer campo omitido usa o default. */
+export interface BrandColors {
+  background?: string;
+  text?: string;
+  accent?: string;
+}
+
+export interface RenderOptions {
+  /** Default "1:1" (comportamento actual, sem quebra). */
+  size?: CarouselSize;
+  /** Sem `colors`: estilo «maestro» actual (papel creme + azul #1e3fae). */
+  colors?: BrandColors;
+}
+
 const BLUE = "#1e3fae";
 const PAPER = "#f5eeda";
+const BRAND_TEXT_DEFAULT = "#071D3A";
+
+/**
+ * Tema resolvido: default = «maestro» (papel + tinta azul); com cores de
+ * marca = fundo sólido da marca, texto na cor da marca e acento (rodapé/
+ * sublinhado) na cor de acento. O modo marca substitui o papel pautado —
+ * o papel é identidade do estilo «maestro», não da marca.
+ */
+function resolveTheme(options: RenderOptions): {
+  background: Record<string, string>;
+  ink: string;
+  accent: string;
+} {
+  const c = options.colors;
+  if (!c || (!c.background && !c.text && !c.accent)) {
+    return { background: paperBackground(), ink: BLUE, accent: BLUE };
+  }
+  const ink = c.text ?? BRAND_TEXT_DEFAULT;
+  return {
+    background: { backgroundColor: c.background ?? "#FFFFFF" },
+    ink,
+    accent: c.accent ?? ink,
+  };
+}
 
 /**
  * Papel pautado envelhecido via CSS puro: creme + linhas + manchas de café.
@@ -103,17 +148,23 @@ function wrapText(text: string, maxChars: number): string[] {
  * Layout 100% manual com posicionamento absoluto.
  * O Satori/Yoga falha com múltiplos blocos de texto com quebra —
  * por isso calculamos cada Y nós mesmos. Determinístico.
+ * A largura é sempre 1080; só a altura muda (1:1 → 1080, 4:5 → 1350),
+ * por isso as fontes mantêm-se e só os Y (título/rodapé) escalam por S.
  */
-function slideToElement(slide: CarouselSlide) {
+function slideToElement(slide: CarouselSlide, options: RenderOptions = {}) {
   const { title, items = [], footer, handle, counter } = slide;
+  const { width, height } = CAROUSEL_SIZES[options.size ?? "1:1"];
+  const S = height / 1080;
+  const theme = resolveTheme(options);
+  const { ink, accent } = theme;
 
   const titleLines = wrapText(title.toUpperCase(), 12);
-  const TITLE_Y = 200;
+  const TITLE_Y = Math.round(200 * S);
   const TITLE_FS = 88;
   const TITLE_LH = 140;
 
   // auto-fit: se os itens não cabem, encolhe fonte/espaçamento (mín. 70%)
-  const FOOTER_Y = 880;
+  const FOOTER_Y = Math.round(880 * S);
   const ITEMS_TOP = TITLE_Y + titleLines.length * TITLE_LH + 24;
   const AVAIL_H = FOOTER_Y - 40 - ITEMS_TOP;
 
@@ -146,7 +197,7 @@ function slideToElement(slide: CarouselSlide) {
           {
             type: "div",
             props: {
-              style: { fontFamily: "Gochi Hand", fontSize: "44px", color: BLUE },
+              style: { fontFamily: "Gochi Hand", fontSize: "44px", color: ink },
               children: handle || "",
             },
           },
@@ -171,7 +222,7 @@ function slideToElement(slide: CarouselSlide) {
         style: {
           position: "absolute", top: `${TITLE_Y + i * TITLE_LH}px`,
           left: "80px", right: "80px", textAlign: "center",
-          fontFamily: "Permanent Marker", fontSize: `${TITLE_FS}px`, color: BLUE,
+          fontFamily: "Permanent Marker", fontSize: `${TITLE_FS}px`, color: ink,
         },
         children: line,
       },
@@ -183,7 +234,7 @@ function slideToElement(slide: CarouselSlide) {
         style: {
           position: "absolute", top: `${ITEMS_TOP + i * itemLh}px`,
           left: "80px", right: "80px",
-          fontFamily: "Gochi Hand", fontSize: `${itemFs}px`, color: BLUE,
+          fontFamily: "Gochi Hand", fontSize: `${itemFs}px`, color: ink,
         },
         children: line || " ",
       },
@@ -200,8 +251,8 @@ function slideToElement(slide: CarouselSlide) {
           style: {
             position: "absolute", top: `${FOOTER_Y + i * 78}px`,
             left: "80px", right: "80px", textAlign: "center",
-            fontFamily: "Permanent Marker", fontSize: "58px", color: BLUE,
-            ...(i === 0 ? { borderTop: `6px solid ${BLUE}`, paddingTop: "24px" } : {}),
+            fontFamily: "Permanent Marker", fontSize: "58px", color: accent,
+            ...(i === 0 ? { borderTop: `6px solid ${accent}`, paddingTop: "24px" } : {}),
           },
           children: line,
         },
@@ -213,31 +264,32 @@ function slideToElement(slide: CarouselSlide) {
     type: "div",
     props: {
       style: {
-        width: "1080px", height: "1080px", position: "relative",
+        width: `${width}px`, height: `${height}px`, position: "relative",
         display: "flex", // exigido pelo satori p/ múltiplos filhos (filhos são absolutos)
-        ...paperBackground(),
+        ...theme.background,
       },
       children,
     },
   } as any;
 }
 
-/** Renderiza UM slide → PNG (Buffer). */
-export async function renderSlide(slide: CarouselSlide): Promise<Buffer> {
-  const svg = await satori(slideToElement(slide), {
-    width: 1080,
-    height: 1080,
+/** Renderiza UM slide → PNG (Buffer). Sem opções: 1080×1080, estilo «maestro». */
+export async function renderSlide(slide: CarouselSlide, options: RenderOptions = {}): Promise<Buffer> {
+  const { width, height } = CAROUSEL_SIZES[options.size ?? "1:1"];
+  const svg = await satori(slideToElement(slide, options), {
+    width,
+    height,
     fonts: loadFonts(),
   });
   const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: 1080 },
+    fitTo: { mode: "width", value: width },
   });
   return Buffer.from(resvg.render().asPng());
 }
 
 /** Renderiza vários slides → array de PNGs. */
-export async function renderCarousel(slides: CarouselSlide[]): Promise<Buffer[]> {
+export async function renderCarousel(slides: CarouselSlide[], options: RenderOptions = {}): Promise<Buffer[]> {
   const out: Buffer[] = [];
-  for (const s of slides) out.push(await renderSlide(s));
+  for (const s of slides) out.push(await renderSlide(s, options));
   return out;
 }

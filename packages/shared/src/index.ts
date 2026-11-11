@@ -41,6 +41,16 @@ export const MockupRequestSchema = z.object({
 export type MockupRequest = z.infer<typeof MockupRequestSchema>;
 // Render de carrossel (Achado 3): antes sem schema nenhum — título e itens
 // sem limite. Agora com tetos iguais aos do documento de carrossel.
+// `size` e `brand` (Fase 1, Ofensiva Criativa) são opcionais: sem eles o
+// render é exactamente o de antes (1080×1080, estilo «maestro»).
+export const CarouselSizeSchema = z.enum(["1:1", "4:5"]);
+export type CarouselSize = z.infer<typeof CarouselSizeSchema>;
+export const CarouselBrandColorsSchema = z.object({
+  background: z.string().max(20).optional(),
+  text: z.string().max(20).optional(),
+  accent: z.string().max(20).optional(),
+});
+export type CarouselBrandColors = z.infer<typeof CarouselBrandColorsSchema>;
 export const CarouselRenderSchema = z.object({
   title: z.string().min(1).max(200),
   items: z
@@ -50,6 +60,8 @@ export const CarouselRenderSchema = z.object({
   footer: z.string().max(200).optional(),
   handle: z.string().max(200).optional(),
   counter: z.string().max(200).optional(),
+  size: CarouselSizeSchema.default("1:1"),
+  brand: CarouselBrandColorsSchema.optional(),
 });
 export type CarouselRender = z.infer<typeof CarouselRenderSchema>;
 export const CarouselStyleSchema = z.enum(["maestro", "clean", "bold"]);
