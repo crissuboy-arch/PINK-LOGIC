@@ -6,17 +6,19 @@ geometria em px) e desenha-o com PIL/DejaVu. É a mesma geometria que o
 drawSlideToCanvas do Editor desenha no browser; a renderização no canvas do
 browser NÃO foi executada aqui (sem browser nesta sessão).
 
-Uso: python3 scripts/render-carousel-pil.py
-Entrada: .proof/fase1-motor/demo-ofensiva/slides.json (+ cover-variants.json)
-Saída:   .proof/fase1-motor/demo-ofensiva/exports/slide-N.png|jpg, cover-*.png
+Uso: python3 scripts/render-carousel-pil.py [pasta-da-demo]
+Entrada: <pasta>/slides.json (+ cover-variants.json)
+Saída:   <pasta>/exports/slide-N.png|jpg, cover-*.png
+Sem argumento, usa .proof/fase1-motor/demo-ofensiva (compatibilidade).
 """
 import json
 import os
+import sys
 import textwrap
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEMO = os.path.join(ROOT, ".proof", "fase1-motor", "demo-ofensiva")
+DEMO = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".proof", "fase1-motor", "demo-ofensiva")
 OUT = os.path.join(DEMO, "exports")
 os.makedirs(OUT, exist_ok=True)
 

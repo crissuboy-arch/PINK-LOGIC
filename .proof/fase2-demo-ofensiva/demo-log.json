@@ -1,0 +1,118 @@
+{
+  "theme": "A IA chegou às pequenas empresas",
+  "architecture": "passo-a-passo",
+  "coverVariant": "destaque",
+  "brand": {
+    "name": "Ofensiva Criativa",
+    "slogan": "Marketing sem filtro. Resultados sem desculpa.",
+    "palette": {
+      "primary": "#103B78",
+      "secondary": "#071D3A",
+      "accent": "#D4AF37",
+      "background": "#FFFFFF",
+      "text": "#071D3A",
+      "surface": "#F5F7FA"
+    },
+    "logo": null
+  },
+  "honesty": "Sem AIsa e sem nenhuma API paga: pauta, copy, legenda e DMs são CONTEÚDO DE DEMONSTRAÇÃO composto localmente a partir de templates (não gerados por IA). Nenhuma imagem de IA por página. A marca é um fixture local; a existência da marca semeada no preview NÃO foi verificada. O fetch real ao website NÃO foi executado. A gravação real no Supabase NÃO foi executada. A renderização no canvas do browser NÃO foi executada (sem browser nesta sessão) — PNG/JPG via PIL a partir da mesma geometria do motor.",
+  "steps": [
+    {
+      "step": "Marca (Brand Kit)",
+      "status": "PARCIAL",
+      "detail": "Ofensiva Criativa — cores #103B78/#D4AF37/#FFFFFF/#071D3A/#F5F7FA, slogan «Marketing sem filtro. Resultados sem desculpa.», LOGO VAZIO (não existe ficheiro oficial). Existência no preview NÃO verificada: GET /api/brands devolveu 401 sem autenticação."
+    },
+    {
+      "step": "Entrevista + website",
+      "status": "PARCIAL",
+      "detail": "Entrevista validada sem erros (nome/cor/tom iguais ao seed). Website: extracção demonstrada sobre HTML de exemplo local (fetch real NÃO executado); nome e cor #103B78 extraídos."
+    },
+    {
+      "step": "Radar 30 → 10",
+      "status": "OK",
+      "detail": "30 pautas geradas (determinísticas, sem IA); top 10 seleccionadas. 1.ª = «Cansado da agenda vazia apesar do bom trabalho? A IA chegou às pequenas empresas resolve isto» (86)."
+    },
+    {
+      "step": "Referência + replicador",
+      "status": "OK",
+      "detail": "Estrutura «Carrossel demo Ofensiva — Fase 2» modelada e replicada para «Vendas directas sem complicação» (6 slides, mapeamento gancho→gancho)."
+    },
+    {
+      "step": "Arquitetura",
+      "status": "OK",
+      "detail": "Escolhida «Passo a passo» (6 slides) de 5 arquiteturas disponíveis (lista, antes-depois, passo-a-passo, história, mito-verdade)."
+    },
+    {
+      "step": "Copy",
+      "status": "OK",
+      "detail": "6 slides gerados por templates locais (sem IA). Capa: «A IA chegou às pequenas empresas». Fecho: «O próximo passo é teu»."
+    },
+    {
+      "step": "Capas",
+      "status": "OK",
+      "detail": "3 variantes geradas (clássica #103B78, destaque #F5F7FA, minimal #071D3A), mesmo título. Escolhida: «destaque»."
+    },
+    {
+      "step": "Cards 4:5",
+      "status": "OK",
+      "detail": "6 cards 1080×1350 produzidos pelo motor (cores da marca, nº 1/6–6/6). Consistência de marca: 0 violações."
+    },
+    {
+      "step": "Corrigir 1 card",
+      "status": "OK",
+      "detail": "Card 3 corrigido e aprovado. Antes: «Passo 2». Depois: «Passo 2 — revisto por ti». Cards 1, 2, 4, 5 e 6 intocados."
+    },
+    {
+      "step": "Revisão",
+      "status": "OK",
+      "detail": "6/6 cards aprovados (revisão por card)."
+    },
+    {
+      "step": "Gate de aprovação",
+      "status": "OK",
+      "detail": "Gate FECHADO sem aprovação → ABERTO após aprovação por Cristiane. Publicação: Instagram desactivado, Composio desactivado (nada agenda nem publica sem aprovação)."
+    },
+    {
+      "step": "Legenda + CTA + DM + PDF",
+      "status": "OK",
+      "detail": "Legenda principal + 2 variantes (curta/pergunta), 3 variantes de CTA, 3 templates de DM (resposta/seguimento/partilha), plano.pdf gerado localmente (2480 bytes)."
+    },
+    {
+      "step": "Export (ZIP)",
+      "status": "OK",
+      "detail": "ZIP de entrega: 23 ficheiros reais (910515 bytes) — 6 slides PNG+JPG 1080×1350, 3 capas PNG+JPG, caption.txt, plano.pdf, dm.txt, project.json, MANIFESTO.txt. Verificados: magia PNG/JPEG + dimensões + PDF + legenda."
+    },
+    {
+      "step": "Guardar e reabrir",
+      "status": "PARCIAL",
+      "detail": "Round-trip local do projecto (parseProject): 6 slides, card 3 corrigido, aprovado por Cristiane, arquitetura passo-a-passo — igual ao guardado. Rascunho desktop (saveDraft/loadDraft, escrita atómica): guardado e relido em disco. Gravação real no Supabase NÃO executada — requer sessão autenticada."
+    }
+  ],
+  "zipFiles": [
+    "MANIFESTO.txt",
+    "caption.txt",
+    "cover-classica.jpg",
+    "cover-classica.png",
+    "cover-destaque.jpg",
+    "cover-destaque.png",
+    "cover-minimal.jpg",
+    "cover-minimal.png",
+    "dm.txt",
+    "plano.pdf",
+    "project.json",
+    "slide-1.jpg",
+    "slide-1.png",
+    "slide-2.jpg",
+    "slide-2.png",
+    "slide-3.jpg",
+    "slide-3.png",
+    "slide-4.jpg",
+    "slide-4.png",
+    "slide-5.jpg",
+    "slide-5.png",
+    "slide-6.jpg",
+    "slide-6.png"
+  ],
+  "zipBytes": 910515,
+  "generatedAt": "2026-11-11T13:21:27.191Z"
+}
