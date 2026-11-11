@@ -1,8 +1,8 @@
 /**
  * Tipos do renderer para a ponte do preload (window.pinkLogicDesktop).
- * O web ainda NÃO usa esta API — a ligação ao editor (autosave) é Fase 2.
- * Este ficheiro só existe para o TypeScript do renderer a reconhecer quando
- * for usada.
+ * Fase 2: o hook useCarouselAutosave usa esta API para guardar/recuperar
+ * projectos de carrossel como rascunhos JSON no desktop; no browser o
+ * fallback é localStorage (nunca Supabase sem sessão autenticada).
  */
 import type { PinkLogicDesktopApi } from './preload';
 

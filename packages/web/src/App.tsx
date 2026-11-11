@@ -14,6 +14,7 @@ import Campanhas from './pages/Gestao/Campanhas';
 import Produtos from './pages/Gestao/Produtos';
 import Status from './pages/Gestao/Status';
 import Editor from './pages/Criacao/Editor';
+import CarouselFlow from './pages/Criacao/CarouselFlow';
 import CaptionStudio from './pages/Criacao/CaptionStudio';
 import { StoryCreator, CopyGenerator, StrategicVision, StickerStudio, HubModels } from './pages/Criacao/SubPages';
 import LogoStudioIA from './pages/Criacao/LogoStudioIA';
@@ -58,6 +59,7 @@ function App() {
                     
                     <Route path="criacao/editor" element={<Editor />} />
                     <Route path="criacao/carrossel" element={<Editor isCarouselOnly={true} />} />
+                    <Route path="criacao/carrossel-fluxo" element={<CarouselFlow />} />
                     <Route path="criacao/templates" element={<TemplatesPremium />} />
                     <Route path="criacao/brandkit" element={<BrandKitPro />} />
                     <Route path="criacao/story" element={<StoryCreator />} />

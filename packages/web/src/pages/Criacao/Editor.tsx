@@ -37,6 +37,7 @@ import { useCentralStore } from '../../store/CentralStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { apiPost } from '../../lib/apiClient';
 import { buildEditableCarousel, type CarouselContent, applyBrandTemplate, buildCoverVariants, applyCoverVariant, correctSlide, setSlideReviewStatus, slideTextContents, buildCaptionText, type CoverVariantId, type SlideReviewStatus } from '../../services/carouselDocument';
+import { buildPlanPdf, buildDmText } from '../../services/carouselDelivery';
 
 const getGradientCss = (color1: string, color2: string, direction: 'tb' | 'lr' | 'diag') => {
   const dirMap = {
@@ -2034,6 +2035,15 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
         brandName: activeBrandKit?.name, title: cover.title,
         caption: generatedCaption, hashtags: [],
       }));
+
+      // Fase 2 — materiais de entrega no mesmo ZIP: plano em PDF + DM.
+      const delivery = {
+        brandName: activeBrandKit?.name ?? '', title: cover.title,
+        caption: generatedCaption, hashtags: [] as string[],
+        slides: slides.map(slideTextContents), cta: '',
+      };
+      zip.file('plano.pdf', buildPlanPdf(delivery));
+      zip.file('dm.txt', buildDmText(delivery));
 
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);

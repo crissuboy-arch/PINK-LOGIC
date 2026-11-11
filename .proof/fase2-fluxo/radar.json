@@ -1,0 +1,258 @@
+{
+  "topic": "A IA chegou às pequenas empresas",
+  "generatedAt": "2026-11-11T13:18:57.831Z",
+  "pautas": [
+    {
+      "id": "pauta-01",
+      "title": "Cansado da agenda vazia apesar do bom trabalho? A IA chegou às pequenas empresas resolve isto",
+      "angle": "dor resolvida",
+      "serves": "dor: a agenda vazia apesar do bom trabalho",
+      "score": 86,
+      "scoreReason": "Serve uma dor do público («a agenda vazia apesar do bom trabalho») — base 86."
+    },
+    {
+      "id": "pauta-03",
+      "title": "Cansado de não serem encontradas online? A IA chegou às pequenas empresas resolve isto",
+      "angle": "dor resolvida",
+      "serves": "dor: não serem encontradas online",
+      "score": 86,
+      "scoreReason": "Serve uma dor do público («não serem encontradas online») — base 86."
+    },
+    {
+      "id": "pauta-05",
+      "title": "Cansado de falta de tempo para criar conteúdo? A IA chegou às pequenas empresas resolve isto",
+      "angle": "dor resolvida",
+      "serves": "dor: falta de tempo para criar conteúdo",
+      "score": 86,
+      "scoreReason": "Serve uma dor do público («falta de tempo para criar conteúdo») — base 86."
+    },
+    {
+      "id": "pauta-07",
+      "title": "A IA chegou às pequenas empresas para encher a agenda com clientes certos",
+      "angle": "objectivo",
+      "serves": "objectivo: encher a agenda com clientes certos",
+      "score": 85,
+      "scoreReason": "Serve um objectivo do público («encher a agenda com clientes certos») — base 85."
+    },
+    {
+      "id": "pauta-09",
+      "title": "A IA chegou às pequenas empresas para ser encontrada por quem procura",
+      "angle": "objectivo",
+      "serves": "objectivo: ser encontrada por quem procura",
+      "score": 85,
+      "scoreReason": "Serve um objectivo do público («ser encontrada por quem procura») — base 85."
+    },
+    {
+      "id": "pauta-11",
+      "title": "A IA chegou às pequenas empresas para vender sem complicação",
+      "angle": "objectivo",
+      "serves": "objectivo: vender sem complicação",
+      "score": 85,
+      "scoreReason": "Serve um objectivo do público («vender sem complicação») — base 85."
+    },
+    {
+      "id": "pauta-02",
+      "title": "A IA chegou às pequenas empresas para quem sofre com a agenda vazia apesar do bom trabalho",
+      "angle": "dor resolvida",
+      "serves": "dor: a agenda vazia apesar do bom trabalho",
+      "score": 84,
+      "scoreReason": "Serve uma dor do público («a agenda vazia apesar do bom trabalho») — base 84."
+    },
+    {
+      "id": "pauta-04",
+      "title": "A IA chegou às pequenas empresas para quem sofre com não serem encontradas online",
+      "angle": "dor resolvida",
+      "serves": "dor: não serem encontradas online",
+      "score": 84,
+      "scoreReason": "Serve uma dor do público («não serem encontradas online») — base 84."
+    },
+    {
+      "id": "pauta-06",
+      "title": "A IA chegou às pequenas empresas para quem sofre com falta de tempo para criar conteúdo",
+      "angle": "dor resolvida",
+      "serves": "dor: falta de tempo para criar conteúdo",
+      "score": 84,
+      "scoreReason": "Serve uma dor do público («falta de tempo para criar conteúdo») — base 84."
+    },
+    {
+      "id": "pauta-08",
+      "title": "O caminho mais curto para encher a agenda com clientes certos com A IA chegou às pequenas empresas",
+      "angle": "objectivo",
+      "serves": "objectivo: encher a agenda com clientes certos",
+      "score": 83,
+      "scoreReason": "Serve um objectivo do público («encher a agenda com clientes certos») — base 83."
+    },
+    {
+      "id": "pauta-10",
+      "title": "O caminho mais curto para ser encontrada por quem procura com A IA chegou às pequenas empresas",
+      "angle": "objectivo",
+      "serves": "objectivo: ser encontrada por quem procura",
+      "score": 83,
+      "scoreReason": "Serve um objectivo do público («ser encontrada por quem procura») — base 83."
+    },
+    {
+      "id": "pauta-12",
+      "title": "O caminho mais curto para vender sem complicação com A IA chegou às pequenas empresas",
+      "angle": "objectivo",
+      "serves": "objectivo: vender sem complicação",
+      "score": 83,
+      "scoreReason": "Serve um objectivo do público («vender sem complicação») — base 83."
+    },
+    {
+      "id": "pauta-14",
+      "title": "A IA chegou às pequenas empresas em 5 passos simples",
+      "angle": "guia prático",
+      "serves": "tema",
+      "score": 82,
+      "scoreReason": "Ângulo «guia prático» sobre o tema — base 82."
+    },
+    {
+      "id": "pauta-17",
+      "title": "Checklist: A IA chegou às pequenas empresas sem esquecer nada",
+      "angle": "checklist",
+      "serves": "tema",
+      "score": 80,
+      "scoreReason": "Ângulo «checklist» sobre o tema — base 80."
+    },
+    {
+      "id": "pauta-13",
+      "title": "O erro que quase todos cometem com A IA chegou às pequenas empresas",
+      "angle": "erro comum",
+      "serves": "tema",
+      "score": 78,
+      "scoreReason": "Ângulo «erro comum» sobre o tema — base 78."
+    },
+    {
+      "id": "pauta-16",
+      "title": "Antes e depois: o que muda com A IA chegou às pequenas empresas",
+      "angle": "antes / depois",
+      "serves": "tema",
+      "score": 76,
+      "scoreReason": "Ângulo «antes / depois» sobre o tema — base 76."
+    },
+    {
+      "id": "pauta-15",
+      "title": "A IA chegou às pequenas empresas: mito ou verdade?",
+      "angle": "mito vs verdade",
+      "serves": "tema",
+      "score": 74,
+      "scoreReason": "Ângulo «mito vs verdade» sobre o tema — base 74."
+    },
+    {
+      "id": "pauta-19",
+      "title": "A IA chegou às pequenas empresas em números: o que vale a pena saber",
+      "angle": "números",
+      "serves": "tema",
+      "score": 72,
+      "scoreReason": "Ângulo «números» sobre o tema — base 72."
+    },
+    {
+      "id": "pauta-22",
+      "title": "marketing sem filtro em 5 passos simples — e A IA chegou às pequenas empresas",
+      "angle": "guia prático",
+      "serves": "tema da marca: marketing sem filtro",
+      "score": 72,
+      "scoreReason": "Variação com tema da marca («marketing sem filtro») — base 82 − 10."
+    },
+    {
+      "id": "pauta-30",
+      "title": "IA nas pequenas empresas em 5 passos simples — e A IA chegou às pequenas empresas",
+      "angle": "guia prático",
+      "serves": "tema da marca: IA nas pequenas empresas",
+      "score": 72,
+      "scoreReason": "Variação com tema da marca («IA nas pequenas empresas») — base 82 − 10."
+    },
+    {
+      "id": "pauta-18",
+      "title": "Como A IA chegou às pequenas empresas mudou o meu trabalho",
+      "angle": "história",
+      "serves": "tema",
+      "score": 70,
+      "scoreReason": "Ângulo «história» sobre o tema — base 70."
+    },
+    {
+      "id": "pauta-25",
+      "title": "Checklist: marketing sem filtro sem esquecer nada — e A IA chegou às pequenas empresas",
+      "angle": "checklist",
+      "serves": "tema da marca: marketing sem filtro",
+      "score": 70,
+      "scoreReason": "Variação com tema da marca («marketing sem filtro») — base 80 − 10."
+    },
+    {
+      "id": "pauta-20",
+      "title": "Será que A IA chegou às pequenas empresas é para ti?",
+      "angle": "pergunta directa",
+      "serves": "tema",
+      "score": 68,
+      "scoreReason": "Ângulo «pergunta directa» sobre o tema — base 68."
+    },
+    {
+      "id": "pauta-21",
+      "title": "O erro que quase todos cometem com IA nas pequenas empresas — e A IA chegou às pequenas empresas",
+      "angle": "erro comum",
+      "serves": "tema da marca: IA nas pequenas empresas",
+      "score": 68,
+      "scoreReason": "Variação com tema da marca («IA nas pequenas empresas») — base 78 − 10."
+    },
+    {
+      "id": "pauta-29",
+      "title": "O erro que quase todos cometem com vendas directas — e A IA chegou às pequenas empresas",
+      "angle": "erro comum",
+      "serves": "tema da marca: vendas directas",
+      "score": 68,
+      "scoreReason": "Variação com tema da marca («vendas directas») — base 78 − 10."
+    },
+    {
+      "id": "pauta-24",
+      "title": "Antes e depois: o que muda com IA nas pequenas empresas — e A IA chegou às pequenas empresas",
+      "angle": "antes / depois",
+      "serves": "tema da marca: IA nas pequenas empresas",
+      "score": 66,
+      "scoreReason": "Variação com tema da marca («IA nas pequenas empresas») — base 76 − 10."
+    },
+    {
+      "id": "pauta-23",
+      "title": "vendas directas: mito ou verdade? — e A IA chegou às pequenas empresas",
+      "angle": "mito vs verdade",
+      "serves": "tema da marca: vendas directas",
+      "score": 64,
+      "scoreReason": "Variação com tema da marca («vendas directas») — base 74 − 10."
+    },
+    {
+      "id": "pauta-27",
+      "title": "IA nas pequenas empresas em números: o que vale a pena saber — e A IA chegou às pequenas empresas",
+      "angle": "números",
+      "serves": "tema da marca: IA nas pequenas empresas",
+      "score": 62,
+      "scoreReason": "Variação com tema da marca («IA nas pequenas empresas») — base 72 − 10."
+    },
+    {
+      "id": "pauta-26",
+      "title": "Como vendas directas mudou o meu trabalho — e A IA chegou às pequenas empresas",
+      "angle": "história",
+      "serves": "tema da marca: vendas directas",
+      "score": 60,
+      "scoreReason": "Variação com tema da marca («vendas directas») — base 70 − 10."
+    },
+    {
+      "id": "pauta-28",
+      "title": "Será que marketing sem filtro é para ti? — e A IA chegou às pequenas empresas",
+      "angle": "pergunta directa",
+      "serves": "tema da marca: marketing sem filtro",
+      "score": 58,
+      "scoreReason": "Variação com tema da marca («marketing sem filtro») — base 68 − 10."
+    }
+  ],
+  "selectedIds": [
+    "pauta-01",
+    "pauta-03",
+    "pauta-05",
+    "pauta-07",
+    "pauta-09",
+    "pauta-11",
+    "pauta-02",
+    "pauta-04",
+    "pauta-06",
+    "pauta-08"
+  ]
+}
