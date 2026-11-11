@@ -10,6 +10,9 @@ import { useMemo, useState } from 'react';
 import { useBrand, type BrandSchema } from '../../providers/BrandProvider';
 import { useCentralStore } from '../../store/CentralStore';
 import { useCarouselAutosave } from '../../hooks/useCarouselAutosave';
+import { useAiConnection } from '../../hooks/useAiConnection';
+import AIStatusBadge from '../../components/AIStatusBadge';
+import { generateTestCopy } from '../../services/aiConnection';
 import {
   INTERVIEW_QUESTIONS, buildBrandFromInterview, extractBrandFromWebsiteHtml,
   normalizeBrandContext, mergeBrandContext, newCarouselProject, approveProject as approveProjectFn,
@@ -17,7 +20,7 @@ import {
   type BrandLike, type CarouselFlowStep, type CarouselProject,
 } from '../../services/carouselFlow';
 import {
-  generateRadar, selectPautas, topPautas, ARCHITECTURES, generateCopy,
+  generateRadar, selectPautas, topPautas, ARCHITECTURES,
   type ArchitectureId, type RadarResult,
 } from '../../services/carouselRadar';
 import { modelReference, replicateContent, type ReferenceModel } from '../../services/carouselReference';
@@ -67,6 +70,7 @@ const OFENSIVA_CONTEXT: BrandContext = normalizeBrandContext({
 export default function CarouselFlowPage() {
   const { activeBrand, createBrand } = useBrand();
   const { activeProjectId } = useCentralStore();
+  const ai = useAiConnection();
   const [step, setStep] = useState<CarouselFlowStep>('marca');
   const [brand, setBrand] = useState<BrandLike | null>(activeBrand ? brandLikeFromSchema(activeBrand) : null);
   const [context, setContext] = useState<BrandContext>(
@@ -189,14 +193,36 @@ export default function CarouselFlowPage() {
     setRadar(selectPautas(radar, selected));
   });
 
-  const runCopy = () => run(() => {
-    if (!brand) throw new Error('Configura primeiro a marca.');
-    const copy = generateCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
-    setCaption(copy.caption);
-    setHashtags(copy.hashtags);
-    setSlides(applyBrandTemplate(brandSchema, copy.slides, { coverVariant }));
-    setNotice(`Copy gerada por templates (${copy.slides.length} slides) — revê cada card antes de aprovar.`);
-  });
+  const runCopy = async () => {
+    setError(null);
+    setNotice(null);
+    if (!brand) { setError('Configura primeiro a marca.'); return; }
+    try {
+      const result = await ai.generateCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
+      setCaption(result.copy.caption);
+      setHashtags(result.copy.hashtags);
+      setSlides(applyBrandTemplate(brandSchema, result.copy.slides, { coverVariant }));
+      setNotice(result.source === 'api'
+        ? `Copy gerada pela API da OpenAI (${result.copy.slides.length} slides, custo ~$${result.costUsd.toFixed(4)}) — revê cada card antes de aprovar.`
+        : `Copy gerada por templates (${result.copy.slides.length} slides) — conteúdo de demonstração, modo de teste. Revê cada card antes de aprovar.`);
+    } catch (e) {
+      // A API falhou (ou o gate recusou): volta aos templates locais, a dizer —
+      // excepto com a IA desligada, onde gerar seria desrespeitar a escolha.
+      if (ai.state.settings.mode === 'desligada') {
+        setError(e instanceof Error ? e.message : String(e));
+        return;
+      }
+      try {
+        const fallback = generateTestCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
+        setCaption(fallback.copy.caption);
+        setHashtags(fallback.copy.hashtags);
+        setSlides(applyBrandTemplate(brandSchema, fallback.copy.slides, { coverVariant }));
+        setNotice(`A API não gerou a copy (${e instanceof Error ? e.message : String(e)}). Gerada por templates locais (modo de teste) — nada foi gasto.`);
+      } catch (e2) {
+        setError(e2 instanceof Error ? e2.message : String(e2));
+      }
+    }
+  };
 
   const runReplicate = () => run(() => {
     if (!brand) throw new Error('Configura primeiro a marca.');
@@ -274,12 +300,28 @@ export default function CarouselFlowPage() {
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '1rem' }}>
       <h2 className="brand-font" style={{ fontSize: '1.6rem', margin: '0 0 4px' }}>Fluxo de Carrosséis</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 0.5rem', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <AIStatusBadge />
+        <span>
+          Marca → Radar → Arquitetura → Copy → Slides → Entrega.{' '}
+          {ai.status === 'teste'
+            ? 'Modo de teste: templates locais, conteúdo de demonstração — não usa os modelos da OpenAI.'
+            : ai.status === 'api'
+              ? 'API ligada: a copy pode ser gerada pela OpenAI (com limites de custo).'
+              : 'IA desligada: sem geração de copy.'}
+        </span>
+      </p>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-        Marca → Radar → Arquitetura → Copy → Slides → Entrega. Templates locais, sem IA paga.
         {autosave.storage && (
           <> Autosave: {autosave.status === 'saved-desktop' ? 'desktop' : autosave.status === 'saved-browser' ? 'browser (localStorage)' : autosave.status} {autosave.lastSavedAt ? `· ${autosave.lastSavedAt.slice(11, 19)}` : ''}.</>
         )}
       </p>
+      {ai.status === 'teste' && (
+        <p data-testid="ai-demo-banner" style={{ background: '#FFF7E0', border: '1px solid #D4AF37', borderRadius: 8, padding: '0.7rem', fontSize: '0.85rem' }}>
+          <strong>Conteúdo de demonstração — modo de teste.</strong> A copy deste fluxo é gerada por
+          templates locais e não usa os modelos da OpenAI. Para a geração real, abre «Ligação de IA».
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1rem' }}>
         {FLOW_STEPS.map((s, i) => (
@@ -395,7 +437,7 @@ export default function CarouselFlowPage() {
             {reference && <span style={{ fontSize: '0.85rem', alignSelf: 'center' }}>Referência: {reference.label} ({reference.structure.length} passos)</span>}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => { runCopy(); setStep('copy'); }}>Gerar copy →</button>
+            <button className="btn-primary" onClick={() => { void runCopy().then(() => setStep('copy')); }}>Gerar copy →</button>
             <button onClick={() => { runReplicate(); setStep('copy'); }} disabled={!reference}>Replicar da referência →</button>
           </div>
         </div>

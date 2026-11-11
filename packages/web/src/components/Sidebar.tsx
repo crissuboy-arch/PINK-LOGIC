@@ -31,7 +31,8 @@ import {
   QrCode,
   BookOpen,
   Box,
-  Users
+  Users,
+  Plug
 } from 'lucide-react';
 import PremiumLogo from './PremiumLogo';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -133,6 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
         { label: 'Radar de Tendências', icon: Lightbulb, path: '/gestao/ideias' },
         { label: 'Visão Estratégica', icon: Eye, path: '/criacao/vision' },
         { label: 'Análise IA e Status', icon: BarChart3, path: '/gestao/status' },
+        { label: 'Ligação de IA', icon: Plug, path: '/sistema/ia' },
         { label: 'Análises e Estratégia', icon: Target, path: '/estrategia' },
       ]
     }

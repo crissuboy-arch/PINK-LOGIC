@@ -1,8 +1,12 @@
 /**
  * Preload — a ÚNICA ponte entre o renderer e o main.
- * Expõe APENAS: versão da app, caminho userData, diálogos guardar/abrir e
- * leitura/escrita de ficheiros de projecto/rascunho. Nada de fs, process ou
- * Node no renderer.
+ * Expõe APENAS: versão da app, caminho userData, diálogos guardar/abrir,
+ * leitura/escrita de ficheiros de projecto/rascunho e a ligação de IA
+ * (Fase 3). Nada de fs, process ou Node no renderer.
+ *
+ * Ligação de IA: o renderer NUNCA recebe a chave. O main cifra/guarda a
+ * chave com safeStorage (secrets.ts) e faz as chamadas à OpenAI (aiApi.ts);
+ * o renderer só vê o estado público (tem chave? qual o modo? quanto gastou?).
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -16,6 +20,58 @@ export interface Draft extends DraftMeta {
   data: unknown;
 }
 
+export type AiConnectionMode = 'teste' | 'api' | 'desligada';
+export type AiKeyStorageKind = 'safeStorage' | 'memory-only' | 'none';
+
+export interface AiConnectionPublicState {
+  settings: {
+    mode: AiConnectionMode;
+    apiEnabled: boolean;
+    monthlyCapUsd: number;
+    maxPerCallUsd: number;
+    model: string;
+  };
+  hasKey: boolean;
+  keyHint: string | null;
+  storage: AiKeyStorageKind;
+  lastTestedAt: string | null;
+  lastTestOk: boolean | null;
+  spend: { month: string; spentUsd: number };
+}
+
+export interface AiSaveKeyResult {
+  stored: boolean;
+  storage: AiKeyStorageKind;
+  /** null quando guardou; senão a mensagem (ex.: fallback só-em-memória). */
+  error: string | null;
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  modelCount: number;
+  models: string[];
+  checkedAt: string;
+  error: string | null;
+}
+
+export interface AiGenerateCopyInput {
+  topic: string;
+  architectureId: string;
+  brandName: string;
+  tone: string;
+  defaultCta: string;
+  pains: string[];
+  goals: string[];
+  avoid: string[];
+}
+
+export interface AiGenerateCopyResult {
+  copy: { slides: { title: string; body: string }[]; caption: string; hashtags: string[] };
+  source: 'api';
+  demo: false;
+  costUsd: number;
+}
+
 export interface PinkLogicDesktopApi {
   getVersion(): Promise<string>;
   getUserDataPath(): Promise<string>;
@@ -27,6 +83,16 @@ export interface PinkLogicDesktopApi {
   showOpenDialog(): Promise<{ canceled: boolean; filePaths: string[] }>;
   readProjectFile(filePath: string): Promise<string>;
   writeProjectFile(filePath: string, contents: string): Promise<boolean>;
+  /** Estado público da ligação de IA (nunca inclui a chave). */
+  getAiConnection(): Promise<AiConnectionPublicState>;
+  /** Guarda a chave cifrada com safeStorage (ou recusa, ver secrets.ts). */
+  saveAiApiKey(key: string): Promise<AiSaveKeyResult>;
+  clearAiApiKey(): Promise<boolean>;
+  saveAiConnectionSettings(settings: AiConnectionPublicState['settings']): Promise<AiConnectionPublicState>;
+  /** Teste de ligação de custo zero (GET /v1/models, feito no main). */
+  testAiConnection(): Promise<AiTestResult>;
+  /** Geração real de copy no main (atrás do gate; recusada sem chave/opt-in). */
+  generateAiCopy(input: AiGenerateCopyInput): Promise<AiGenerateCopyResult>;
 }
 
 const api: PinkLogicDesktopApi = {
@@ -41,6 +107,12 @@ const api: PinkLogicDesktopApi = {
   readProjectFile: (filePath) => ipcRenderer.invoke('pink-logic:read-project-file', filePath),
   writeProjectFile: (filePath, contents) =>
     ipcRenderer.invoke('pink-logic:write-project-file', filePath, contents),
+  getAiConnection: () => ipcRenderer.invoke('pink-logic:ai-get'),
+  saveAiApiKey: (key) => ipcRenderer.invoke('pink-logic:ai-save-key', key),
+  clearAiApiKey: () => ipcRenderer.invoke('pink-logic:ai-clear-key'),
+  saveAiConnectionSettings: (settings) => ipcRenderer.invoke('pink-logic:ai-save-settings', settings),
+  testAiConnection: () => ipcRenderer.invoke('pink-logic:ai-test'),
+  generateAiCopy: (input) => ipcRenderer.invoke('pink-logic:ai-generate-copy', input),
 };
 
 contextBridge.exposeInMainWorld('pinkLogicDesktop', api);

@@ -8,6 +8,11 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { deleteDraft, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
+import {
+  clearApiKey, encryptionAvailable, keyHintFromStored, loadDiskConfig,
+  saveDiskConfig, storeApiKey, type AiConnectionDiskConfig,
+} from './secrets';
+import { generateCopyMain, testAiConnectionMain, type MainCopyInput } from './aiApi';
 
 const isSelfTest = process.env.PINK_DESKTOP_SELFTEST === '1';
 const selfTestOut = process.env.PINK_DESKTOP_SELFTEST_OUT || '';
@@ -93,6 +98,65 @@ function registerIpc(): void {
     fs.writeFileSync(filePath, contents, 'utf8');
     return true;
   });
+
+  // Ligação de IA (Fase 3) — o renderer nunca recebe a chave; o main cifra
+  // (safeStorage), guarda e faz as chamadas à OpenAI. O estado devolvido é
+  // sempre público (ver publicStatus em aiConnection.ts).
+  const publicAiState = () => {
+    const userData = app.getPath('userData');
+    const config = loadDiskConfig(userData);
+    return {
+      settings: config.settings,
+      hasKey: config.encryptedKey !== null,
+      keyHint: keyHintFromStored(userData),
+      storage: config.storage,
+      lastTestedAt: config.lastTestedAt,
+      lastTestOk: config.lastTestOk,
+      spend: config.spend,
+    };
+  };
+  ipcMain.handle('pink-logic:ai-get', () => publicAiState());
+  ipcMain.handle('pink-logic:ai-save-key', (_e, key: string) => {
+    const userData = app.getPath('userData');
+    if (typeof key !== 'string' || !/^sk-[A-Za-z0-9_-]{20,}$/.test(key.trim())) {
+      return { stored: false, storage: 'none' as const, error: 'A chave não tem o formato esperado (começa por «sk-»).' };
+    }
+    const result = storeApiKey(userData, key.trim());
+    return { stored: result.stored, storage: result.storage, error: result.error ?? null };
+  });
+  ipcMain.handle('pink-logic:ai-clear-key', () => {
+    clearApiKey(app.getPath('userData'));
+    return true;
+  });
+  ipcMain.handle('pink-logic:ai-save-settings', (_e, settings: AiConnectionDiskConfig['settings']) => {
+    const userData = app.getPath('userData');
+    const config = loadDiskConfig(userData);
+    const monthly = Number(settings?.monthlyCapUsd);
+    const perCall = Number(settings?.maxPerCallUsd);
+    if (!Number.isFinite(monthly) || monthly <= 0 || monthly > 1000) throw new Error('O teto mensal tem de estar entre 0 e 1000 USD.');
+    if (!Number.isFinite(perCall) || perCall <= 0 || perCall > 10) throw new Error('O máximo por chamada tem de estar entre 0 e 10 USD.');
+    if (perCall > monthly) throw new Error('O máximo por chamada não pode ser maior que o teto mensal.');
+    if (!['teste', 'api', 'desligada'].includes(settings?.mode)) throw new Error('Modo de IA desconhecido.');
+    if (!['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'].includes(settings?.model)) throw new Error('Modelo desconhecido.');
+    config.settings = {
+      mode: settings.mode,
+      apiEnabled: settings.apiEnabled === true,
+      monthlyCapUsd: monthly,
+      maxPerCallUsd: perCall,
+      model: settings.model,
+    };
+    // Sem chave guardada, o armazenamento seguro não se aplica; se a
+    // encriptação não estiver disponível, o estado diz 'none' (a chave, se
+    // existir, só vive em memória no renderer — ver useAiConnection).
+    if (!config.encryptedKey) config.storage = 'none';
+    else if (!encryptionAvailable()) config.storage = 'memory-only';
+    saveDiskConfig(userData, config);
+    return publicAiState();
+  });
+  ipcMain.handle('pink-logic:ai-test', () => testAiConnectionMain(app.getPath('userData')));
+  ipcMain.handle('pink-logic:ai-generate-copy', (_e, input: MainCopyInput) =>
+    generateCopyMain(app.getPath('userData'), input),
+  );
 }
 
 /**

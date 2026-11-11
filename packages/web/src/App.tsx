@@ -26,6 +26,7 @@ import TemplatesPremium from './pages/Criacao/TemplatesPremium';
 import Estrategia from './pages/Estrategia';
 import { MeusProjetos } from './pages/Biblioteca/SubPages';
 import Login from './pages/Auth/Login';
+import AIConnectionPage from './pages/Settings/AIConnection';
 import AgentDashboard from './pages/System/AgentDashboard';
 import ExecutionDashboard from './pages/Sistema/ExecutionDashboard';
 
@@ -76,6 +77,7 @@ function App() {
                     <Route path="estrategia" element={<Estrategia />} />
                     <Route path="biblioteca" element={<MeusProjetos />} />
                     <Route path="sistema/agentes" element={<AgentDashboard />} />
+                    <Route path="sistema/ia" element={<AIConnectionPage />} />
                     <Route path="sistema/execucao" element={<ExecutionDashboard />} />
                   </Route>
                 </Routes>

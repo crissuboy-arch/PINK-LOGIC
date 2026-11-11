@@ -10,16 +10,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CarouselProject } from '../services/carouselFlow';
 import { parseProject, serializeProject } from '../services/carouselFlow';
 
-/** Ponte mínima do preload (o renderer.d.ts vive no package desktop). */
-declare global {
-  interface Window {
-    pinkLogicDesktop?: {
-      saveDraft(draft: { id: string; title: string; data: unknown }): Promise<{ id: string; title: string; updatedAt: string }>;
-      loadDraft(id: string): Promise<{ id: string; title: string; updatedAt: string; data: unknown } | null>;
-    };
-  }
-}
-
 export type AutosaveStatus =
   | 'idle'
   | 'saving'
