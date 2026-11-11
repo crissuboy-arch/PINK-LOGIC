@@ -32,14 +32,14 @@ rmSync(userDataDir, { recursive: true, force: true });
 // 1. Builds (VITE_API_URL explícita p/ o desktop apontar p/ a API Vercel;
 // VITE_PINK_DESKTOP_SELFTEST=1 activa SÓ neste bundle a sessão local de
 // demonstração do self-test — ver authService; o pack:win normal não a define).
-run('npm', ['run', 'build', '--workspace=@pink-logic/web'], {
+run(process.execPath, [process.env.npm_execpath, 'run', 'build', '--workspace=@pink-logic/web'], {
   env: { ...process.env, VITE_API_URL: 'https://pink-logic.vercel.app', VITE_PINK_DESKTOP_SELFTEST: '1' },
 });
-run('npm', ['run', 'build', '--workspace=@pink-logic/desktop']);
-run('npm', ['run', 'build:web', '--workspace=@pink-logic/desktop']);
+run(process.execPath, [process.env.npm_execpath, 'run', 'build', '--workspace=@pink-logic/desktop']);
+run(process.execPath, [process.env.npm_execpath, 'run', 'build:web', '--workspace=@pink-logic/desktop']);
 
 // 2. Electron + self-test (xvfb-run se existir; senão tenta directo).
-const electronBin = join(repoRoot, 'node_modules', '.bin', 'electron');
+const electronBin = process.platform === 'win32' ? join(repoRoot, 'node_modules', 'electron', 'dist', 'electron.exe') : join(repoRoot, 'node_modules', '.bin', 'electron');
 const proofProject = join(repoRoot, '.proof', 'fase3-primeira-prova', 'project.json');
 const env = {
   ...process.env,
