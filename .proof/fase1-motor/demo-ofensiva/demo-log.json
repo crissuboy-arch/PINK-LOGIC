@@ -1,0 +1,81 @@
+{
+  "theme": "Como a inteligência artificial está a transformar o marketing das pequenas empresas",
+  "pauta": [
+    "A IA chegou às pequenas empresas",
+    "Atendimento sem parar",
+    "Conteúdo em minutos",
+    "Anúncios mais certeiros",
+    "O próximo passo é teu"
+  ],
+  "brand": {
+    "name": "Ofensiva Criativa",
+    "slogan": "Marketing sem filtro. Resultados sem desculpa.",
+    "palette": {
+      "primary": "#103B78",
+      "secondary": "#071D3A",
+      "accent": "#D4AF37",
+      "background": "#071D3A",
+      "text": "#FFFFFF",
+      "surface": "#F5F7FA"
+    },
+    "logo": null
+  },
+  "honesty": "Sem AIsa e sem nenhuma API paga: pauta, roteiro, copy e legenda são CONTEÚDO DE DEMONSTRAÇÃO escrito localmente a partir de templates (não gerados por IA). Nenhuma imagem de IA por página. A marca é um fixture local; a existência da marca semeada no preview NÃO foi verificada (GET /api/brands devolveu 401 sem autenticação). A gravação real no Supabase NÃO foi executada.",
+  "steps": [
+    {
+      "step": "Selecionar a marca",
+      "status": "PARCIAL",
+      "detail": "Ofensiva Criativa — fixture local (cores #103B78/#D4AF37/#FFFFFF/#071D3A/#F5F7FA, sem logótipo). Existência no preview NÃO verificada: GET /api/brands devolveu 401 sem autenticação."
+    },
+    {
+      "step": "Pauta",
+      "status": "OK",
+      "detail": "Tema: «Como a inteligência artificial está a transformar o marketing das pequenas empresas». 5 pontos definidos localmente (conteúdo de demonstração, sem IA)."
+    },
+    {
+      "step": "Roteiro",
+      "status": "OK",
+      "detail": "5 pares título/corpo escritos localmente (conteúdo de demonstração, sem IA)."
+    },
+    {
+      "step": "Rever textos",
+      "status": "OK",
+      "detail": "5 cards produzidos pelo motor (1080x1350, cores da marca). Aprovados: 1, 2, 4, 5. Card 3: pendente, a corrigir."
+    },
+    {
+      "step": "Escolher capa",
+      "status": "OK",
+      "detail": "3 variantes geradas (clássica #103B78, destaque #F5F7FA, minimal #071D3A), mesmo título. Escolhida: «destaque». Restantes 4 cards intactos (mesmos objetos)."
+    },
+    {
+      "step": "Produzir 5 cards",
+      "status": "OK",
+      "detail": "5 cards 1080x1350 com fundo/cor da marca, hierarquia tipográfica e nº 1/5–5/5."
+    },
+    {
+      "step": "Corrigir 1 card",
+      "status": "OK",
+      "detail": "Card 3 corrigido e aprovado. Antes: «2. Conteúdo em minutos». Depois: «2. Conteúdo em minutos, com a tua voz». Cards 1, 2, 4 e 5 intocados."
+    },
+    {
+      "step": "Criar legenda",
+      "status": "OK",
+      "detail": "caption.txt escrito localmente (conteúdo de demonstração, sem IA), com hashtags e aviso de demonstração."
+    },
+    {
+      "step": "Exportar os 5 cards",
+      "status": "OK",
+      "detail": "Documento guardado em slides.json; renderização PNG/JPG + ZIP feita pelos scripts render-carousel-pil.py e zip-carousel-demo.mjs (ver demo-log.json e o ZIP)."
+    },
+    {
+      "step": "Guardar projeto, fechar e reabrir",
+      "status": "PARCIAL",
+      "detail": "Round-trip local do documento JSON: guardado e relido sem diferenças (5 slides, card 3 aprovado com correctedAt). Gravação real no Supabase (pl_editor_documents) NÃO executada — requer sessão autenticada."
+    },
+    {
+      "step": "Confirmar persistência",
+      "status": "PARCIAL",
+      "detail": "O documento relido é igual ao guardado (deepEqual PASS). A persistência no Supabase continua por verificar numa sessão autenticada."
+    }
+  ]
+}
