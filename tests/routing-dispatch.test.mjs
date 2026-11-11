@@ -216,6 +216,91 @@ test('router: schedule POST com auth e body válido → 503 (chega ao serviço; 
   assert.equal(res.statusCode, 503);
 });
 
+// --- brands (ChatGPT) ----------------------------------------------------
+test('router: brands GET sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'brands' }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: brands GET com auth → 503 (chega ao listBrands; sem dono/base)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'brands', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: brands POST sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'brands', body: { name: 'X' } }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: brands POST com auth e body inválido → 400 (falta o nome)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'brands', headers: SERVICE_AUTH, body: {} }));
+  assert.equal(res.statusCode, 400);
+});
+
+test('router: brands POST com auth e body válido → 503 (chega ao createBrand; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'brands', headers: SERVICE_AUTH, body: { name: 'Marca Teste' } }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: brands/:id GET sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'brands/abc-123' }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: brands/:id GET com auth → 503 (chega ao getBrand; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'brands/abc-123', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: brands/:id PUT com auth → 405 "Só GET"', async () => {
+  const res = await call(fakeReq({ method: 'PUT', path: 'brands/abc-123', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 405);
+  assert.match(res.body.error, /Só GET/);
+});
+
+// --- campaigns (ChatGPT) -------------------------------------------------
+test('router: campaigns GET sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'campaigns' }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: campaigns GET com auth → 503 (chega ao listCampaigns; sem dono/base)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'campaigns', headers: SERVICE_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: campaigns POST com auth e body inválido → 400 (falta o nome)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'campaigns', headers: SERVICE_AUTH, body: {} }));
+  assert.equal(res.statusCode, 400);
+});
+
+test('router: campaigns POST com auth e body válido → 503 (chega ao createCampaign; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'campaigns', headers: SERVICE_AUTH, body: { name: 'Campanha Teste' } }));
+  assert.equal(res.statusCode, 503);
+});
+
+// --- media/import (ChatGPT) ----------------------------------------------
+test('router: media/import GET → 405 "Só POST" (método antes da auth)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'media/import' }));
+  assert.equal(res.statusCode, 405);
+  assert.match(res.body.error, /Só POST/);
+});
+
+test('router: media/import POST sem auth → 401', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'media/import', body: { url: 'https://example.com/a.png' } }));
+  assert.equal(res.statusCode, 401);
+});
+
+test('router: media/import POST com auth e body inválido → 400 (URL inválida)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'media/import', headers: SERVICE_AUTH, body: { url: 'não-url' } }));
+  assert.equal(res.statusCode, 400);
+});
+
+test('router: media/import POST com auth e body válido → 503 (chega ao importMedia; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'media/import', headers: SERVICE_AUTH, body: { url: 'https://example.com/a.png' } }));
+  assert.equal(res.statusCode, 503);
+});
+
 // --- desconhecidos / vazios ----------------------------------------------
 test('router: ação desconhecida → 404', async () => {
   const res = await call(fakeReq({ method: 'GET', path: 'posts/abc-123/unknown', headers: SERVICE_AUTH }));

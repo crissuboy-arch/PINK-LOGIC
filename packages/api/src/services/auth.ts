@@ -3,7 +3,10 @@
  *
  * Aceita dois tipos de credencial no header `Authorization: Bearer <token>`:
  *  - token de sessão do Supabase Auth (utilizador logado no site) → { kind: "user" }
- *  - PINK_LOGIC_SERVICE_KEY (Athena/MCP, servidor-a-servidor) → { kind: "service" }
+ *  - chave de serviço (Athena/MCP: PINK_LOGIC_SERVICE_KEY; ChatGPT:
+ *    PINK_LOGIC_CHATGPT_KEY) → { kind: "service" }
+ * As duas chaves de serviço são independentes: o GPT tem a sua, a Athena
+ * tem a sua — revogar uma não toca na outra.
  *
  * Fecha por omissão: sem credencial válida → 401; sem config no servidor → 503.
  */
@@ -30,10 +33,14 @@ function supabaseUrl(): string | null {
 }
 
 function isServiceKey(token: string): boolean {
-  const key = process.env.PINK_LOGIC_SERVICE_KEY || "";
-  if (key.length < 32) return false; // chave ausente ou fraca nunca autentica
-  // Compara digests (mesmo tamanho) em tempo constante.
-  return timingSafeEqual(sha256(token), sha256(key));
+  // Qualquer das chaves de serviço vale (≥32 chars cada; chave ausente
+  // ou fraca nunca autentica). Comparação em tempo constante por chave.
+  for (const raw of [process.env.PINK_LOGIC_SERVICE_KEY || "", process.env.PINK_LOGIC_CHATGPT_KEY || ""]) {
+    const key = raw.trim();
+    if (key.length < 32) continue;
+    if (timingSafeEqual(sha256(token), sha256(key))) return true;
+  }
+  return false;
 }
 
 export async function authenticate(authorization: string | undefined): Promise<AuthResult> {

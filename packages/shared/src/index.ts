@@ -186,6 +186,75 @@ export const ScheduledPostListQuerySchema = z.object({
 });
 export type ScheduledPostListQuery = z.infer<typeof ScheduledPostListQuerySchema>;
 
+// ─── Brand Kit / campanhas — API /api/brands + /api/campaigns (ChatGPT) ──
+// Estes schemas espelham as COLUNAS das tabelas `brands` e `campaigns`
+// (supabase/migrations/20260607000000 + 20261008113719). NÃO confundir
+// com o BrandSchema do web (forma da UI, com `muted`/`voiceTone`/etc.).
+export const BrandCreateSchema = z.object({
+  projectId: z.string().uuid().optional(), // omitido → primeiro projeto do dono
+  name: z.string().min(1).max(100),
+  colors: z
+    .object({
+      primary: z.string().max(20).optional(),
+      secondary: z.string().max(20).optional(),
+      accent: z.string().max(20).optional(),
+      background: z.string().max(20).optional(),
+      text: z.string().max(20).optional(),
+      glow: z.string().max(20).optional(),
+    })
+    .optional(),
+  fonts: z
+    .object({ heading: z.string().max(100).optional(), body: z.string().max(100).optional() })
+    .optional(),
+  hashtags: z.array(z.string().max(80)).max(30).default([]),
+  cta: z.string().max(200).default(""),
+  tone: z.string().max(200).default(""),
+  style: z.string().max(200).default(""),
+  overlays: z.array(z.string().max(200)).max(20).default([]),
+  logo: z.string().url().max(2000).optional(),
+  avatar: z.string().max(2000).optional(),
+  secondary_colors: z.array(z.string().max(20)).max(10).default([]),
+  social_links: z.record(z.string().max(500)).default({}),
+  brand_dna: z.record(z.unknown()).default({}),
+});
+export type BrandCreate = z.infer<typeof BrandCreateSchema>;
+
+export const BrandUpdateSchema = BrandCreateSchema.partial().omit({ projectId: true });
+export type BrandUpdate = z.infer<typeof BrandUpdateSchema>;
+
+export const BrandListQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type BrandListQuery = z.infer<typeof BrandListQuerySchema>;
+
+export const CampaignCreateSchema = z.object({
+  projectId: z.string().uuid().optional(), // omitido → primeiro projeto do dono
+  name: z.string().min(1).max(200),
+  main_product: z.string().max(200).optional(),
+  secondary_product: z.string().max(200).optional(),
+  message: z.string().max(2000).optional(),
+  status: z.string().max(30).default("draft"),
+  goal: z.string().max(500).optional(),
+  cta: z.string().max(200).optional(),
+  start_date: z.string().datetime().optional(),
+  linked_post_ids: z.array(z.string().uuid()).max(500).default([]),
+});
+export type CampaignCreate = z.infer<typeof CampaignCreateSchema>;
+
+export const CampaignListQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type CampaignListQuery = z.infer<typeof CampaignListQuerySchema>;
+
+// ─── Import de imagem — POST /api/media/import (ChatGPT) ────────────────
+export const MediaImportRequestSchema = z.object({
+  url: z.string().url().max(2000), // link público (ex.: openaiFileIdRefs do ChatGPT)
+  filename: z.string().max(100).optional(),
+});
+export type MediaImportRequest = z.infer<typeof MediaImportRequestSchema>;
+
 // Resultado da publicação na Meta Graph API (Instagram e/ou Facebook).
 export const PlatformPublishResultSchema = z.object({
   ok: z.boolean(),

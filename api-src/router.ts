@@ -20,6 +20,10 @@
  *  - posts (base): GET/POST, auth + rate limit geral;
  *  - posts/:id: GET/PATCH/DELETE, auth;
  *  - posts/:id/approve|publish|schedule: POST, 405 antes da auth;
+ *  - brands (base): GET/POST, auth + rate limit geral (ChatGPT);
+ *  - brands/:id: GET, auth (ChatGPT);
+ *  - campaigns (base): GET/POST, auth + rate limit geral (ChatGPT);
+ *  - media/import: POST, 405 antes da auth (ChatGPT);
  *  - integrations/health: pública, qualquer método;
  *  - integrations/stats: só GET, Bearer PINKLOGIC_ATHENA_API_KEY;
  *  - auth/owner-status: só GET, auth (devolve só { isOwner });
@@ -46,6 +50,10 @@ import postsDetail from "./_handlers/posts/[id].js";
 import postsApprove from "./_handlers/posts/approve.js";
 import postsPublish from "./_handlers/posts/publish.js";
 import postsSchedule from "./_handlers/posts/schedule.js";
+import brandsIndex from "./_handlers/brands/index.js";
+import brandsDetail from "./_handlers/brands/[id].js";
+import campaignsIndex from "./_handlers/campaigns/index.js";
+import mediaImport from "./_handlers/media/import.js";
 import integrationsHealth from "./_handlers/integrations/health.js";
 import integrationsStats from "./_handlers/integrations/stats.js";
 import ownerStatus from "./_handlers/auth/owner-status.js";
@@ -133,6 +141,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(404).json({ error: "Rota não encontrada." });
   }
 
+  // --- brands (ChatGPT) -------------------------------------------------
+  if (first === "brands") {
+    if (segments.length === 1) {
+      plain();
+      return brandsIndex(req, res);
+    }
+    if (segments.length === 2) {
+      withId(second);
+      return brandsDetail(req, res);
+    }
+    return res.status(404).json({ error: "Rota não encontrada." });
+  }
+
+  // --- campaigns (ChatGPT) ----------------------------------------------
+  if (first === "campaigns") {
+    if (segments.length === 1) {
+      plain();
+      return campaignsIndex(req, res);
+    }
+    return res.status(404).json({ error: "Rota não encontrada." });
+  }
+
   // --- integrations ------------------------------------------------------
   if (first === "integrations" && segments.length === 2) {
     plain();
@@ -146,6 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (first === "auth" && second === "owner-status") return ownerStatus(req, res);
     if (first === "cron" && second === "publish") return cronPublish(req, res);
     if (first === "carousel" && second === "render") return carouselRender(req, res);
+    if (first === "media" && second === "import") return mediaImport(req, res);
   }
 
   // --- rotas de 1 segmento -----------------------------------------------

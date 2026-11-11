@@ -18011,7 +18011,7 @@ var init_zod = __esm({
 });
 
 // packages/shared/dist/index.js
-var BrandSchema, GenerateModuleSchema, MockupTypeSchema, MockupRequestSchema, CarouselRenderSchema, CarouselStyleSchema, GenerateRequestSchema, GenerateResultSchema, CarouselBriefSchema, CarouselDocumentSchema, PostStatusSchema, PostSchema, DecideRequestSchema, DecideResultSchema, CollectRequestSchema, PublisherPlatformSchema, ScheduledPostStatusSchema, ScheduledPostCreateSchema, ScheduledPostUpdateSchema, ScheduledPostListQuerySchema, PlatformPublishResultSchema;
+var BrandSchema, GenerateModuleSchema, MockupTypeSchema, MockupRequestSchema, CarouselRenderSchema, CarouselStyleSchema, GenerateRequestSchema, GenerateResultSchema, CarouselBriefSchema, CarouselDocumentSchema, PostStatusSchema, PostSchema, DecideRequestSchema, DecideResultSchema, CollectRequestSchema, PublisherPlatformSchema, ScheduledPostStatusSchema, ScheduledPostCreateSchema, ScheduledPostUpdateSchema, ScheduledPostListQuerySchema, BrandCreateSchema, BrandUpdateSchema, BrandListQuerySchema, CampaignCreateSchema, CampaignListQuerySchema, MediaImportRequestSchema, PlatformPublishResultSchema;
 var init_dist = __esm({
   "packages/shared/dist/index.js"() {
     "use strict";
@@ -18158,12 +18158,198 @@ var init_dist = __esm({
       to: external_exports.string().datetime().optional(),
       limit: external_exports.coerce.number().int().min(1).max(200).default(50)
     });
+    BrandCreateSchema = external_exports.object({
+      projectId: external_exports.string().uuid().optional(),
+      // omitido → primeiro projeto do dono
+      name: external_exports.string().min(1).max(100),
+      colors: external_exports.object({
+        primary: external_exports.string().max(20).optional(),
+        secondary: external_exports.string().max(20).optional(),
+        accent: external_exports.string().max(20).optional(),
+        background: external_exports.string().max(20).optional(),
+        text: external_exports.string().max(20).optional(),
+        glow: external_exports.string().max(20).optional()
+      }).optional(),
+      fonts: external_exports.object({ heading: external_exports.string().max(100).optional(), body: external_exports.string().max(100).optional() }).optional(),
+      hashtags: external_exports.array(external_exports.string().max(80)).max(30).default([]),
+      cta: external_exports.string().max(200).default(""),
+      tone: external_exports.string().max(200).default(""),
+      style: external_exports.string().max(200).default(""),
+      overlays: external_exports.array(external_exports.string().max(200)).max(20).default([]),
+      logo: external_exports.string().url().max(2e3).optional(),
+      avatar: external_exports.string().max(2e3).optional(),
+      secondary_colors: external_exports.array(external_exports.string().max(20)).max(10).default([]),
+      social_links: external_exports.record(external_exports.string().max(500)).default({}),
+      brand_dna: external_exports.record(external_exports.unknown()).default({})
+    });
+    BrandUpdateSchema = BrandCreateSchema.partial().omit({ projectId: true });
+    BrandListQuerySchema = external_exports.object({
+      projectId: external_exports.string().uuid().optional(),
+      limit: external_exports.coerce.number().int().min(1).max(200).default(50)
+    });
+    CampaignCreateSchema = external_exports.object({
+      projectId: external_exports.string().uuid().optional(),
+      // omitido → primeiro projeto do dono
+      name: external_exports.string().min(1).max(200),
+      main_product: external_exports.string().max(200).optional(),
+      secondary_product: external_exports.string().max(200).optional(),
+      message: external_exports.string().max(2e3).optional(),
+      status: external_exports.string().max(30).default("draft"),
+      goal: external_exports.string().max(500).optional(),
+      cta: external_exports.string().max(200).optional(),
+      start_date: external_exports.string().datetime().optional(),
+      linked_post_ids: external_exports.array(external_exports.string().uuid()).max(500).default([])
+    });
+    CampaignListQuerySchema = external_exports.object({
+      projectId: external_exports.string().uuid().optional(),
+      limit: external_exports.coerce.number().int().min(1).max(200).default(50)
+    });
+    MediaImportRequestSchema = external_exports.object({
+      url: external_exports.string().url().max(2e3),
+      // link público (ex.: openaiFileIdRefs do ChatGPT)
+      filename: external_exports.string().max(100).optional()
+    });
     PlatformPublishResultSchema = external_exports.object({
       ok: external_exports.boolean(),
       id: external_exports.string().optional(),
       // ig_media_id ou fb_post_id
       error: external_exports.string().optional()
     });
+  }
+});
+
+// packages/api/dist/services/ssrf.js
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+function httpError6(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+function isPrivateIPv4(ip) {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255))
+    return false;
+  const [a, b] = parts;
+  if (a === 10)
+    return true;
+  if (a === 172 && b >= 16 && b <= 31)
+    return true;
+  if (a === 192 && b === 168)
+    return true;
+  if (a === 127)
+    return true;
+  if (a === 169 && b === 254)
+    return true;
+  if (a === 0)
+    return true;
+  if (a === 100 && b >= 64 && b <= 127)
+    return true;
+  if (a === 192 && b === 0)
+    return true;
+  if (a === 198 && (b === 18 || b === 19))
+    return true;
+  if (a === 198 && b === 51 && parts[2] === 100)
+    return true;
+  if (a === 203 && b === 0 && parts[2] === 113)
+    return true;
+  if (a >= 240)
+    return true;
+  return false;
+}
+function isPrivateIPv6(ip) {
+  const h2 = ip.toLowerCase();
+  if (h2 === "::1" || h2 === "::")
+    return true;
+  if (h2.startsWith("fe8") || h2.startsWith("fe9") || h2.startsWith("fea") || h2.startsWith("feb"))
+    return true;
+  if (h2.startsWith("fc") || h2.startsWith("fd"))
+    return true;
+  if (h2.startsWith("::ffff:")) {
+    const v4 = h2.slice("::ffff:".length);
+    if (isIP(v4) === 4)
+      return isPrivateIPv4(v4);
+  }
+  return false;
+}
+function isBlockedIp(ip) {
+  const v2 = isIP(ip);
+  if (v2 === 4)
+    return isPrivateIPv4(ip);
+  if (v2 === 6)
+    return isPrivateIPv6(ip);
+  return false;
+}
+function isBlockedHostname(host) {
+  const h2 = host.toLowerCase();
+  if (h2 === "localhost" || h2.endsWith(".localhost"))
+    return true;
+  if (isIP(h2))
+    return isBlockedIp(h2);
+  return false;
+}
+async function assertPublicHost(host) {
+  if (isBlockedHostname(host)) {
+    throw httpError6(400, "URL bloqueada: o destino n\xE3o \xE9 um endere\xE7o p\xFAblico.");
+  }
+  let addrs;
+  try {
+    addrs = await lookup(host, { all: true });
+  } catch {
+    throw httpError6(400, "N\xE3o foi poss\xEDvel resolver o host da URL.");
+  }
+  if (addrs.length === 0 || addrs.some((a) => isBlockedIp(a.address))) {
+    throw httpError6(400, "URL bloqueada: o destino n\xE3o \xE9 um endere\xE7o p\xFAblico.");
+  }
+}
+async function fetchPublicImage(url, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 15e3;
+  const maxRedirects = opts.maxRedirects ?? 5;
+  const maxBytes = opts.maxBytes ?? 5 * 1024 * 1024;
+  let current = url;
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    let u2;
+    try {
+      u2 = new URL(current);
+    } catch {
+      throw httpError6(400, "URL inv\xE1lida.");
+    }
+    if (u2.protocol !== "http:" && u2.protocol !== "https:") {
+      throw httpError6(400, "S\xF3 URLs http(s) s\xE3o permitidas.");
+    }
+    await assertPublicHost(u2.hostname);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    let r;
+    try {
+      r = await fetch(current, { signal: ctrl.signal, redirect: "manual" });
+    } catch {
+      throw httpError6(400, "N\xE3o foi poss\xEDvel obter a imagem.");
+    } finally {
+      clearTimeout(t);
+    }
+    if ([301, 302, 303, 307, 308].includes(r.status)) {
+      const loc = r.headers.get("location");
+      if (!loc)
+        throw httpError6(400, "Redirect sem destino.");
+      if (hop === maxRedirects)
+        throw httpError6(400, "Demasiados redirects.");
+      current = new URL(loc, current).toString();
+      continue;
+    }
+    if (!r.ok)
+      throw httpError6(400, "N\xE3o foi poss\xEDvel obter a imagem.");
+    const ct2 = r.headers.get("content-type") || "";
+    if (!ct2.startsWith("image/"))
+      throw httpError6(400, "A URL n\xE3o \xE9 uma imagem.");
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > maxBytes)
+      throw httpError6(400, "A imagem excede 5MB.");
+    return { contentType: ct2.split(";")[0], buffer: buf };
+  }
+  throw httpError6(400, "Demasiados redirects.");
+}
+var init_ssrf = __esm({
+  "packages/api/dist/services/ssrf.js"() {
+    "use strict";
   }
 });
 
@@ -38923,141 +39109,6 @@ var init_carousel_render = __esm({
   }
 });
 
-// packages/api/dist/services/ssrf.js
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
-function httpError3(status, message) {
-  return Object.assign(new Error(message), { status });
-}
-function isPrivateIPv4(ip) {
-  const parts = ip.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255))
-    return false;
-  const [a, b] = parts;
-  if (a === 10)
-    return true;
-  if (a === 172 && b >= 16 && b <= 31)
-    return true;
-  if (a === 192 && b === 168)
-    return true;
-  if (a === 127)
-    return true;
-  if (a === 169 && b === 254)
-    return true;
-  if (a === 0)
-    return true;
-  if (a === 100 && b >= 64 && b <= 127)
-    return true;
-  if (a === 192 && b === 0)
-    return true;
-  if (a === 198 && (b === 18 || b === 19))
-    return true;
-  if (a === 198 && b === 51 && parts[2] === 100)
-    return true;
-  if (a === 203 && b === 0 && parts[2] === 113)
-    return true;
-  if (a >= 240)
-    return true;
-  return false;
-}
-function isPrivateIPv6(ip) {
-  const h2 = ip.toLowerCase();
-  if (h2 === "::1" || h2 === "::")
-    return true;
-  if (h2.startsWith("fe8") || h2.startsWith("fe9") || h2.startsWith("fea") || h2.startsWith("feb"))
-    return true;
-  if (h2.startsWith("fc") || h2.startsWith("fd"))
-    return true;
-  if (h2.startsWith("::ffff:")) {
-    const v4 = h2.slice("::ffff:".length);
-    if (isIP(v4) === 4)
-      return isPrivateIPv4(v4);
-  }
-  return false;
-}
-function isBlockedIp(ip) {
-  const v2 = isIP(ip);
-  if (v2 === 4)
-    return isPrivateIPv4(ip);
-  if (v2 === 6)
-    return isPrivateIPv6(ip);
-  return false;
-}
-function isBlockedHostname(host) {
-  const h2 = host.toLowerCase();
-  if (h2 === "localhost" || h2.endsWith(".localhost"))
-    return true;
-  if (isIP(h2))
-    return isBlockedIp(h2);
-  return false;
-}
-async function assertPublicHost(host) {
-  if (isBlockedHostname(host)) {
-    throw httpError3(400, "URL bloqueada: o destino n\xE3o \xE9 um endere\xE7o p\xFAblico.");
-  }
-  let addrs;
-  try {
-    addrs = await lookup(host, { all: true });
-  } catch {
-    throw httpError3(400, "N\xE3o foi poss\xEDvel resolver o host da URL.");
-  }
-  if (addrs.length === 0 || addrs.some((a) => isBlockedIp(a.address))) {
-    throw httpError3(400, "URL bloqueada: o destino n\xE3o \xE9 um endere\xE7o p\xFAblico.");
-  }
-}
-async function fetchPublicImage(url, opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 15e3;
-  const maxRedirects = opts.maxRedirects ?? 5;
-  const maxBytes = opts.maxBytes ?? 5 * 1024 * 1024;
-  let current = url;
-  for (let hop = 0; hop <= maxRedirects; hop++) {
-    let u2;
-    try {
-      u2 = new URL(current);
-    } catch {
-      throw httpError3(400, "URL inv\xE1lida.");
-    }
-    if (u2.protocol !== "http:" && u2.protocol !== "https:") {
-      throw httpError3(400, "S\xF3 URLs http(s) s\xE3o permitidas.");
-    }
-    await assertPublicHost(u2.hostname);
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    let r;
-    try {
-      r = await fetch(current, { signal: ctrl.signal, redirect: "manual" });
-    } catch {
-      throw httpError3(400, "N\xE3o foi poss\xEDvel obter a imagem.");
-    } finally {
-      clearTimeout(t);
-    }
-    if ([301, 302, 303, 307, 308].includes(r.status)) {
-      const loc = r.headers.get("location");
-      if (!loc)
-        throw httpError3(400, "Redirect sem destino.");
-      if (hop === maxRedirects)
-        throw httpError3(400, "Demasiados redirects.");
-      current = new URL(loc, current).toString();
-      continue;
-    }
-    if (!r.ok)
-      throw httpError3(400, "N\xE3o foi poss\xEDvel obter a imagem.");
-    const ct2 = r.headers.get("content-type") || "";
-    if (!ct2.startsWith("image/"))
-      throw httpError3(400, "A URL n\xE3o \xE9 uma imagem.");
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > maxBytes)
-      throw httpError3(400, "A imagem excede 5MB.");
-    return { contentType: ct2.split(";")[0], buffer: buf };
-  }
-  throw httpError3(400, "Demasiados redirects.");
-}
-var init_ssrf = __esm({
-  "packages/api/dist/services/ssrf.js"() {
-    "use strict";
-  }
-});
-
 // packages/api/dist/services/mockup-render.js
 var mockup_render_exports = {};
 __export(mockup_render_exports, {
@@ -47426,10 +47477,14 @@ function supabaseUrl() {
   return null;
 }
 function isServiceKey(token) {
-  const key = process.env.PINK_LOGIC_SERVICE_KEY || "";
-  if (key.length < 32)
-    return false;
-  return timingSafeEqual(sha256(token), sha256(key));
+  for (const raw of [process.env.PINK_LOGIC_SERVICE_KEY || "", process.env.PINK_LOGIC_CHATGPT_KEY || ""]) {
+    const key = raw.trim();
+    if (key.length < 32)
+      continue;
+    if (timingSafeEqual(sha256(token), sha256(key)))
+      return true;
+  }
+  return false;
 }
 async function authenticate(authorization) {
   const match = /^Bearer\s+(.+)$/i.exec(authorization || "");
@@ -48058,11 +48113,324 @@ async function handler5(req, res) {
   }
 }
 
+// api-src/_handlers/brands/index.ts
+init_dist();
+
+// packages/api/dist/services/scope.js
+function httpError3(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+var adminClient2 = null;
+function admin2() {
+  if (adminClient2)
+    return adminClient2;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key)
+    throw httpError3(503, "Falta SUPABASE_SERVICE_ROLE_KEY nas vari\xE1veis de ambiente da Vercel.");
+  adminClient2 = createClient(url, key, { auth: { persistSession: false } });
+  return adminClient2;
+}
+async function resolveOwnerId2(auth) {
+  if (auth.kind === "user")
+    return auth.userId;
+  const ownerId = process.env.PINK_LOGIC_OWNER_USER_ID || "";
+  if (!ownerId) {
+    throw httpError3(503, "PINK_LOGIC_OWNER_USER_ID n\xE3o configurado \u2014 as chaves de servi\xE7o n\xE3o sabem em nome de quem operar. Defina-o com o UUID da sua conta (Supabase \u2192 Authentication \u2192 Users).");
+  }
+  return ownerId;
+}
+async function resolveProjectId2(ownerId, projectId) {
+  const db = admin2();
+  if (projectId) {
+    const { data: data2, error: error2 } = await db.from("projects").select("id").eq("id", projectId).eq("user_id", ownerId).maybeSingle();
+    if (error2)
+      throw httpError3(500, "Falha ao validar o projeto.");
+    if (!data2)
+      throw httpError3(404, "Projeto n\xE3o encontrado (ou n\xE3o pertence a esta conta).");
+    return data2.id;
+  }
+  const { data, error } = await db.from("projects").select("id").eq("user_id", ownerId).order("created_at", { ascending: true }).limit(1).maybeSingle();
+  if (error)
+    throw httpError3(500, "Falha ao procurar um projeto.");
+  if (!data)
+    throw httpError3(422, "Esta conta ainda n\xE3o tem nenhum projeto \u2014 crie um no site antes de continuar.");
+  return data.id;
+}
+async function ownerProjectIds(ownerId) {
+  const { data, error } = await admin2().from("projects").select("id").eq("user_id", ownerId);
+  if (error)
+    throw httpError3(500, "Falha ao procurar projetos.");
+  return (data ?? []).map((p) => p.id);
+}
+
+// packages/api/dist/services/brands.js
+function httpError4(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+function rowToApi2(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    colors: row.colors,
+    fonts: row.fonts,
+    hashtags: row.hashtags ?? [],
+    cta: row.cta ?? "",
+    tone: row.tone ?? "",
+    style: row.style ?? "",
+    overlays: row.overlays ?? [],
+    logo: row.logo ?? null,
+    avatar: row.avatar ?? null,
+    secondaryColors: row.secondary_colors ?? [],
+    socialLinks: row.social_links ?? {},
+    brandDna: row.brand_dna ?? {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+async function listBrands(auth, query) {
+  const ownerId = await resolveOwnerId2(auth);
+  const ids = await ownerProjectIds(ownerId);
+  if (ids.length === 0)
+    return [];
+  let q = admin2().from("brands").select("*").in("project_id", ids).order("created_at", { ascending: true }).limit(query.limit);
+  if (query.projectId) {
+    const projectId = await resolveProjectId2(ownerId, query.projectId);
+    q = q.eq("project_id", projectId);
+  }
+  const { data, error } = await q;
+  if (error)
+    throw httpError4(500, "Falha ao listar marcas.");
+  return (data ?? []).map(rowToApi2);
+}
+async function createBrand(auth, input) {
+  const ownerId = await resolveOwnerId2(auth);
+  const projectId = await resolveProjectId2(ownerId, input.projectId);
+  const insert = { project_id: projectId, name: input.name };
+  if (input.colors !== void 0)
+    insert.colors = input.colors;
+  if (input.fonts !== void 0)
+    insert.fonts = input.fonts;
+  if (input.hashtags !== void 0)
+    insert.hashtags = input.hashtags;
+  if (input.cta !== void 0)
+    insert.cta = input.cta;
+  if (input.tone !== void 0)
+    insert.tone = input.tone;
+  if (input.style !== void 0)
+    insert.style = input.style;
+  if (input.overlays !== void 0)
+    insert.overlays = input.overlays;
+  if (input.logo !== void 0)
+    insert.logo = input.logo;
+  if (input.avatar !== void 0)
+    insert.avatar = input.avatar;
+  if (input.secondary_colors !== void 0)
+    insert.secondary_colors = input.secondary_colors;
+  if (input.social_links !== void 0)
+    insert.social_links = input.social_links;
+  if (input.brand_dna !== void 0)
+    insert.brand_dna = input.brand_dna;
+  const { data, error } = await admin2().from("brands").insert(insert).select().single();
+  if (error)
+    throw httpError4(500, "Falha ao criar a marca.");
+  return rowToApi2(data);
+}
+async function getBrand(auth, id) {
+  const ownerId = await resolveOwnerId2(auth);
+  const ids = await ownerProjectIds(ownerId);
+  if (ids.length === 0)
+    throw httpError4(404, "Marca n\xE3o encontrada.");
+  const { data, error } = await admin2().from("brands").select("*").eq("id", id).in("project_id", ids).maybeSingle();
+  if (error)
+    throw httpError4(500, "Falha ao ler a marca.");
+  if (!data)
+    throw httpError4(404, "Marca n\xE3o encontrada.");
+  return rowToApi2(data);
+}
+
+// api-src/_handlers/brands/index.ts
+async function handler6(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
+  try {
+    if (req.method === "GET") {
+      const parsed = BrandListQuerySchema.safeParse(req.query);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      return res.status(200).json({ brands: await listBrands(auth, parsed.data) });
+    }
+    if (req.method === "POST") {
+      const parsed = BrandCreateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      return res.status(201).json({ brand: await createBrand(auth, parsed.data) });
+    }
+    return res.status(405).json({ error: "S\xF3 GET ou POST" });
+  } catch (err2) {
+    const pub = toPublicError(err2);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/_handlers/brands/[id].ts
+async function handler7(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
+  if (req.method !== "GET") return res.status(405).json({ error: "S\xF3 GET" });
+  const id = String(req.query.id || "");
+  try {
+    res.status(200).json({ brand: await getBrand(auth, id) });
+  } catch (err2) {
+    const pub = toPublicError(err2);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/_handlers/campaigns/index.ts
+init_dist();
+
+// packages/api/dist/services/campaigns.js
+function httpError5(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+function rowToApi3(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    mainProduct: row.main_product ?? null,
+    secondaryProduct: row.secondary_product ?? null,
+    message: row.message ?? null,
+    status: row.status,
+    goal: row.goal ?? null,
+    cta: row.cta ?? null,
+    startDate: row.start_date ?? null,
+    linkedPostIds: row.linked_post_ids ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+async function listCampaigns(auth, query) {
+  const ownerId = await resolveOwnerId2(auth);
+  const ids = await ownerProjectIds(ownerId);
+  if (ids.length === 0)
+    return [];
+  let q = admin2().from("campaigns").select("*").in("project_id", ids).order("created_at", { ascending: true }).limit(query.limit);
+  if (query.projectId) {
+    const projectId = await resolveProjectId2(ownerId, query.projectId);
+    q = q.eq("project_id", projectId);
+  }
+  const { data, error } = await q;
+  if (error)
+    throw httpError5(500, "Falha ao listar campanhas.");
+  return (data ?? []).map(rowToApi3);
+}
+async function createCampaign(auth, input) {
+  const ownerId = await resolveOwnerId2(auth);
+  const projectId = await resolveProjectId2(ownerId, input.projectId);
+  const insert = { project_id: projectId, name: input.name };
+  if (input.main_product !== void 0)
+    insert.main_product = input.main_product;
+  if (input.secondary_product !== void 0)
+    insert.secondary_product = input.secondary_product;
+  if (input.message !== void 0)
+    insert.message = input.message;
+  if (input.status !== void 0)
+    insert.status = input.status;
+  if (input.goal !== void 0)
+    insert.goal = input.goal;
+  if (input.cta !== void 0)
+    insert.cta = input.cta;
+  if (input.start_date !== void 0)
+    insert.start_date = input.start_date;
+  if (input.linked_post_ids !== void 0)
+    insert.linked_post_ids = input.linked_post_ids;
+  const { data, error } = await admin2().from("campaigns").insert(insert).select().single();
+  if (error)
+    throw httpError5(500, "Falha ao criar a campanha.");
+  return rowToApi3(data);
+}
+
+// api-src/_handlers/campaigns/index.ts
+async function handler8(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
+  try {
+    if (req.method === "GET") {
+      const parsed = CampaignListQuerySchema.safeParse(req.query);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      return res.status(200).json({ campaigns: await listCampaigns(auth, parsed.data) });
+    }
+    if (req.method === "POST") {
+      const parsed = CampaignCreateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      return res.status(201).json({ campaign: await createCampaign(auth, parsed.data) });
+    }
+    return res.status(405).json({ error: "S\xF3 GET ou POST" });
+  } catch (err2) {
+    const pub = toPublicError(err2);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
+// api-src/_handlers/media/import.ts
+init_dist();
+
+// packages/api/dist/services/media.js
+import { randomUUID } from "node:crypto";
+init_ssrf();
+function httpError7(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+var EXT_BY_CONTENT_TYPE = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif"
+};
+async function importMedia(auth, input) {
+  await resolveOwnerId2(auth);
+  const { contentType, buffer } = await fetchPublicImage(input.url, { maxBytes: 5 * 1024 * 1024 });
+  const ext = EXT_BY_CONTENT_TYPE[contentType] ?? null;
+  if (!ext)
+    throw httpError7(400, "S\xF3 imagens JPEG, PNG, WebP ou GIF.");
+  const safeName = (input.filename || "imagem").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "imagem";
+  const d2 = /* @__PURE__ */ new Date();
+  const day = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+  const path = `chatgpt/${day}/${randomUUID()}-${safeName}.${ext}`;
+  const bucket = (process.env.PINK_LOGIC_MEDIA_BUCKET || "pink-logic-media").trim();
+  const { error } = await admin2().storage.from(bucket).upload(path, buffer, { contentType, upsert: false });
+  if (error) {
+    throw httpError7(503, `N\xE3o foi poss\xEDvel guardar a imagem no bucket "${bucket}" \u2014 criar o bucket p\xFAblico no Supabase (Storage \u2192 New bucket, p\xFAblico).`);
+  }
+  const { data } = admin2().storage.from(bucket).getPublicUrl(path);
+  return { url: data.publicUrl, path, contentType, sizeBytes: buffer.length };
+}
+
+// api-src/_handlers/media/import.ts
+async function handler9(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!enforceRateLimit(generalLimiter, rateLimitKey(auth), res)) return;
+  const parsed = MediaImportRequestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    res.status(200).json(await importMedia(auth, parsed.data));
+  } catch (err2) {
+    const pub = toPublicError(err2);
+    res.status(pub.status).json({ error: pub.message });
+  }
+}
+
 // api-src/_handlers/integrations/health.ts
 var PLATFORM = "PinkLogic";
 var CONTRACT = "v1";
 var VERSION = "2.0.0";
-async function handler6(_req, res) {
+async function handler10(_req, res) {
   res.status(200).json({
     platform: PLATFORM,
     status: "operational",
@@ -48156,7 +48524,7 @@ async function collectStats(supabase) {
   };
 }
 function createHandler(deps) {
-  return async function handler17(req, res) {
+  return async function handler21(req, res) {
     if (req.method !== "GET") return res.status(405).json({ error: "S\xF3 GET." });
     const expected = deps.env[API_KEY_ENV];
     if (!expected) {
@@ -48188,7 +48556,7 @@ var stats_default = createHandler({
 });
 
 // api-src/_handlers/auth/owner-status.ts
-async function handler7(req, res) {
+async function handler11(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "S\xF3 GET" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48212,7 +48580,7 @@ function isCronSecretValid(authorization, secret) {
 }
 
 // api-src/_handlers/cron/publish.ts
-async function handler8(req, res) {
+async function handler12(req, res) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(503).json({ error: "CRON_SECRET n\xE3o configurado." });
   if (!isCronSecretValid(req.headers.authorization, secret)) return res.status(401).json({ error: "N\xE3o autorizado." });
@@ -48226,7 +48594,7 @@ async function handler8(req, res) {
 }
 
 // api-src/_handlers/health.ts
-async function handler9(_req, res) {
+async function handler13(_req, res) {
   res.status(200).json({
     ok: true,
     service: "pink-logic-api",
@@ -48240,14 +48608,14 @@ async function handler9(_req, res) {
 }
 
 // api-src/_handlers/ping.ts
-function handler10(_req, res) {
+function handler14(_req, res) {
   res.status(200).json({ ping: "pong" });
 }
 
 // api-src/_handlers/collect.ts
 init_dist();
 init_aisa();
-async function handler11(req, res) {
+async function handler15(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48265,7 +48633,7 @@ async function handler11(req, res) {
 
 // api-src/_handlers/decide.ts
 init_dist();
-async function handler12(req, res) {
+async function handler16(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48381,7 +48749,7 @@ async function generate(module, prompt, options = {}) {
 }
 
 // api-src/_handlers/generate.ts
-async function handler13(req, res) {
+async function handler17(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48400,7 +48768,7 @@ async function handler13(req, res) {
 // api-src/_handlers/mockup.ts
 init_dist();
 init_mockup_render();
-async function handler14(req, res) {
+async function handler18(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48427,7 +48795,7 @@ async function handler14(req, res) {
 // api-src/_handlers/carousel/render.ts
 init_dist();
 init_carousel_render();
-async function handler15(req, res) {
+async function handler19(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "S\xF3 POST" });
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -48483,7 +48851,7 @@ function segmentsOf(req) {
     return [];
   }
 }
-async function handler16(req, res) {
+async function handler20(req, res) {
   const segments = segmentsOf(req);
   const query = { ...req.query };
   delete query.__path;
@@ -48513,30 +48881,49 @@ async function handler16(req, res) {
     }
     return res.status(404).json({ error: "Rota n\xE3o encontrada." });
   }
+  if (first === "brands") {
+    if (segments.length === 1) {
+      plain();
+      return handler6(req, res);
+    }
+    if (segments.length === 2) {
+      withId(second);
+      return handler7(req, res);
+    }
+    return res.status(404).json({ error: "Rota n\xE3o encontrada." });
+  }
+  if (first === "campaigns") {
+    if (segments.length === 1) {
+      plain();
+      return handler8(req, res);
+    }
+    return res.status(404).json({ error: "Rota n\xE3o encontrada." });
+  }
   if (first === "integrations" && segments.length === 2) {
     plain();
-    if (second === "health") return handler6(req, res);
+    if (second === "health") return handler10(req, res);
     if (second === "stats") return stats_default(req, res);
   }
   if (segments.length === 2) {
     plain();
-    if (first === "auth" && second === "owner-status") return handler7(req, res);
-    if (first === "cron" && second === "publish") return handler8(req, res);
-    if (first === "carousel" && second === "render") return handler15(req, res);
+    if (first === "auth" && second === "owner-status") return handler11(req, res);
+    if (first === "cron" && second === "publish") return handler12(req, res);
+    if (first === "carousel" && second === "render") return handler19(req, res);
+    if (first === "media" && second === "import") return handler9(req, res);
   }
   if (segments.length === 1) {
     plain();
-    if (first === "health") return handler9(req, res);
-    if (first === "ping") return handler10(req, res);
-    if (first === "collect") return handler11(req, res);
-    if (first === "decide") return handler12(req, res);
-    if (first === "generate") return handler13(req, res);
-    if (first === "mockup") return handler14(req, res);
+    if (first === "health") return handler13(req, res);
+    if (first === "ping") return handler14(req, res);
+    if (first === "collect") return handler15(req, res);
+    if (first === "decide") return handler16(req, res);
+    if (first === "generate") return handler17(req, res);
+    if (first === "mockup") return handler18(req, res);
   }
   return res.status(404).json({ error: "Rota n\xE3o encontrada." });
 }
 export {
-  handler16 as default,
+  handler20 as default,
   segmentsOf
 };
 /*! Bundled license information:
