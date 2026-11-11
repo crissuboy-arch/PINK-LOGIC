@@ -19,3 +19,5 @@ Known limits: no signing certificate configured; installer unsigned.
 Cloud authentication settings absent in this checkout; full authenticated customer flow unverified.
 Local tests do not establish OpenAI image generation, Instagram, Drive or secure QR transfer.
 Update feed not configured; updates remain inactive.
+
+Installation validation: final unsigned NSIS installer (122804433 bytes) installed successfully on Windows in %LOCALAPPDATA%\Programs\PinkLogic-Install-Test-20261111. Installed executable and uninstaller present. Start menu and desktop shortcuts present. Installed application launched with real window title 'PinkLogic | Sua Central de Design & Estratégia'. Evidence: packages/desktop/test-evidence/windows-installation.json. Silent installation tested; interactive wizard and uninstall execution remain untested. Full customer flow blocked by absent cloud auth build settings.
