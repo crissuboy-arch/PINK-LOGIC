@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff, User, UserPlus, KeyRound } from 'lucide-react';
 import { authService } from '../../services/authService';
+import logoUrl from '../../assets/logo.png';
 
 type Mode = 'login' | 'signup' | 'forgot' | 'reset';
 
@@ -89,7 +90,7 @@ const Login = ({ initialMode = 'login' }: { initialMode?: Mode }) => {
               boxShadow: isHovered ? "0 0 50px rgba(255, 45, 141, 0.4)" : "0 0 30px rgba(255, 45, 141, 0.2)"
             }}
           >
-            <img src="/logo.png" alt="PinkLogic" className="login-logo-img" />
+            <img src={logoUrl} alt="PinkLogic" className="login-logo-img" />
           </motion.div>
           <h1>{copy.title} <span className="notranslate" translate="no">PinkLogic</span></h1>
           <p>{copy.subtitle}</p>

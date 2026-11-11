@@ -1,4 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
+// Desktop (Electron) carrega o dist por file:// — aí o pathname é o caminho
+// do ficheiro e o BrowserRouter não casa nenhuma rota (ecrã vazio). Só
+// nesse caso usa-se HashRouter; no browser/Vercel nada muda.
+const isFileProtocol =
+  typeof window !== 'undefined' && window.location.protocol === 'file:';
+const Router = isFileProtocol ? HashRouter : BrowserRouter;
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Calendario from './pages/Gestao/Calendario';

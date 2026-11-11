@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import logoUrl from '../assets/logo.png';
 
 const LoadingScreen = () => {
   return (
@@ -20,7 +21,7 @@ const LoadingScreen = () => {
           ease: "easeInOut"
         }}
       >
-        <img src="/logo.png" alt="Loading..." className="loading-icon" />
+        <img src={logoUrl} alt="Loading..." className="loading-icon" />
       </motion.div>
       <motion.p
         initial={{ opacity: 0 }}
