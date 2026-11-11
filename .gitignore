@@ -36,3 +36,8 @@ dev_out.txt
 
 # Supabase CLI local cache
 supabase/.temp/
+
+# Pink Logic desktop (Fase 1)
+packages/desktop/dist-web/
+packages/desktop/release/
+packages/desktop/test-evidence/

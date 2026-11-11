@@ -1,0 +1,33 @@
+# Pink Logic — desktop (Electron)
+# Esqueleto Fase 1. Sem assinatura, sem distribuição, sem updates activos.
+appId: com.pinklogic.app
+productName: Pink Logic
+copyright: Copyright © Pink Logic
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-web/**/*
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  category: public.app-category.productivity
+# Publicação DESACTIVADA: não há `publish:` aqui de propósito — o
+# electron-builder 26 não aceita `publish: never` no YAML (tenta carregar um
+# provider chamado "never" e falha). Usa-se sempre `--publish=never` na CLI.
+# Sem distribuição, sem assinatura.
