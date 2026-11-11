@@ -59,6 +59,10 @@ export interface EditorElement {
 export interface Slide {
   id: string;
   elements: EditorElement[];
+  /** Estado de revisão do card no fluxo de carrossel (persistido no documento). */
+  reviewStatus?: 'pendente' | 'aprovado' | 'corrigido';
+  /** Data/hora ISO da última correção individual deste card. */
+  correctedAt?: string;
   background: {
     type: 'color' | 'gradient' | 'image';
     value: string;
