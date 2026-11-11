@@ -13,7 +13,7 @@ a API continua a ser a já hospedada (`https://pink-logic.vercel.app`, via
   diálogos guardar/abrir, ler/escrever ficheiro de projecto.
 - `src/drafts.ts` — rascunhos como JSON em `<userData>/drafts/<id>.json`
   (escrita atómica tmp+rename; ids saneados p/ não escapar da pasta).
-- `electron-builder.yml` — `com.pinklogic.app`; Windows NSIS x64 + portable;
+- `electron-builder.yml` — `com.pinklogic.app`; Windows NSIS x64 (assistente de instalação);
   macOS dmg arm64+x64; `publish: never` (sem distribuição, sem assinatura).
 - `electron-updater` está instalado como dependência mas **não activado**
   (sem updates nesta fase).
@@ -49,3 +49,7 @@ npm run dist:win --workspace=@pink-logic/desktop
   CDN — offline, a app cai p/ fontes do sistema (nada parte, só o aspecto).
 - **Assinatura**: sem certificado de assinatura de código — o instalador
   Windows vai mostrar o aviso SmartScreen até haver assinatura.
+
+## Checkpoint Windows real — 2026-11-11
+
+Ver docs/WINDOWS-CHECKPOINT-2026-11-11.md. Build Windows gera apenas o instalador assistido NSIS, com ícone oficial e idiomas português, inglês e espanhol. O self-test foi corrigido para executar npm e Electron nativos no Windows. A validação de demonstração não substitui autenticação e geração de IA reais.
