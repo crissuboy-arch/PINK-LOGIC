@@ -72,9 +72,19 @@ export interface AiGenerateCopyResult {
   costUsd: number;
 }
 
+export interface ChatGPTConnectionStatus {
+  connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean;
+  sessionOwnedBy: 'Pink Logic'; subscriptionAuthorized: boolean; textGenerationVerified: boolean;
+  textRequestAvailable: boolean; lastTextAt: string | null;
+}
 export interface PinkLogicDesktopApi {
+  beginChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
+  cancelChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
+  disconnectChatGPT(): Promise<ChatGPTConnectionStatus>;
+  generateChatGPTText(input: string, consent: boolean): Promise<{text: string; source: 'chatgpt-plan'; verified: true}>;
+
   saveExport(name: string, bytes: Uint8Array): Promise<{saved: boolean; filePath?: string}>;
-  getChatGPTStatus(): Promise<{connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean}>;
+  getChatGPTStatus(): Promise<ChatGPTConnectionStatus>;
   openChatGPTManual(prompt: string): Promise<boolean>;
   requestChatGPTAccess(): Promise<void>;
   startLocalTransfer(bytes: Uint8Array): Promise<{url: string; qrDataUrl: string; expiresAt: string}>;
@@ -103,6 +113,11 @@ export interface PinkLogicDesktopApi {
 }
 
 const api: PinkLogicDesktopApi = {
+  beginChatGPTLogin: () => ipcRenderer.invoke('pink-logic:chatgpt-begin'),
+  cancelChatGPTLogin: () => ipcRenderer.invoke('pink-logic:chatgpt-cancel'),
+  disconnectChatGPT: () => ipcRenderer.invoke('pink-logic:chatgpt-disconnect'),
+  generateChatGPTText: (input,consent) => ipcRenderer.invoke('pink-logic:chatgpt-text',input,consent),
+
   saveExport: (name, bytes) => ipcRenderer.invoke('pink-logic:save-export',name,bytes),
   getChatGPTStatus: () => ipcRenderer.invoke('pink-logic:chatgpt-status'),
   openChatGPTManual: prompt => ipcRenderer.invoke('pink-logic:chatgpt-manual', prompt),

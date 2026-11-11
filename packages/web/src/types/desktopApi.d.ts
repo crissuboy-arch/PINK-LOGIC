@@ -16,9 +16,19 @@ export interface DesktopDraft {
   data: unknown;
 }
 
+export interface ChatGPTConnectionStatus {
+  connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean;
+  sessionOwnedBy: 'Pink Logic'; subscriptionAuthorized: boolean; textGenerationVerified: boolean;
+  textRequestAvailable: boolean; lastTextAt: string | null;
+}
 export interface PinkLogicDesktopApi {
+  beginChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
+  cancelChatGPTLogin(): Promise<ChatGPTConnectionStatus>;
+  disconnectChatGPT(): Promise<ChatGPTConnectionStatus>;
+  generateChatGPTText(input: string, consent: boolean): Promise<{text: string; source: 'chatgpt-plan'; verified: true}>;
+
   saveExport(name: string, bytes: Uint8Array): Promise<{saved: boolean; filePath?: string}>;
-  getChatGPTStatus(): Promise<{connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean}>;
+  getChatGPTStatus(): Promise<ChatGPTConnectionStatus>;
   openChatGPTManual(prompt: string): Promise<boolean>;
   requestChatGPTAccess(): Promise<void>;
   startLocalTransfer(bytes: Uint8Array): Promise<{url: string; qrDataUrl: string; expiresAt: string}>;

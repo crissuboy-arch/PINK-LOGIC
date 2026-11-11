@@ -1,3 +1,4 @@
+import { PinkChatGPTOAuth } from './chatgptOAuth';
 import { runAcceptance } from './acceptance';
 import { startTransfer, stopTransfer } from './localTransfer';
 /**
@@ -6,7 +7,7 @@ import { startTransfer, stopTransfer } from './localTransfer';
  * sem Node exposto ao renderer. O renderer só fala com o main através do
  * preload (window.pinkLogicDesktop) e só para as operações registadas aqui.
  */
-import { app, BrowserWindow, dialog, ipcMain, shell, clipboard } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, clipboard, safeStorage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { deleteDraft, draftsDir, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
@@ -24,6 +25,7 @@ if (process.env.PINK_DESKTOP_USER_DATA) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let chatgptConnection: PinkChatGPTOAuth | null = null;
 
 function webEntry(): { url?: string; file?: string } {
   // Dev explícito: servidor Vite (o script `dev` do web corre na porta 3001).
@@ -57,7 +59,8 @@ function createWindow(): BrowserWindow {
   });
   win.webContents.on('did-finish-load', () => {
     console.log(`[desktop] SPA carregada: ${win.webContents.getURL()} | título: ${win.webContents.getTitle()}`);
-    if (process.env.PINK_DESKTOP_ACCEPTANCE) void runAcceptance(win).then(() => app.exit(0)).catch(err => { console.error(err); app.exit(1); });
+    if (process.env.PINK_CHATGPT_DIAGNOSTIC_OUT) { void win.webContents.executeJavaScript('window.pinkLogicDesktop.getChatGPTStatus()').then(status => { const ok = status.sessionOwnedBy === 'Pink Logic' && status.connected === false && status.subscriptionAuthorized === false && status.textGenerationVerified === false && status.status === 'approval-required'; fs.writeFileSync(process.env.PINK_CHATGPT_DIAGNOSTIC_OUT!, JSON.stringify({ok, ...status}, null, 2)); app.exit(ok ? 0 : 1); }); }
+    else if (process.env.PINK_DESKTOP_ACCEPTANCE) void runAcceptance(win).then(() => app.exit(0)).catch(err => { console.error(err); app.exit(1); });
     else if (isSelfTest) void runSelfTest(win).catch((err) => failSelfTest(err));
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
@@ -69,6 +72,19 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
+  chatgptConnection = new PinkChatGPTOAuth({
+    userData: app.getPath('userData'),
+    clientId: process.env.PINK_CHATGPT_COMMERCIAL_CLIENT_ID,
+    commercialApproved: process.env.PINK_CHATGPT_COMMERCIAL_APPROVED === '1',
+    callbackPort: Number(process.env.PINK_CHATGPT_CALLBACK_PORT || '1456'),
+    encryption: { available: () => safeStorage.isEncryptionAvailable(), encrypt: value => safeStorage.encryptString(value), decrypt: value => safeStorage.decryptString(value) },
+    openBrowser: async url => { if(new URL(url).origin !== 'https://auth.openai.com') throw new Error('Destino de autenticação rejeitado.'); await shell.openExternal(url); },
+  });
+  ipcMain.handle('pink-logic:chatgpt-begin', () => chatgptConnection!.begin());
+  ipcMain.handle('pink-logic:chatgpt-cancel', () => { chatgptConnection!.cancel(); return chatgptConnection!.status(); });
+  ipcMain.handle('pink-logic:chatgpt-disconnect', () => chatgptConnection!.disconnect());
+  ipcMain.handle('pink-logic:chatgpt-text', (_e,input: string,consent: boolean) => chatgptConnection!.generateText(input,consent === true));
+
   ipcMain.handle('pink-logic:save-export', async (_e, name: string, bytes: Uint8Array) => {
     if (typeof name !== 'string' || !/^[a-zA-Z0-9_.-]+\.(zip|pdf|png|jpg|json|txt)$/.test(name) || !(bytes instanceof Uint8Array) || bytes.length > 100*1024*1024) throw new Error('Exportação inválida.');
     let target: string | undefined;
@@ -77,7 +93,7 @@ function registerIpc(): void {
     if(!target) return {saved:false}; fs.writeFileSync(target,bytes); return {saved:true,filePath:target};
   });
 
-  ipcMain.handle('pink-logic:chatgpt-status', () => ({ connected: false, status: 'approval-required', method: 'Sign in with ChatGPT', reason: 'Acesso comercial ainda não aprovado. A transferência manual está disponível.', imageGeneration: false }));
+  ipcMain.handle('pink-logic:chatgpt-status', () => chatgptConnection!.status());
   ipcMain.handle('pink-logic:chatgpt-manual', async (_e, prompt: string) => {
     if (typeof prompt !== 'string' || prompt.length > 30000) throw new Error('Pedido inválido.');
     clipboard.writeText(prompt); await shell.openExternal('https://chatgpt.com/'); return true;
@@ -338,6 +354,6 @@ void app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  stopTransfer();
+  stopTransfer(); chatgptConnection?.cancel();
   if (process.platform !== 'darwin') app.quit();
 });

@@ -1,3 +1,4 @@
+import type { ChatGPTConnectionStatus } from '../../types/desktopApi';
 // ---------------------------------------------------------------------------
 // Ecrã «Ligação de IA» — Fase 3 (Sistema → Ligação de IA).
 //
@@ -10,7 +11,7 @@
 // - A geração real fica DESACTIVADA por predefinição e só é chamada com
 //   chave + opt-in explícito + dentro dos limites.
 // ---------------------------------------------------------------------------
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAiConnection } from '../../hooks/useAiConnection';
 import {
   AI_STATUS_DESCRIPTIONS, apiNotReadyReason, redactText,
@@ -29,6 +30,17 @@ const MODE_OPTIONS: { id: AiMode; label: string; hint: string }[] = [
 export default function AIConnectionPage() {
   const ai = useAiConnection();
   const [chatGPTMessage, setChatGPTMessage] = useState("");
+  const [chatGPTState, setChatGPTState] = useState<ChatGPTConnectionStatus | null>(null);
+  const [planConsent, setPlanConsent] = useState(false);
+  const [realText, setRealText] = useState('');
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => { void window.pinkLogicDesktop?.getChatGPTStatus().then(s => {if(active) setChatGPTState(s);}).catch(() => {if(active) setChatGPTMessage('Não foi possível verificar a sessão própria.');}); };
+    refresh(); const timer = setInterval(refresh, 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
+
   const { state, label: statusLabel, status } = ai;
   const [keyInput, setKeyInput] = useState('');
   const [monthlyCap, setMonthlyCap] = useState('');
@@ -103,12 +115,20 @@ export default function AIConnectionPage() {
 
       <section className="card" style={{ padding: 20, marginBottom: 16 }}>
         <h3>Conectar ChatGPT</h3>
-        <p>Estado: não conectado. O Pink Logic ainda aguarda aprovação comercial para Sign in with ChatGPT. Login de identidade, plano ChatGPT, MCP e API são permissões distintas.</p>
-        <button data-testid="connect-chatgpt" onClick={() => void run(async () => { const s = await window.pinkLogicDesktop?.getChatGPTStatus(); setChatGPTMessage(s?.reason || 'Abra o aplicativo desktop.'); })}>CONECTAR CHATGPT</button>
-        <p role="status">{chatGPTMessage}</p>
+        <p>Sessão: {chatGPTState?.connected ? 'identidade autorizada no Pink Logic' : 'não conectado no Pink Logic'}. Login do Codex não liga esta aplicação. Identidade, permissão do plano e geração concluída são estados diferentes.</p>
+        <button data-testid="connect-chatgpt" onClick={() => void run(async () => { const s = await window.pinkLogicDesktop?.beginChatGPTLogin(); if(s) setChatGPTState(s); setChatGPTMessage(s?.reason || 'Abra o aplicativo desktop.'); })}>CONECTAR CHATGPT</button>
+        <p role="status">{chatGPTMessage || chatGPTState?.reason}</p>
+        <p>Uso do plano: {chatGPTState?.subscriptionAuthorized ? 'autorizado' : 'não autorizado'}. Texto real: {chatGPTState?.textGenerationVerified ? 'verificado por resposta concluída' : 'não verificado'}. Imagens por esta rota: indisponíveis.</p>
+        {chatGPTState?.status === 'connecting' && <button onClick={() => void run(async () => { setChatGPTState(await window.pinkLogicDesktop!.cancelChatGPTLogin()); })}>Cancelar autorização</button>}
+        {chatGPTState?.connected && <button onClick={() => void run(async () => { setChatGPTState(await window.pinkLogicDesktop!.disconnectChatGPT()); setRealText(''); setPlanConsent(false); })}>Remover sessão deste computador</button>}
+        <label><input type="checkbox" checked={planConsent} onChange={e => setPlanConsent(e.target.checked)} disabled={!chatGPTState?.textRequestAvailable}/> Autorizar um teste que utiliza os limites e as definições de uso do meu plano ChatGPT. Não ativa a API paga.</label>
+        <button disabled={!chatGPTState?.textRequestAvailable || !planConsent || generatingPlan} onClick={() => void run(async () => { setGeneratingPlan(true); try { const r = await window.pinkLogicDesktop!.generateChatGPTText('Responde apenas: Pink Logic ligado.', planConsent); setRealText(r.text); setChatGPTState(await window.pinkLogicDesktop!.getChatGPTStatus()); } finally { setGeneratingPlan(false); } })}>{generatingPlan ? 'A gerar texto real…' : 'Verificar geração de texto real'}</button>
+        {realText && <pre aria-label="Resposta real do plano ChatGPT">{realText}</pre>}
+        <p>A remoção local não revoga o acesso no ChatGPT; utilize as definições de uso/acesso do ChatGPT para revogação. Esta versão requer nova autorização após a sessão expirar.</p>
+        <p>O callback de uma ligação própria identifica Pink Logic. Uma página “Signed in to Codex” não é uma prova desta ligação.</p>
         <button onClick={() => void window.pinkLogicDesktop?.requestChatGPTAccess()}>Solicitar acesso oficial</button>
         <p>Alternativa disponível: no Fluxo de Carrosséis, copie o pedido e abra o ChatGPT no navegador; depois importe a resposta JSON. É transferência manual, sem verificação da assinatura e sem API.</p>
-        <p>O plano pode suportar texto em apps elegíveis; a prévia oficial não suporta geração de imagens. A arte local tem custo de API zero. API paga permanece desativada.</p>
+        <p>Esta rota Sign in with ChatGPT pode suportar texto em apps elegíveis; a prévia não suporta geração de imagens. A geração integrada no Codex é outra rota e não foi ligada a este produto comercial. A arte local tem custo de API zero. API paga permanece desativada.</p>
         <a href="https://developers.openai.com/siwc/quickstart" target="_blank" rel="noreferrer">Mecanismo oficial e elegibilidade</a>
       </section>
       <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem' }}>
