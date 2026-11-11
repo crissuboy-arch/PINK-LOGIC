@@ -15,7 +15,7 @@ win:
       arch: [x64]
     - target: portable
       arch: [x64]
-  artifactName: ${productName}-${version}-setup-${arch}.${ext}
+  artifactName: Pink-Logic-Setup-${version}.${ext}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
