@@ -1,3 +1,4 @@
+import ofensivaLogo from '../../assets/ofensiva-criativa-logo.png?inline';
 // ---------------------------------------------------------------------------
 // Fluxo completo de criação de carrosséis — Fase 2 (passos a–o).
 // Assistente em 6 passos: Marca → Radar → Arquitetura → Copy → Slides → Entrega.
@@ -6,7 +7,7 @@
 // Sem IA paga, sem rede para gerar conteúdo; a leitura de website é só HTML
 // público e pode falhar por CORS — nesse caso diz-se, não se contorna.
 // ---------------------------------------------------------------------------
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBrand, type BrandSchema } from '../../providers/BrandProvider';
 import { useCentralStore } from '../../store/CentralStore';
@@ -17,7 +18,7 @@ import { generateTestCopy } from '../../services/aiConnection';
 import {
   INTERVIEW_QUESTIONS, buildBrandFromInterview, extractBrandFromWebsiteHtml,
   normalizeBrandContext, mergeBrandContext, newCarouselProject, approveProject as approveProjectFn,
-  serializeProject, FLOW_STEPS, type BrandContext, type BrandInterviewAnswers,
+  serializeProject, parseProject, FLOW_STEPS, type BrandContext, type BrandInterviewAnswers,
   type BrandLike, type CarouselFlowStep, type CarouselProject,
 } from '../../services/carouselFlow';
 import {
@@ -95,6 +96,12 @@ export default function CarouselFlowPage() {
   const { activeBrand, createBrand } = useBrand();
   const { activeProjectId } = useCentralStore();
   const ai = useAiConnection();
+  const [projectId, setProjectId] = useState<string>(() => crypto.randomUUID());
+  const [savedBrands, setSavedBrands] = useState<{id: string; title: string}[]>([]);
+  const [savedDrafts, setSavedDrafts] = useState<{id: string; title: string}[]>([]);
+  const [transfer, setTransfer] = useState<{url: string; qrDataUrl: string; expiresAt: string} | null>(null);
+  const [manualCopy, setManualCopy] = useState('');
+  const [contentOrigin, setContentOrigin] = useState('templates locais');
   const [step, setStep] = useState<CarouselFlowStep>('marca');
   const [brand, setBrand] = useState<BrandLike | null>(activeBrand ? brandLikeFromSchema(activeBrand) : null);
   const [context, setContext] = useState<BrandContext>(
@@ -129,7 +136,7 @@ export default function CarouselFlowPage() {
 
   const project: CarouselProject | null = useMemo(() => {
     if (!brand) return null;
-    const p = newCarouselProject({ title: topic || 'Carrossel sem título', brand, context, topic });
+    const p = newCarouselProject({ id: projectId, title: topic || 'Carrossel sem título', brand, context, topic });
     p.architectureId = architectureId;
     p.coverVariant = coverVariant;
     p.slides = slides.map(slideTextContents);
@@ -139,10 +146,57 @@ export default function CarouselFlowPage() {
     p.approvedAt = approvedAt;
     p.referenceId = reference?.id ?? null;
     p.pautaId = radar?.selectedIds[0] ?? null;
+    Object.assign(p, { brandSnapshot: brand, contentOrigin });
     return p;
-  }, [brand, context, topic, architectureId, coverVariant, slides, caption, hashtags, approvedBy, approvedAt, reference, radar]);
+  }, [projectId, brand, context, topic, architectureId, coverVariant, slides, caption, hashtags, approvedBy, approvedAt, reference, radar, contentOrigin]);
 
   const autosave = useCarouselAutosave(project);
+  useEffect(() => { void window.pinkLogicDesktop?.listDrafts().then(d => { setSavedDrafts(d.filter(x => x.id.startsWith('carousel-'))); setSavedBrands(d.filter(x => x.id.startsWith('brand-'))); }); }, []);
+  const restoreDraft = async (id: string) => {
+    try {
+      const draft = await window.pinkLogicDesktop?.loadDraft(id);
+      if (!draft) throw new Error('Projeto não encontrado.');
+      const restored = parseProject(JSON.stringify(draft.data));
+      const extra = draft.data as { brandSnapshot?: BrandLike; contentOrigin?: string };
+      if (!extra.brandSnapshot) throw new Error('Este rascunho antigo não contém a identidade. Reabra com a marca original.');
+      setProjectId(restored.id); setBrand(extra.brandSnapshot); setContext(restored.context); setTopic(restored.topic);
+      setArchitectureId(restored.architectureId as ArchitectureId); setCoverVariant(restored.coverVariant);
+      setSlides(applyBrandTemplate(toBrandSchema(extra.brandSnapshot, restored.context), restored.slides, { coverVariant: restored.coverVariant }));
+      setCaption(restored.caption); setHashtags(restored.hashtags); setApprovedBy(''); setApprovedAt(null);
+      setContentOrigin(extra.contentOrigin || 'origem não registada'); setStep('copy'); setNotice('Projeto e marca recuperados do disco.');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+  const loadOfensivaExample = async () => {
+    const b: BrandLike = { id: 'ofensiva-criativa', projectId: 'ofensiva-local', name: 'Ofensiva Criativa', palette: {primary: '#103B78', secondary: '#071D3A', accent: '#D4AF37', background: '#FFFFFF', text: '#071D3A', surface: '#F5F7FA'}, typography: {heading: 'Arial', body: 'Arial'}, tone: 'Direto e sem filtro', visualStyle: 'Editorial azul e dourado', logo: ofensivaLogo, colors: ['#103B78', '#D4AF37'] };
+    const theme = '5 tarefas que a tua empresa pode automatizar com inteligência artificial.';
+    const texts = [
+      {title: '1. Responder às perguntas frequentes', body: 'Organiza respostas sobre horários, serviços e prazos. A IA prepara uma resposta; a equipa revê os casos sensíveis.'},
+      {title: '2. Preparar propostas comerciais', body: 'Usa modelos com serviços e condições aprovados. Confirma valores e escopo antes de enviar a proposta.'},
+      {title: '3. Organizar contactos e seguimentos', body: 'Resume conversas e prepara lembretes. Pede autorização antes de enviar mensagens aos clientes.'},
+      {title: '4. Transformar conteúdos próprios', body: 'Converte um artigo num rascunho de carrossel ou legenda. Revê os factos e mantém a voz da marca.'},
+      {title: '5. Resumir relatórios de rotina', body: 'Reúne indicadores e destaca pontos para revisão humana. Marketing sem filtro. Resultados sem desculpa. Comenta LINK.'},
+    ];
+    setProjectId(crypto.randomUUID()); setBrand(b); setContext(OFENSIVA_CONTEXT); setTopic(theme); setArchitectureId('lista'); setCoverVariant('classica');
+    setSlides(applyBrandTemplate(toBrandSchema(b, OFENSIVA_CONTEXT), texts, {coverVariant: 'classica'}));
+    setCaption('Começa por uma tarefa repetitiva e mantém a revisão humana. Estas cinco ideias são um ponto de partida. Marketing sem filtro. Resultados sem desculpa. Comenta LINK.'); setHashtags(['#OfensivaCriativa', '#InteligenciaArtificial']); setContentOrigin('texto de exemplo escrito localmente; sem geração de IA'); setApprovedAt(null); setApprovedBy(''); setStep('copy');
+    if (window.pinkLogicDesktop) { await window.pinkLogicDesktop.saveDraft({ id: 'brand-ofensiva-criativa', title: b.name, data: {brand: b, context: OFENSIVA_CONTEXT, slogan: 'Marketing sem filtro. Resultados sem desculpa.'} }); setSavedBrands((await window.pinkLogicDesktop.listDrafts()).filter(x => x.id.startsWith('brand-'))); }
+    setNotice('Ofensiva Criativa configurada e guardada localmente. Exemplo com 5 cards; logótipo oficial incluído. Texto e arte locais, sem IA.');
+  };
+  const saveLocalBrand = async () => {
+    if (!brand) return;
+    try { await window.pinkLogicDesktop!.saveDraft({ id: `brand-${brand.id}`, title: brand.name, data: { brand, context } }); setSavedBrands((await window.pinkLogicDesktop!.listDrafts()).filter(x => x.id.startsWith('brand-'))); setNotice('Brand Kit guardado neste computador.'); }
+    catch(e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+  const importChatGPTCopy = () => {
+    try {
+      if (!brandSchema) throw new Error('Configure a marca.');
+      const parsed = JSON.parse(manualCopy) as { slides: {title: string; body: string}[]; caption: string; hashtags: string[] };
+      if (!Array.isArray(parsed.slides) || parsed.slides.length !== 5 || !parsed.slides.every(x => typeof x.title === 'string' && typeof x.body === 'string') || typeof parsed.caption !== 'string' || !Array.isArray(parsed.hashtags) || !parsed.hashtags.every(x => typeof x === 'string')) throw new Error('Esperado JSON com 5 slides (title/body), caption e hashtags.');
+      setSlides(applyBrandTemplate(brandSchema, parsed.slides, {coverVariant})); setCaption(parsed.caption); setHashtags(parsed.hashtags);
+      setContentOrigin('texto importado manualmente — origem declarada pelo utilizador'); setNotice('Texto importado. Arte por templates locais; revise antes de exportar.'); setStep('copy');
+    } catch(e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+
 
   const run = (fn: () => void) => {
     setError(null);
@@ -154,12 +208,14 @@ export default function CarouselFlowPage() {
     const { brand: built, errors } = buildBrandFromInterview(answers as BrandInterviewAnswers, activeProjectId || 'default');
     setInterviewErrors(errors);
     if (Object.keys(errors).length) return;
+    if (brand?.id !== built.id) { setProjectId(crypto.randomUUID()); setSlides([]); setCaption(''); setHashtags([]); setApprovedAt(null); setApprovedBy(''); }
     setBrand(built);
     setNotice(`Marca «${built.name}» configurada por entrevista (logo vazio — sem ficheiro oficial).`);
   });
 
   const saveInterviewBrandToKit = () => run(() => {
     if (!brand) throw new Error('Configura primeiro a marca por entrevista.');
+    if (window.pinkLogicDesktop) { void saveLocalBrand(); return; }
     createBrand({
       projectId: brand.projectId, name: brand.name, logo: undefined,
       palette: brand.palette, typography: brand.typography,
@@ -223,6 +279,7 @@ export default function CarouselFlowPage() {
     if (!brand) { setError('Configura primeiro a marca.'); return; }
     try {
       const result = await ai.generateCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
+      setContentOrigin(result.source === "api" ? "OpenAI API" : "templates locais");
       setCaption(result.copy.caption);
       setHashtags(result.copy.hashtags);
       setSlides(applyBrandTemplate(brandSchema, result.copy.slides, { coverVariant }));
@@ -237,6 +294,7 @@ export default function CarouselFlowPage() {
         return;
       }
       try {
+        setContentOrigin('templates locais'); setApprovedAt(null);
         const fallback = generateTestCopy({ topic, architectureId, context, brandName: brand.name, tone: brand.tone });
         setCaption(fallback.copy.caption);
         setHashtags(fallback.copy.hashtags);
@@ -249,6 +307,7 @@ export default function CarouselFlowPage() {
   };
 
   const runReplicate = () => run(() => {
+    setContentOrigin('templates locais'); setApprovedAt(null);
     if (!brand) throw new Error('Configura primeiro a marca.');
     if (!reference) throw new Error('Modela primeiro uma referência.');
     const result = replicateContent({
@@ -261,11 +320,13 @@ export default function CarouselFlowPage() {
   });
 
   const changeCover = (variant: CoverVariantId) => run(() => {
+    setApprovedAt(null);
     setCoverVariant(variant);
     if (slides.length) setSlides(applyCoverVariant(slides, variant, brandSchema));
   });
 
   const editSlide = (index: number, patch: { title?: string; body?: string }) => run(() => {
+    setApprovedAt(null);
     setSlides(correctSlide(slides, index, patch, brandSchema));
   });
 
@@ -286,14 +347,23 @@ export default function CarouselFlowPage() {
   const captionVariants = caption ? buildCaptionVariants({ brandName: brand?.name ?? '', title: topic, caption, hashtags, slides: slides.map(slideTextContents), cta: context.defaultCta }) : null;
   const ctaVariants = buildCtaVariants(context.defaultCta);
 
-  const download = (name: string, blob: Blob) => {
+  const download = async (name: string, blob: Blob) => {
+    if(window.pinkLogicDesktop?.saveExport) { const result=await window.pinkLogicDesktop.saveExport(name,new Uint8Array(await blob.arrayBuffer())); if(!result.saved) throw new Error('Exportação cancelada.'); return; }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = name; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const exportDeliveryZip = async () => {
+  const exportCardsPdf = async (downloadFile = true) => {
+    if (!slides.length) throw new Error("Não há cards para exportar.");
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({orientation: 'portrait', unit: 'px', format: [1080, 1350], hotfixes: ['px_scaling']});
+    for (let i = 0; i < slides.length; i++) { if (i) pdf.addPage([1080, 1350]); const png = await renderSlideToBlob(slides[i], 'jpeg'); const data = new Uint8Array(await png.arrayBuffer()); pdf.addImage(data, 'JPEG', 0, 0, 1080, 1350); }
+    const blob = pdf.output('blob'); if(downloadFile) await download('pinklogic-cards.pdf', blob); return blob;
+  };
+  const exportDeliveryZip = async (toPhone = false) => {
     if (!project) return;
     setError(null);
     try {
@@ -305,11 +375,12 @@ export default function CarouselFlowPage() {
       // browser não conseguir renderizar um slide, o ZIP não sai a fingir
       // que saiu: o erro é mostrado e nada é descarregado.
       for (let i = 0; i < slides.length; i++) {
-        zip.file(`slide-${i + 1}.png`, await renderSlideToBlob(slides[i], 'png'));
-        zip.file(`slide-${i + 1}.jpg`, await renderSlideToBlob(slides[i], 'jpeg'));
+        zip.file(`slide-${i + 1}.png`, new Uint8Array(await (await renderSlideToBlob(slides[i], 'png')).arrayBuffer()));
+        zip.file(`slide-${i + 1}.jpg`, new Uint8Array(await (await renderSlideToBlob(slides[i], 'jpeg')).arrayBuffer()));
       }
       zip.file('caption.txt', buildCaptionText({ brandName: brand?.name, title: topic, caption, hashtags }));
       zip.file('plano.pdf', buildPlanPdf(delivery));
+      zip.file('cards.pdf', new Uint8Array(await (await exportCardsPdf(false)).arrayBuffer()));
       zip.file('dm.txt', buildDmText(delivery));
       zip.file('project.json', serializeProject(project));
       const manifest = buildExportManifest({ slideCount: Math.max(slides.length, 1) });
@@ -317,30 +388,18 @@ export default function CarouselFlowPage() {
         'Ficheiros do ZIP de entrega (PNG/JPG renderizados no canvas do browser):',
         ...manifest.map((m) => ` - ${m.name}`),
         '',
-        'Conteúdo composto a partir de templates locais (sem IA).',
+        `Origem do texto: ${contentOrigin}. Arte por templates locais.`,
       ].join('\n'));
       const blob = await zip.generateAsync({ type: 'blob' });
-      download(`pinklogic-carrossel-${new Date().toISOString().split('T')[0]}.zip`, blob);
+      if (toPhone) { if (!window.pinkLogicDesktop) throw new Error('Transferência local requer o desktop.'); setTransfer(await window.pinkLogicDesktop.startLocalTransfer(new Uint8Array(await blob.arrayBuffer()))); }
+      else await download(`pinklogic-carrossel-${new Date().toISOString().split('T')[0]}.zip`, blob);
       setNotice(`ZIP de entrega descarregado (${slides.length} slides PNG+JPG 1080×1350, caption, plano.pdf, dm, project.json).`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const restoreSavedProject = async () => {
-    setError(null);
-    setNotice(null);
-    try {
-      const restored = await autosave.restore();
-      if (!restored) { setNotice('Não há projecto guardado para recuperar (neste dispositivo).'); return; }
-      const same = serializeProject(restored) === (project ? serializeProject(project) : '');
-      setNotice(same
-        ? `Projecto recuperado — igual ao guardado (título «${restored.title}», ${restored.slides.length} slides).`
-        : `Projecto guardado recuperado («${restored.title}», ${restored.slides.length} slides) — difere do estado actual em ecrã; o autosave vai voltar a guardar o estado actual.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const restoreSavedProject = async () => { await restoreDraft(`carousel-${projectId}`); };
 
   const stepIndex = FLOW_STEPS.findIndex((s) => s.id === step);
 
@@ -376,6 +435,20 @@ export default function CarouselFlowPage() {
           Passo 2 — Ligação de IA ({ai.status === 'teste' ? 'modo de teste' : ai.status === 'api' ? 'API ligada' : 'desligada'}) →
         </button>
       </div>
+      {window.pinkLogicDesktop && <section className="card" style={{padding: 16, marginBottom: 16}}>
+        <h3>Projetos neste computador</h3>
+        <button data-testid="load-ofensiva-example" onClick={() => void loadOfensivaExample()}>Carregar exemplo Ofensiva Criativa — 5 cards locais</button>
+        <select aria-label="Brand Kits locais" value="" onChange={async e => { const d = await window.pinkLogicDesktop!.loadDraft(e.target.value); if(d) { const kit = d.data as {brand: BrandLike; context: BrandContext}; setProjectId(crypto.randomUUID()); setBrand(kit.brand); setContext(kit.context); setSlides([]); setCaption(''); setHashtags([]); setApprovedAt(null); setApprovedBy(''); setTopic(''); setRadar(null); setReference(null); setContentOrigin('templates locais'); setStep('marca'); } }}><option value="">Abrir Brand Kit local…</option>{savedBrands.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select>
+        <button onClick={async () => { await autosave.saveNow(); setSavedDrafts((await window.pinkLogicDesktop!.listDrafts()).filter(x => x.id.startsWith('carousel-'))); }}>Guardar e atualizar lista</button>
+        <select aria-label="Recuperar projeto" value="" onChange={e => void restoreDraft(e.target.value)}><option value="">Recuperar projeto guardado…</option>{savedDrafts.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select>
+        <p>Origem: {contentOrigin}. Capas e cards: templates locais editáveis.</p>
+      </section>}
+      <details style={{marginBottom: 16}}><summary>Usar texto do meu ChatGPT sem API — transferência manual</summary>
+        <p>Na Ligação de IA, abra o ChatGPT e copie o pedido. Cole aqui a resposta JSON. Isto não liga nem verifica a sua assinatura.</p>
+        <textarea aria-label="Resposta JSON do ChatGPT" value={manualCopy} onChange={e => setManualCopy(e.target.value)} rows={6} style={inputStyle}/>
+        <button onClick={() => void window.pinkLogicDesktop?.openChatGPTManual(`Cria 5 cards em português de Portugal sobre: ${topic}. Marca: ${brand?.name || 'não definida'}. Tom: ${brand?.tone || ''}. Contexto: ${JSON.stringify(context)}. Devolve apenas JSON, sem markdown: {"slides":[{"title":"...","body":"..."}],"caption":"...","hashtags":["..."]}. Exatamente 5 slides. Não inventes resultados, provas ou tendências.`)}>Copiar pedido e abrir ChatGPT</button>
+        <button onClick={importChatGPTCopy}>Importar e rever os 5 cards</button>
+      </details>
       <details style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
         <summary style={{ cursor: 'pointer' }}>Fluxo completo — 15 passos (onde está cada um)</summary>
         <ol style={{ paddingLeft: '1.2rem', margin: '0.5rem 0 0' }}>
@@ -583,7 +656,10 @@ export default function CarouselFlowPage() {
           <label style={label}>Mensagens de DM (templates — editar antes de enviar; nada é enviado automaticamente)</label>
           <textarea style={inputStyle} rows={6} readOnly value={project ? buildDmText({ brandName: brand?.name ?? '', title: topic, caption, hashtags, slides: slides.map(slideTextContents), cta: context.defaultCta }) : ''} />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={exportDeliveryZip} disabled={!slides.length}>Exportar ZIP de entrega</button>
+            <button onClick={() => void exportCardsPdf().catch(e => setError(e instanceof Error ? e.message : String(e)))} disabled={!slides.length}>Exportar PDF dos cards</button>
+            <button onClick={() => void exportDeliveryZip(true)} disabled={!slides.length || !window.pinkLogicDesktop}>Enviar ao telemóvel por QR</button>
+            {transfer && <div><img src={transfer.qrDataUrl} alt="QR de transferência local"/><p>Mesma rede Wi-Fi. Link HTTP local, de uso único, expira em 5 minutos. Utilize rede de confiança.</p><button onClick={() => { void window.pinkLogicDesktop?.stopLocalTransfer(); setTransfer(null); }}>Encerrar transferência</button></div>}
+            <button className="btn-primary" onClick={() => void exportDeliveryZip()} disabled={!slides.length}>Exportar ZIP de entrega</button>
             <button onClick={() => project && download('plano.pdf', new Blob([buildPlanPdf({ brandName: brand?.name ?? '', title: topic, caption, hashtags, slides: slides.map(slideTextContents), cta: context.defaultCta })], { type: 'application/pdf' }))} disabled={!slides.length}>Descarregar plano.pdf</button>
           </div>
           <h4 style={{ margin: '0.4rem 0 0' }}>Guardar e recuperar (passo 14)</h4>

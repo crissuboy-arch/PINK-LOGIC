@@ -208,6 +208,7 @@ const Login = ({ initialMode = 'login' }: { initialMode?: Mode }) => {
         </div>
       </motion.div>
 
+      {window.pinkLogicDesktop && <button data-testid="open-local-workspace" className="btn-primary" style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 10 }} onClick={() => { authService.startLocalWorkspace(); navigate('/criacao/carrossel-fluxo'); }}>Abrir espaço local — sem conta e sem API</button>}
       <style>{`
         .login-page {
           width: 100vw;

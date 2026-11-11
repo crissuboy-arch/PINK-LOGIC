@@ -28,6 +28,7 @@ const MODE_OPTIONS: { id: AiMode; label: string; hint: string }[] = [
 
 export default function AIConnectionPage() {
   const ai = useAiConnection();
+  const [chatGPTMessage, setChatGPTMessage] = useState("");
   const { state, label: statusLabel, status } = ai;
   const [keyInput, setKeyInput] = useState('');
   const [monthlyCap, setMonthlyCap] = useState('');
@@ -100,6 +101,16 @@ export default function AIConnectionPage() {
       {error && <p style={{ color: '#b00020', fontSize: '0.85rem' }}>{error}</p>}
       {notice && <p style={{ color: '#0a6b2d', fontSize: '0.85rem' }}>{notice}</p>}
 
+      <section className="card" style={{ padding: 20, marginBottom: 16 }}>
+        <h3>Conectar ChatGPT</h3>
+        <p>Estado: não conectado. O Pink Logic ainda aguarda aprovação comercial para Sign in with ChatGPT. Login de identidade, plano ChatGPT, MCP e API são permissões distintas.</p>
+        <button data-testid="connect-chatgpt" onClick={() => void run(async () => { const s = await window.pinkLogicDesktop?.getChatGPTStatus(); setChatGPTMessage(s?.reason || 'Abra o aplicativo desktop.'); })}>CONECTAR CHATGPT</button>
+        <p role="status">{chatGPTMessage}</p>
+        <button onClick={() => void window.pinkLogicDesktop?.requestChatGPTAccess()}>Solicitar acesso oficial</button>
+        <p>Alternativa disponível: no Fluxo de Carrosséis, copie o pedido e abra o ChatGPT no navegador; depois importe a resposta JSON. É transferência manual, sem verificação da assinatura e sem API.</p>
+        <p>O plano pode suportar texto em apps elegíveis; a prévia oficial não suporta geração de imagens. A arte local tem custo de API zero. API paga permanece desativada.</p>
+        <a href="https://developers.openai.com/siwc/quickstart" target="_blank" rel="noreferrer">Mecanismo oficial e elegibilidade</a>
+      </section>
       <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem' }}>
         <h3 style={{ margin: 0 }}>1. Modo</h3>
         {MODE_OPTIONS.map((m) => (

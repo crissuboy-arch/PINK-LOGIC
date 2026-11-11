@@ -165,6 +165,17 @@ export async function renderSlideToBlob(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('O browser não disponibilizou um contexto canvas 2D.');
   drawSlideToCanvas(ctx as unknown as SlideCanvasContext, slide, canvas.width, canvas.height);
+  // Load each logo before export; fail rather than silently omitting brand assets.
+  for (const el of slide.elements.filter(e => e.type === 'image')) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve, reject) => { const timeout = setTimeout(() => reject(new Error('Tempo esgotado ao carregar o logótipo.')), 10000); img.onload = () => { clearTimeout(timeout); resolve(); }; img.onerror = () => { clearTimeout(timeout); reject(new Error('Não foi possível carregar o logótipo para exportar.')); }; img.src = el.content; });
+    const ratio = Math.min(el.width / img.naturalWidth, el.height / img.naturalHeight);
+    const width = img.naturalWidth * ratio, height = img.naturalHeight * ratio;
+    ctx.save(); ctx.globalAlpha = el.opacity / 100;
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(el.x-5, el.y-5, el.width+10, el.height+10);
+    ctx.drawImage(img, el.x + (el.width-width)/2, el.y + (el.height-height)/2, width, height); ctx.restore();
+  }
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, format === 'png' ? 'image/png' : 'image/jpeg', 0.92),
   );

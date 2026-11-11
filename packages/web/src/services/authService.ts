@@ -136,6 +136,7 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
+    localStorage.removeItem("pinklogic.local-workspace");
     if (supabase) {
       try {
         await supabase.auth.signOut();
@@ -147,7 +148,15 @@ class AuthService {
   }
 
   /** Confirma a sessão real (Supabase) e atualiza o cache. Devolve se há sessão válida. */
+  startLocalWorkspace(): void {
+    if (!window.pinkLogicDesktop) throw new Error("O espaço local requer o aplicativo desktop.");
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ email: "", name: "Espaço local", role: "Local — sem acesso à nuvem" }));
+    localStorage.setItem("pinklogic.local-workspace", "1");
+    window.dispatchEvent(new Event("pinklogic:auth-changed"));
+  }
+
   async syncSession(): Promise<boolean> {
+    if (window.pinkLogicDesktop && localStorage.getItem("pinklogic.local-workspace") === "1") return true;
     // Self-test: a sessão local semeada pelo main basta (sem Supabase aqui).
     if (selfTestAuth && this.isAuthenticated()) return true;
     if (supabase) {
@@ -161,6 +170,7 @@ class AuthService {
 
   /** Token de acesso atual (renovado automaticamente pelo Supabase) para chamar a API. */
   async getAccessToken(): Promise<string | null> {
+    if (window.pinkLogicDesktop && localStorage.getItem("pinklogic.local-workspace") === "1") return null;
     if (!supabase) return null;
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ?? null;

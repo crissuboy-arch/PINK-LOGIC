@@ -41,3 +41,8 @@ supabase/.temp/
 packages/desktop/dist-web/
 packages/desktop/release/
 packages/desktop/test-evidence/
+
+.tmp-siwc-devkit/
+
+.proof/windows-continuity*/
+.proof/windows-acceptance-*/

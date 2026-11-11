@@ -1,10 +1,12 @@
+import { runAcceptance } from './acceptance';
+import { startTransfer, stopTransfer } from './localTransfer';
 /**
  * Pink Logic — processo main (Electron).
  * Segurança: contextIsolation=true, nodeIntegration=false, sem `remote`,
  * sem Node exposto ao renderer. O renderer só fala com o main através do
  * preload (window.pinkLogicDesktop) e só para as operações registadas aqui.
  */
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, clipboard } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { deleteDraft, draftsDir, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
@@ -55,7 +57,8 @@ function createWindow(): BrowserWindow {
   });
   win.webContents.on('did-finish-load', () => {
     console.log(`[desktop] SPA carregada: ${win.webContents.getURL()} | título: ${win.webContents.getTitle()}`);
-    if (isSelfTest) void runSelfTest(win).catch((err) => failSelfTest(err));
+    if (process.env.PINK_DESKTOP_ACCEPTANCE) void runAcceptance(win).then(() => app.exit(0)).catch(err => { console.error(err); app.exit(1); });
+    else if (isSelfTest) void runSelfTest(win).catch((err) => failSelfTest(err));
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     console.error(`[desktop] FALHA ao carregar ${url}: ${code} ${desc}`);
@@ -66,6 +69,23 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
+  ipcMain.handle('pink-logic:save-export', async (_e, name: string, bytes: Uint8Array) => {
+    if (typeof name !== 'string' || !/^[a-zA-Z0-9_.-]+\.(zip|pdf|png|jpg|json|txt)$/.test(name) || !(bytes instanceof Uint8Array) || bytes.length > 100*1024*1024) throw new Error('Exportação inválida.');
+    let target: string | undefined;
+    if (process.env.PINK_DESKTOP_ACCEPTANCE && process.env.PINK_ACCEPTANCE_OUT) target=path.join(process.env.PINK_ACCEPTANCE_OUT,name);
+    else { const result=await dialog.showSaveDialog(mainWindow!, {defaultPath:path.join(app.getPath('downloads'),name)}); if(result.canceled) return {saved:false}; target=result.filePath; }
+    if(!target) return {saved:false}; fs.writeFileSync(target,bytes); return {saved:true,filePath:target};
+  });
+
+  ipcMain.handle('pink-logic:chatgpt-status', () => ({ connected: false, status: 'approval-required', method: 'Sign in with ChatGPT', reason: 'Acesso comercial ainda não aprovado. A transferência manual está disponível.', imageGeneration: false }));
+  ipcMain.handle('pink-logic:chatgpt-manual', async (_e, prompt: string) => {
+    if (typeof prompt !== 'string' || prompt.length > 30000) throw new Error('Pedido inválido.');
+    clipboard.writeText(prompt); await shell.openExternal('https://chatgpt.com/'); return true;
+  });
+  ipcMain.handle('pink-logic:chatgpt-access', () => shell.openExternal('https://openai.com/form/sign-in-with-chatgpt-interest/'));
+  ipcMain.handle('pink-logic:transfer-start', (_e, bytes: Uint8Array) => startTransfer(bytes));
+  ipcMain.handle('pink-logic:transfer-stop', () => { stopTransfer(); return true; });
+
   ipcMain.handle('pink-logic:get-version', () => app.getVersion());
   ipcMain.handle('pink-logic:get-user-data-path', () => app.getPath('userData'));
 
@@ -318,5 +338,6 @@ void app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  stopTransfer();
   if (process.platform !== 'darwin') app.quit();
 });

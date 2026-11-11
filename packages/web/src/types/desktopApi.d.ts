@@ -17,6 +17,13 @@ export interface DesktopDraft {
 }
 
 export interface PinkLogicDesktopApi {
+  saveExport(name: string, bytes: Uint8Array): Promise<{saved: boolean; filePath?: string}>;
+  getChatGPTStatus(): Promise<{connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean}>;
+  openChatGPTManual(prompt: string): Promise<boolean>;
+  requestChatGPTAccess(): Promise<void>;
+  startLocalTransfer(bytes: Uint8Array): Promise<{url: string; qrDataUrl: string; expiresAt: string}>;
+  stopLocalTransfer(): Promise<boolean>;
+
   getVersion(): Promise<string>;
   getUserDataPath(): Promise<string>;
   saveDraft(draft: { id: string; title: string; data: unknown }): Promise<{ id: string; title: string; updatedAt: string }>;

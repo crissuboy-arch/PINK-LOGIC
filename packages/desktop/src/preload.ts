@@ -73,6 +73,13 @@ export interface AiGenerateCopyResult {
 }
 
 export interface PinkLogicDesktopApi {
+  saveExport(name: string, bytes: Uint8Array): Promise<{saved: boolean; filePath?: string}>;
+  getChatGPTStatus(): Promise<{connected: boolean; status: string; method: string; reason: string; imageGeneration: boolean}>;
+  openChatGPTManual(prompt: string): Promise<boolean>;
+  requestChatGPTAccess(): Promise<void>;
+  startLocalTransfer(bytes: Uint8Array): Promise<{url: string; qrDataUrl: string; expiresAt: string}>;
+  stopLocalTransfer(): Promise<boolean>;
+
   getVersion(): Promise<string>;
   getUserDataPath(): Promise<string>;
   saveDraft(draft: Draft): Promise<DraftMeta>;
@@ -96,6 +103,13 @@ export interface PinkLogicDesktopApi {
 }
 
 const api: PinkLogicDesktopApi = {
+  saveExport: (name, bytes) => ipcRenderer.invoke('pink-logic:save-export',name,bytes),
+  getChatGPTStatus: () => ipcRenderer.invoke('pink-logic:chatgpt-status'),
+  openChatGPTManual: prompt => ipcRenderer.invoke('pink-logic:chatgpt-manual', prompt),
+  requestChatGPTAccess: () => ipcRenderer.invoke('pink-logic:chatgpt-access'),
+  startLocalTransfer: bytes => ipcRenderer.invoke('pink-logic:transfer-start', bytes),
+  stopLocalTransfer: () => ipcRenderer.invoke('pink-logic:transfer-stop'),
+
   getVersion: () => ipcRenderer.invoke('pink-logic:get-version'),
   getUserDataPath: () => ipcRenderer.invoke('pink-logic:get-user-data-path'),
   saveDraft: (draft) => ipcRenderer.invoke('pink-logic:save-draft', draft),
