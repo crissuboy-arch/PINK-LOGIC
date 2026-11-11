@@ -29,19 +29,23 @@ const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   "image/gif": "gif",
 };
 
-export async function importMedia(auth: AuthContext, input: MediaImportRequest) {
-  // Auth + dono configurado (fail-closed); o ficheiro fica no bucket da conta.
-  await resolveOwnerId(auth);
-
-  const { contentType, buffer } = await fetchPublicImage(input.url, { maxBytes: 5 * 1024 * 1024 });
+/**
+ * Guarda um buffer de imagem no bucket e devolve a URL pública.
+ * Caminhos com UUID (não enumeráveis); só leitura pública — a escrita
+ * passa sempre por esta API autenticada. O bucket tem de existir e ser
+ * público; sem ele, 503 com mensagem clara.
+ */
+export async function storeImage(
+  buffer: Buffer,
+  contentType: string,
+  filename: string
+): Promise<{ url: string; path: string; sizeBytes: number }> {
   const ext = EXT_BY_CONTENT_TYPE[contentType] ?? null;
   if (!ext) throw httpError(400, "Só imagens JPEG, PNG, WebP ou GIF.");
-
-  const safeName = (input.filename || "imagem").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "imagem";
+  const safeName = (filename || "imagem").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "imagem";
   const d = new Date();
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const path = `chatgpt/${day}/${randomUUID()}-${safeName}.${ext}`;
-
   const bucket = (process.env.PINK_LOGIC_MEDIA_BUCKET || "pink-logic-media").trim();
   const { error } = await admin().storage.from(bucket).upload(path, buffer, { contentType, upsert: false });
   if (error) {
@@ -51,5 +55,14 @@ export async function importMedia(auth: AuthContext, input: MediaImportRequest) 
     );
   }
   const { data } = admin().storage.from(bucket).getPublicUrl(path);
-  return { url: data.publicUrl, path, contentType, sizeBytes: buffer.length };
+  return { url: data.publicUrl, path, sizeBytes: buffer.length };
+}
+
+export async function importMedia(auth: AuthContext, input: MediaImportRequest) {
+  // Auth + dono configurado (fail-closed); o ficheiro fica no bucket da conta.
+  await resolveOwnerId(auth);
+
+  const { contentType, buffer } = await fetchPublicImage(input.url, { maxBytes: 5 * 1024 * 1024 });
+  const stored = await storeImage(buffer, contentType, input.filename || "imagem");
+  return { url: stored.url, path: stored.path, contentType, sizeBytes: stored.sizeBytes };
 }

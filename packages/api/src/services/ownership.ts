@@ -23,14 +23,18 @@ export function getOwnerUserId(): string | null {
 
 /**
  * Verdadeiro só para a proprietária.
- * - service (chave de serviço Athena/MCP): age em nome do dono configurado;
+ * - service (chave Athena/MCP): age em nome do dono configurado;
  *   sem dono configurado, não é dono de ninguém.
+ * - chatgpt (chave do GPT): NUNCA é dona — permissões mínimas por
+ *   desenho (só rascunhos/leitura/geração); agendar, aprovar, publicar
+ *   e apagar passam sempre pelo requireOwner e dão 403.
  * - user (sessão Supabase): só se o userId for o dono configurado.
  */
 export function isOwner(auth: AuthContext): boolean {
   const ownerId = getOwnerUserId();
   if (!ownerId) return false;
   if (auth.kind === "service") return true;
+  if (auth.kind === "chatgpt") return false;
   return auth.userId === ownerId;
 }
 
@@ -40,6 +44,11 @@ export function isOwner(auth: AuthContext): boolean {
  * Devolve o UUID do dono para filtrar queries.
  */
 export function requireOwner(auth: AuthContext): string {
+  // A chave do ChatGPT é barrada ANTES de qualquer outra verificação
+  // (403 determinístico, mesmo sem dono configurado no servidor).
+  if (auth.kind === "chatgpt") {
+    throw httpError(403, "A chave do ChatGPT não pode aprovar, agendar nem publicar — faz isso no site.");
+  }
   const ownerId = getOwnerUserId();
   if (!ownerId) {
     throw httpError(

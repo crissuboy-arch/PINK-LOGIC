@@ -4,6 +4,10 @@
  * logo/sticker: Pollinations.ai (HTTP direto, grátis) — mesma fonte do web.
  * qrcode: api.qrserver.com (HTTP direto, grátis).
  * story/copy: via AIsa quando configurada; senão 503 (não mock).
+ * carousel/mockup com options.store=true: o PNG é guardado no Storage
+ * e a resposta traz imageUrl em vez de imageBase64 — sem isto, o GPT
+ * não consegue receber o PNG (a resposta rebenta o limite de ~100K
+ * caracteres das Actions).
  */
 import { GenerateModule } from "@pink-logic/shared";
 import { generateText, aisaReady } from "./aisa.js";
@@ -77,6 +81,11 @@ export async function generate(module: GenerateModule, prompt: string, options: 
         handle: (options.handle as string) || "",
         counter: slideNumber || "",
       });
+      if (options.store === true) {
+        const { storeImage } = await import("./media.js");
+        const stored = await storeImage(png, "image/png", `carousel-slide-${slideNumber || "1"}.png`);
+        return { module, imageUrl: stored.url, metadata: { renderer: "hybrid", style: "maestro", stored: true, path: stored.path } };
+      }
       return { module, imageBase64: png.toString("base64"), metadata: { renderer: "hybrid", style: "maestro" } };
     }
     case "mockup": {
@@ -95,6 +104,15 @@ export async function generate(module: GenerateModule, prompt: string, options: 
         artworkUrl: artwork,
         projectName: options.projectName as string | undefined,
       });
+      if (options.store === true) {
+        const { storeImage } = await import("./media.js");
+        const stored = await storeImage(png, "image/png", `mockup-${mockupType}.png`);
+        return {
+          module,
+          imageUrl: stored.url,
+          metadata: { renderer: "satori", mockupType, idempotencyKey: options.idempotencyKey ?? null, stored: true, path: stored.path },
+        };
+      }
       return {
         module,
         imageBase64: png.toString("base64"),

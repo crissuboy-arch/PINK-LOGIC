@@ -43,7 +43,11 @@ export const generationLimiter = new RateLimiter(30, 60_000);
 export const dailyQuota = new RateLimiter(200, 24 * 60 * 60_000);
 
 export function rateLimitKey(auth: AuthContext): string {
-  return auth.kind === "service" ? "service" : `user:${auth.userId}`;
+  // Balde próprio por chamador: a chave do ChatGPT não come a quota da
+  // Athena (nem vice-versa); utilizadores limitados por userId.
+  if (auth.kind === "service") return "service";
+  if (auth.kind === "chatgpt") return "chatgpt";
+  return `user:${auth.userId}`;
 }
 
 /**

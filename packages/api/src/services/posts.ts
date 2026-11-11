@@ -115,6 +115,11 @@ function rowToApi(row: any) {
 }
 
 export async function createPost(auth: AuthContext, input: ScheduledPostCreate) {
+  // Chave do ChatGPT: só rascunhos — agendar é 403 (falha cedo, antes
+  // do Jev e antes de tocar na base). O agendamento faz-se no site.
+  if (auth.kind === "chatgpt" && input.scheduledAt) {
+    throw httpError(403, "A chave do ChatGPT só cria rascunhos — agenda no site.");
+  }
   const ownerId = await resolveOwnerId(auth);
   const projectId = await resolveProjectId(ownerId, input.projectId);
   await validateBrandAndCampaign(projectId, input.brandId, input.campaignId);
@@ -184,6 +189,11 @@ export async function getPost(auth: AuthContext, id: string) {
 }
 
 export async function updatePost(auth: AuthContext, id: string, input: ScheduledPostUpdate) {
+  // Chave do ChatGPT: edita conteúdo (título, legenda, hashtags, mídia,
+  // plataformas, marca, campanha) mas nunca muda estado nem data.
+  if (auth.kind === "chatgpt" && (input.status !== undefined || input.scheduledAt !== undefined)) {
+    throw httpError(403, "A chave do ChatGPT não muda estado nem data — agenda no site.");
+  }
   const ownerId = await resolveOwnerId(auth);
   const current = await getOwnedPost(ownerId, id); // 404 cedo se não for dela
   // Agendar é exclusivo da proprietária (Achado 1): criar um "agendado"
@@ -211,6 +221,8 @@ export async function updatePost(auth: AuthContext, id: string, input: Scheduled
 }
 
 export async function deletePost(auth: AuthContext, id: string) {
+  // Chave do ChatGPT: nunca apaga.
+  if (auth.kind === "chatgpt") throw httpError(403, "A chave do ChatGPT não apaga posts.");
   const ownerId = await resolveOwnerId(auth);
   await getOwnedPost(ownerId, id);
   const { error } = await admin().from("scheduled_posts").delete().eq("id", id).eq("user_id", ownerId);

@@ -40,8 +40,10 @@ delete process.env.PINK_LOGIC_OWNER_USER_ID;
 delete process.env.PINKLOGIC_ATHENA_API_KEY;
 delete process.env.CRON_SECRET;
 process.env.PINK_LOGIC_SERVICE_KEY = 'test-service-key-0123456789abcdef';
+process.env.PINK_LOGIC_CHATGPT_KEY = 'test-chatgpt-key-0123456789abcdef';
 
 const SERVICE_AUTH = { authorization: 'Bearer test-service-key-0123456789abcdef' };
+const CHATGPT_AUTH = { authorization: 'Bearer ' + process.env.PINK_LOGIC_CHATGPT_KEY };
 
 // --- mocks -------------------------------------------------------------
 // fakeReq simula a Vercel: query já vem parseada do URL (como a
@@ -298,6 +300,66 @@ test('router: media/import POST com auth e body inválido → 400 (URL inválida
 
 test('router: media/import POST com auth e body válido → 503 (chega ao importMedia; sem dono)', async () => {
   const res = await call(fakeReq({ method: 'POST', path: 'media/import', headers: SERVICE_AUTH, body: { url: 'https://example.com/a.png' } }));
+  assert.equal(res.statusCode, 503);
+});
+
+// --- chave do ChatGPT: permissões mínimas -------------------------------
+test('router: brands GET com chave ChatGPT → 503 (auth passou; sem dono)', async () => {
+  const res = await call(fakeReq({ method: 'GET', path: 'brands', headers: CHATGPT_AUTH }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: posts POST com chave ChatGPT e sem data → 503 (rascunho permitido; sem dono)', async () => {
+  const res = await call(fakeReq({
+    method: 'POST', path: 'posts', headers: CHATGPT_AUTH,
+    body: { title: 't', caption: 'c', platforms: ['Instagram'] },
+  }));
+  assert.equal(res.statusCode, 503);
+});
+
+test('router: posts POST com chave ChatGPT e scheduledAt → 403 (só rascunhos)', async () => {
+  const res = await call(fakeReq({
+    method: 'POST', path: 'posts', headers: CHATGPT_AUTH,
+    body: { title: 't', caption: 'c', platforms: ['Instagram'], scheduledAt: '2030-01-01T09:00:00.000Z' },
+  }));
+  assert.equal(res.statusCode, 403);
+  assert.match(res.body.error, /só cria rascunhos/);
+});
+
+test('router: approve POST com chave ChatGPT → 403 (não aprova)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/approve', headers: CHATGPT_AUTH }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('router: publish POST com chave ChatGPT → 403 (não publica)', async () => {
+  const res = await call(fakeReq({ method: 'POST', path: 'posts/abc-123/publish', headers: CHATGPT_AUTH }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('router: schedule POST com chave ChatGPT → 403 (não agenda)', async () => {
+  const res = await call(fakeReq({
+    method: 'POST', path: 'posts/abc-123/schedule', headers: CHATGPT_AUTH,
+    body: { scheduledAt: '2030-01-01T09:00:00.000Z' },
+  }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('router: [id] DELETE com chave ChatGPT → 403 (não apaga)', async () => {
+  const res = await call(fakeReq({ method: 'DELETE', path: 'posts/abc-123', headers: CHATGPT_AUTH }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('router: [id] PATCH com chave ChatGPT e status → 403 (não muda estado)', async () => {
+  const res = await call(fakeReq({
+    method: 'PATCH', path: 'posts/abc-123', headers: CHATGPT_AUTH, body: { status: 'publicado' },
+  }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('router: [id] PATCH com chave ChatGPT e só legenda → 503 (edição permitida; sem dono)', async () => {
+  const res = await call(fakeReq({
+    method: 'PATCH', path: 'posts/abc-123', headers: CHATGPT_AUTH, body: { caption: 'nova' },
+  }));
   assert.equal(res.statusCode, 503);
 });
 

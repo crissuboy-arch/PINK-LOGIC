@@ -1,12 +1,15 @@
 /**
  * Autenticação das rotas da API (Etapa 1).
  *
- * Aceita dois tipos de credencial no header `Authorization: Bearer <token>`:
+ * Aceita três tipos de credencial no header `Authorization: Bearer <token>`:
  *  - token de sessão do Supabase Auth (utilizador logado no site) → { kind: "user" }
- *  - chave de serviço (Athena/MCP: PINK_LOGIC_SERVICE_KEY; ChatGPT:
- *    PINK_LOGIC_CHATGPT_KEY) → { kind: "service" }
- * As duas chaves de serviço são independentes: o GPT tem a sua, a Athena
- * tem a sua — revogar uma não toca na outra.
+ *  - PINK_LOGIC_SERVICE_KEY (Athena/MCP, servidor-a-servidor) → { kind: "service" }
+ *  - PINK_LOGIC_CHATGPT_KEY (GPT privado do ChatGPT) → { kind: "chatgpt" }
+ *
+ * A chave do ChatGPT é DEDICADA e de permissões mínimas: cria rascunhos,
+ * lê, gera e importa — mas NUNCA é dona (ver ownership.ts): não agenda,
+ * não aprova, não publica, não apaga. Revoga-se apagando/rodando a env
+ * na Vercel; a chave da Athena não é afetada.
  *
  * Fecha por omissão: sem credencial válida → 401; sem config no servidor → 503.
  */
@@ -15,7 +18,8 @@ import { createClient } from "@supabase/supabase-js";
 
 export type AuthContext =
   | { kind: "user"; userId: string; email: string | null }
-  | { kind: "service" };
+  | { kind: "service" }
+  | { kind: "chatgpt" };
 
 export type AuthResult =
   | { ok: true; ctx: AuthContext }
@@ -32,15 +36,15 @@ function supabaseUrl(): string | null {
   return null;
 }
 
-function isServiceKey(token: string): boolean {
-  // Qualquer das chaves de serviço vale (≥32 chars cada; chave ausente
-  // ou fraca nunca autentica). Comparação em tempo constante por chave.
-  for (const raw of [process.env.PINK_LOGIC_SERVICE_KEY || "", process.env.PINK_LOGIC_CHATGPT_KEY || ""]) {
-    const key = raw.trim();
-    if (key.length < 32) continue;
-    if (timingSafeEqual(sha256(token), sha256(key))) return true;
-  }
-  return false;
+/** Devolve o tipo de chave de serviço, ou null se o token não for nenhuma. */
+function serviceKeyKind(token: string): "service" | "chatgpt" | null {
+  // Cada chave vale por si (≥32 chars; ausente ou fraca nunca autentica).
+  // Comparação em tempo constante por chave.
+  const serviceKey = (process.env.PINK_LOGIC_SERVICE_KEY || "").trim();
+  if (serviceKey.length >= 32 && timingSafeEqual(sha256(token), sha256(serviceKey))) return "service";
+  const chatKey = (process.env.PINK_LOGIC_CHATGPT_KEY || "").trim();
+  if (chatKey.length >= 32 && timingSafeEqual(sha256(token), sha256(chatKey))) return "chatgpt";
+  return null;
 }
 
 export async function authenticate(authorization: string | undefined): Promise<AuthResult> {
@@ -48,7 +52,8 @@ export async function authenticate(authorization: string | undefined): Promise<A
   const token = match?.[1]?.trim();
   if (!token) return { ok: false, status: 401, error: "Não autenticado: faça login." };
 
-  if (isServiceKey(token)) return { ok: true, ctx: { kind: "service" } };
+  const kind = serviceKeyKind(token);
+  if (kind) return { ok: true, ctx: { kind } };
 
   const url = supabaseUrl();
   const anonKey = (process.env.SUPABASE_ANON_KEY || "").trim() || (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
