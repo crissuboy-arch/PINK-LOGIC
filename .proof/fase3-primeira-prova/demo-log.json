@@ -1,0 +1,129 @@
+{
+  "theme": "A IA chegou às pequenas empresas",
+  "architecture": "lista",
+  "coverVariant": "destaque",
+  "slideCount": 5,
+  "brand": {
+    "name": "Ofensiva Criativa",
+    "slogan": "Marketing sem filtro. Resultados sem desculpa.",
+    "palette": {
+      "primary": "#103B78",
+      "secondary": "#071D3A",
+      "accent": "#D4AF37",
+      "background": "#FFFFFF",
+      "text": "#071D3A",
+      "surface": "#F5F7FA"
+    },
+    "logo": null
+  },
+  "honesty": "Sem AIsa e sem nenhuma API paga: pauta, copy, legenda e DMs são CONTEÚDO DE DEMONSTRAÇÃO composto localmente a partir de templates (não gerados por IA). Nenhuma imagem de IA por página. A marca é um fixture local; a existência da marca semeada no preview NÃO foi verificada. O fetch real ao website NÃO foi executado. A gravação real no Supabase NÃO foi executada. Os PNG/JPG do ZIP são renderizados com PIL a partir da mesma geometria do motor; a renderização no canvas do browser (serviço novo carouselRender.ts, usado pela exportação na app) é provada por testes unitários com mock de canvas (4/4), não neste script. O botão «Guardar no Brand Kit» da UI não foi clicado (sem automação de cliques).",
+  "steps": [
+    {
+      "step": "1. Aplicação Windows a executar",
+      "status": "OK",
+      "detail": "Electron arranca por file:// (userData temporário), root com conteúdo, preload presente. Navegação real: #/criacao/carrossel-fluxo visível com banner de demonstração + botão «Ligação de IA»; #/sistema/ia visível; modo de IA no main = «teste». Capturas reais: screenshot-arranque.png (63197 bytes), screenshot-fluxo.png (283530 bytes), screenshot-ia.png (306101 bytes). Round-trip do projecto via preload: OK."
+    },
+    {
+      "step": "2. Ligar a IA (modo de teste)",
+      "status": "OK",
+      "detail": "Estado predefinido: modo «teste», sem chave, gasto $0. O gate recusa a geração real em modo de teste. O ecrã /sistema/ia e o rótulo de demonstração são provados no self-test Electron (screenshot-ia.png)."
+    },
+    {
+      "step": "3. Site ou descrição do negócio",
+      "status": "PARCIAL",
+      "detail": "Website: extracção demonstrada sobre HTML de exemplo local (fetch real NÃO executado); nome e cor #103B78 extraídos. A importação por URL existe na etapa 1 do fluxo."
+    },
+    {
+      "step": "4. Contexto Oficial da Marca por entrevista",
+      "status": "OK",
+      "detail": "Entrevista validada sem erros (nome/cor/tom/slogan iguais ao seed)."
+    },
+    {
+      "step": "5. Brand Kit guardado",
+      "status": "PARCIAL",
+      "detail": "Marca «Ofensiva Criativa» — cores #103B78/#D4AF37/#FFFFFF/#071D3A/#F5F7FA, slogan «Marketing sem filtro. Resultados sem desculpa.», LOGO VAZIO (não existe ficheiro oficial). O botão «Guardar no Brand Kit» existe na etapa 1 do fluxo; o clique na UI NÃO foi executado nesta prova (sem automação de cliques)."
+    },
+    {
+      "step": "6. Radar — 30 pautas, 10 destacadas",
+      "status": "OK",
+      "detail": "30 pautas geradas (determinísticas, sem IA); top 10 seleccionadas. 1.ª = «Cansado da agenda vazia apesar do bom trabalho? A IA chegou às pequenas empresas resolve isto» (86)."
+    },
+    {
+      "step": "7. Tema + estrutura do carrossel",
+      "status": "OK",
+      "detail": "Arquitetura «Lista» (5 slides) de 5 disponíveis. Referência modelada e replicada para «Vendas directas sem complicação» (5 slides)."
+    },
+    {
+      "step": "8. Copy com revisões",
+      "status": "OK",
+      "detail": "5 slides gerados por templates locais em MODO DE TESTE (demonstração, custo $0 — nunca finge usar os modelos da OpenAI). Capa: «A IA chegou às pequenas empresas». Fecho: «O próximo passo é teu»."
+    },
+    {
+      "step": "9. Até 3 capas",
+      "status": "OK",
+      "detail": "3 variantes geradas (clássica #103B78, destaque #F5F7FA, minimal #071D3A), mesmo título. Escolhida: «destaque»."
+    },
+    {
+      "step": "10. Capa escolhida + identidade nos restantes cards",
+      "status": "OK",
+      "detail": "Capa «destaque» aplicada ao card 1; cards 2–5 intocados (mesma referência). Consistência de marca: 0 violações. Fundos: #F5F7FA, #071D3A, #071D3A, #071D3A, #071D3A — só cores do Brand Kit Ofensiva. Contraste verificado por teste (WCAG AA 4,5:1 em todos os textos, todas as capas — o motor resolve os papéis por luminância, por isso a paleta com fundo claro também dá texto legível)."
+    },
+    {
+      "step": "11. Correcção individual por card",
+      "status": "OK",
+      "detail": "Card 3 corrigido e aprovado. Antes: «2. A IA chegou às pequenas empresas — ponto 2». Depois: «Passo 2 — revisto por ti». Cards 1, 2, 4 e 5 intocados (mesma referência). 5/5 cards aprovados."
+    },
+    {
+      "step": "12. Legenda, CTA e materiais complementares",
+      "status": "OK",
+      "detail": "Legenda principal + 2 variantes (curta/pergunta), 3 variantes de CTA, 3 templates de DM (resposta/seguimento/partilha), plano.pdf gerado localmente (2497 bytes). Gate FECHADO sem aprovação → ABERTO após aprovação por Cristiane."
+    },
+    {
+      "step": "13. Exportar (ZIP real)",
+      "status": "OK",
+      "detail": "ZIP de entrega: 21 ficheiros reais (1262558 bytes) — 5 slides PNG+JPG 1080×1350, 3 capas PNG+JPG, caption.txt, plano.pdf, dm.txt, project.json, MANIFESTO.txt. Verificados: magia PNG/JPEG + dimensões + PDF + legenda. Nota: PNG/JPG via PIL a partir da mesma geometria do motor; a renderização no canvas do browser (serviço novo da app) é provada por testes unitários, não aqui."
+    },
+    {
+      "step": "14. Guardar e recuperar o projecto",
+      "status": "OK",
+      "detail": "Round-trip local do projecto (parseProject): 5 slides, card 3 corrigido, aprovado por Cristiane, arquitetura lista — igual ao guardado. Rascunho desktop (saveDraft/loadDraft, escrita atómica): guardado e relido em disco. O round-trip via preload real é provado no self-test Electron. Gravação real no Supabase NÃO executada — requer sessão autenticada."
+    },
+    {
+      "step": "15. Instagram / agendamento / analytics / automação",
+      "status": "OK",
+      "detail": "SÓ esqueleto desactivado (como na Fase 2): Instagram desactivado, Composio desactivado — nada agenda nem publica sem aprovação humana. Nenhuma chamada, nenhuma credencial."
+    }
+  ],
+  "zipFiles": [
+    "MANIFESTO.txt",
+    "caption.txt",
+    "cover-classica.jpg",
+    "cover-classica.png",
+    "cover-destaque.jpg",
+    "cover-destaque.png",
+    "cover-minimal.jpg",
+    "cover-minimal.png",
+    "dm.txt",
+    "plano.pdf",
+    "project.json",
+    "slide-1.jpg",
+    "slide-1.png",
+    "slide-2.jpg",
+    "slide-2.png",
+    "slide-3.jpg",
+    "slide-3.png",
+    "slide-4.jpg",
+    "slide-4.png",
+    "slide-5.jpg",
+    "slide-5.png"
+  ],
+  "zipBytes": 1262558,
+  "selftest": {
+    "ok": true,
+    "flowVisible": true,
+    "iaVisible": true,
+    "aiMode": "teste",
+    "projectRoundTripOk": true
+  },
+  "generatedAt": "2026-11-11T14:29:41.921Z"
+}

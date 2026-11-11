@@ -1,0 +1,73 @@
+{
+  "id": "demo-ofensiva-fase3",
+  "title": "A IA chegou às pequenas empresas",
+  "updatedAt": "2026-11-11T14:29:02.738Z",
+  "data": {
+    "version": 1,
+    "id": "carousel-ofensiva-fase3",
+    "title": "A IA chegou às pequenas empresas",
+    "brandId": "brand-ofensiva-demo",
+    "brandName": "Ofensiva Criativa",
+    "context": {
+      "audience": "Pequenas empresas que querem vender mais sem complicação",
+      "pains": [
+        "a agenda vazia apesar do bom trabalho",
+        "não serem encontradas online",
+        "falta de tempo para criar conteúdo"
+      ],
+      "goals": [
+        "encher a agenda com clientes certos",
+        "ser encontrada por quem procura",
+        "vender sem complicação"
+      ],
+      "themes": [
+        "IA nas pequenas empresas",
+        "marketing sem filtro",
+        "vendas directas"
+      ],
+      "avoid": [
+        "promessas de resultados garantidos",
+        "linguagem de guru"
+      ],
+      "defaultCta": "Comenta LINK",
+      "hashtags": [
+        "#OfensivaCriativa"
+      ]
+    },
+    "topic": "A IA chegou às pequenas empresas",
+    "pautaId": "pauta-01",
+    "architectureId": "lista",
+    "coverVariant": "destaque",
+    "slides": [
+      {
+        "title": "A IA chegou às pequenas empresas",
+        "body": "Vamos directos ao assunto. Se a agenda vazia apesar do bom trabalho te soa familiar, este post é para ti. O objectivo é simples: encher a agenda com clientes certos. Desliza para ver como."
+      },
+      {
+        "title": "1. A IA chegou às pequenas empresas — ponto 1",
+        "body": "Ponto 1 de A IA chegou às pequenas empresas: aplica hoje, sem ferramentas pagas e sem complicação."
+      },
+      {
+        "title": "Passo 2 — revisto por ti",
+        "body": "Ideias, textos e legendas saem em minutos — revisto por ti, não escrito por ti."
+      },
+      {
+        "title": "3. A IA chegou às pequenas empresas — ponto 3",
+        "body": "Ponto 3 de A IA chegou às pequenas empresas: aplica hoje, sem ferramentas pagas e sem complicação."
+      },
+      {
+        "title": "O próximo passo é teu",
+        "body": "Comenta LINK."
+      }
+    ],
+    "caption": "A IA chegou às pequenas empresas\n\nVamos directos ao assunto. Se a agenda vazia apesar do bom trabalho te soa familiar, este post é para ti. O objectivo é simples: encher a agenda com clientes certos.\n\nComenta LINK.",
+    "hashtags": [
+      "#OfensivaCriativa"
+    ],
+    "approvedBy": "Cristiane",
+    "approvedAt": "2026-11-11T14:29:01.737Z",
+    "referenceId": "ref-mwc7su5g",
+    "createdAt": "2026-11-11T14:29:01.737Z",
+    "updatedAt": "2026-11-11T14:29:02.737Z"
+  }
+}

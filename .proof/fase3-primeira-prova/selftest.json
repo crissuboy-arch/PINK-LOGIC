@@ -1,0 +1,63 @@
+{
+  "startedAt": "2026-11-11T14:29:34.168Z",
+  "pageUrl": "file:///home/hatch/workspace/pink-logic-audit/packages/desktop/dist-web/index.html#/login",
+  "pageTitle": "PinkLogic | Sua Central de Design & Estratégia",
+  "rootChildren": 1,
+  "bodyTextLength": 149,
+  "bodyTextSample": "Boas-vindas ao PinkLogic\n\nAcesse sua central estratégica de design e dados\n\nEsqueci minha senha\nEntrar na Plataforma\n\nNão tem uma conta? Comece agora",
+  "apiPresent": true,
+  "version": "2.0.0",
+  "userDataPath": "/home/hatch/workspace/pink-logic-audit/packages/desktop/test-evidence/user-data",
+  "savedMeta": {
+    "id": "selftest-projecto",
+    "title": "Projecto self-test",
+    "updatedAt": "2026-11-11T14:29:37.175Z"
+  },
+  "listed": [
+    {
+      "id": "selftest-projecto",
+      "title": "Projecto self-test",
+      "updatedAt": "2026-11-11T14:29:37.175Z"
+    }
+  ],
+  "loaded": {
+    "id": "selftest-projecto",
+    "title": "Projecto self-test",
+    "updatedAt": "2026-11-11T14:29:37.175Z",
+    "data": {
+      "texto": "rascunho de teste",
+      "itens": [
+        1,
+        2,
+        3
+      ]
+    }
+  },
+  "roundTripOk": true,
+  "screenshot": "/home/hatch/workspace/pink-logic-audit/packages/desktop/test-evidence/screenshot.png",
+  "screenshotBytes": 63197,
+  "flowVisible": true,
+  "flowUrl": "file:///home/hatch/workspace/pink-logic-audit/packages/desktop/dist-web/index.html#/criacao/carrossel-fluxo",
+  "flowDemoBanner": true,
+  "flowAiLink": true,
+  "flowBodySample": "PINK\nLOGIC\nSelecionar Projeto...\nDashboard\nCriação\nDesigner Social Profissional\nGerador de Carrossel\nModelos Premium\nCriador de Histórias\nEstúdio de Logótipos IA\nEstúdio de Maquetes\nEstúdio de Código QR\nEstúdio de Stickers IA\nLegendas Animadas\nGerador de Copy\nAtivos\nCentral de Ativos\nKit de Marca Pr",
+  "screenshotFlowBytes": 283530,
+  "screenshotFlow": "/home/hatch/workspace/pink-logic-audit/packages/desktop/test-evidence/screenshot-flow.png",
+  "iaVisible": true,
+  "iaUrl": "file:///home/hatch/workspace/pink-logic-audit/packages/desktop/dist-web/index.html#/sistema/ia",
+  "iaBodySample": "PINK\nLOGIC\nSelecionar Projeto...\nDashboard\nCriação\nDesigner Social Profissional\nGerador de Carrossel\nModelos Premium\nCriador de Histórias\nEstúdio de Logótipos IA\nEstúdio de Maquetes\nEstúdio de Código QR\nEstúdio de Stickers IA\nLegendas Animadas\nGerador de Copy\nAtivos\nCentral de Ativos\nKit de Marca Pr",
+  "screenshotIaBytes": 306101,
+  "screenshotIa": "/home/hatch/workspace/pink-logic-audit/packages/desktop/test-evidence/screenshot-ia.png",
+  "aiMode": "teste",
+  "aiModeTeste": true,
+  "projectDraftMeta": {
+    "id": "fase3-primeira-prova",
+    "title": "A IA chegou às pequenas empresas",
+    "updatedAt": "2026-11-11T14:29:41.672Z"
+  },
+  "projectRoundTripOk": true,
+  "projectDraftFile": "/home/hatch/workspace/pink-logic-audit/packages/desktop/test-evidence/user-data/drafts/fase3-primeira-prova.json",
+  "projectDraftFileExists": true,
+  "finishedAt": "2026-11-11T14:29:41.674Z",
+  "ok": true
+}
