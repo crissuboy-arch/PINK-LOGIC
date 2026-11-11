@@ -29,20 +29,24 @@ function run(cmd, args, opts = {}) {
 mkdirSync(evidenceDir, { recursive: true });
 rmSync(userDataDir, { recursive: true, force: true });
 
-// 1. Builds (VITE_API_URL explícita p/ o desktop apontar p/ a API Vercel).
+// 1. Builds (VITE_API_URL explícita p/ o desktop apontar p/ a API Vercel;
+// VITE_PINK_DESKTOP_SELFTEST=1 activa SÓ neste bundle a sessão local de
+// demonstração do self-test — ver authService; o pack:win normal não a define).
 run('npm', ['run', 'build', '--workspace=@pink-logic/web'], {
-  env: { ...process.env, VITE_API_URL: 'https://pink-logic.vercel.app' },
+  env: { ...process.env, VITE_API_URL: 'https://pink-logic.vercel.app', VITE_PINK_DESKTOP_SELFTEST: '1' },
 });
 run('npm', ['run', 'build', '--workspace=@pink-logic/desktop']);
 run('npm', ['run', 'build:web', '--workspace=@pink-logic/desktop']);
 
 // 2. Electron + self-test (xvfb-run se existir; senão tenta directo).
 const electronBin = join(repoRoot, 'node_modules', '.bin', 'electron');
+const proofProject = join(repoRoot, '.proof', 'fase3-primeira-prova', 'project.json');
 const env = {
   ...process.env,
   PINK_DESKTOP_SELFTEST: '1',
   PINK_DESKTOP_SELFTEST_OUT: selfTestOut,
   PINK_DESKTOP_USER_DATA: userDataDir,
+  PINK_DESKTOP_SELFTEST_PROJECT: existsSync(proofProject) ? proofProject : '',
   ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
 };
 const xvfb = spawnSync('which', ['xvfb-run']);
@@ -66,6 +70,15 @@ const checks = {
   roundTripOk: result.roundTripOk === true,
   draftFileExists: existsSync(draftFile),
   screenshotBytes: result.screenshotBytes,
+  flowVisible: result.flowVisible === true,
+  flowDemoBanner: result.flowDemoBanner === true,
+  flowAiLink: result.flowAiLink === true,
+  iaVisible: result.iaVisible === true,
+  aiModeTeste: result.aiModeTeste === true,
+  screenshotFlowBytes: result.screenshotFlowBytes,
+  screenshotIaBytes: result.screenshotIaBytes,
+  projectRoundTripOk: result.projectRoundTripOk === true || result.projectRoundTripOk === null,
+  projectDraftFileExists: result.projectRoundTripOk === null ? true : result.projectDraftFileExists === true,
 };
 console.log(JSON.stringify({ checks, result }, null, 2));
 const failed = Object.entries(checks).filter(([, v]) => v === false || v === 0);

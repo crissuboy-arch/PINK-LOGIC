@@ -92,7 +92,7 @@ export default function AIConnectionPage() {
       </p>
 
       {status === 'teste' && (
-        <p data-testid="ai-demo-banner" style={{ background: '#FFF7E0', border: '1px solid #D4AF37', borderRadius: 8, padding: '0.7rem', fontSize: '0.85rem' }}>
+        <p data-testid="ai-demo-banner" style={{ background: '#FFF7E0', border: '1px solid #D4AF37', borderRadius: 8, padding: '0.7rem', fontSize: '0.85rem', color: '#4a3600' }}>
           <strong>Conteúdo de demonstração — modo de teste.</strong> O fluxo de carrosséis gera copy
           com templates locais. Não usa os modelos da OpenAI nem gasta nada.
         </p>

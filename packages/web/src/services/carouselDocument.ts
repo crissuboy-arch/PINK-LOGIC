@@ -73,13 +73,41 @@ interface BrandColors {
   surface: string;
 }
 
+/** Luminância relativa (WCAG) de um hex — para resolver papéis por contraste. */
+function luminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const channels = [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function pickByLuminance(colors: string[], pick: 'darkest' | 'lightest'): string | null {
+  const valid = colors.filter((c): c is string => typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c));
+  if (!valid.length) return null;
+  return valid.reduce((best, c) =>
+    (pick === 'darkest' ? luminance(c) < luminance(best) : luminance(c) > luminance(best)) ? c : best);
+}
+
 function resolveColors(brand: BrandSchema | null): BrandColors {
   const p = brand?.palette;
+  const primary = p?.primary || '#103B78';
+  const accent = p?.accent || '#D4AF37';
+  // Os papéis do motor (fundo escuro de slide / texto claro sobre escuro)
+  // são resolvidos por LUMINÂNCIA, não pelo nome do slot: o `background`
+  // de uma marca tanto pode ser escuro (convenção da app: #0D0D12) como
+  // claro (a página da marca é branca — seed da Ofensiva: #FFFFFF), e o
+  // `text` tanto pode ser claro como escuro (#071D3A). Com a leitura por
+  // slot, essa paleta produzia corpo branco sobre fundo branco (ilegível)
+  // apesar de «0 violações» de consistência — a consistência só verifica
+  // pertença à paleta, não contraste. Com luminância, as duas convenções
+  // dão o mesmo resultado legível (ver teste de contraste).
   return {
-    primary: p?.primary || '#103B78',
-    accent: p?.accent || '#D4AF37',
-    background: p?.background || '#071D3A',
-    text: p?.text || '#FFFFFF',
+    primary,
+    accent,
+    background: pickByLuminance([primary, p?.secondary, p?.background].filter(Boolean) as string[], 'darkest') || '#071D3A',
+    text: pickByLuminance([p?.text, p?.background, p?.surface].filter(Boolean) as string[], 'lightest') || '#FFFFFF',
     surface: p?.surface || '#F5F7FA',
   };
 }

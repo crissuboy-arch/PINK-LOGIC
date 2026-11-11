@@ -7,7 +7,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { deleteDraft, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
+import { deleteDraft, draftsDir, listDrafts, loadDraft, saveDraft, type Draft } from './drafts';
 import {
   clearApiKey, encryptionAvailable, keyHintFromStored, loadDiskConfig,
   saveDiskConfig, storeApiKey, type AiConnectionDiskConfig,
@@ -163,10 +163,34 @@ function registerIpc(): void {
  * Self-test (PINK_DESKTOP_SELFTEST=1): exercita o preload REAL no renderer
  * (window.pinkLogicDesktop), guarda/carrega um rascunho, tira screenshot e
  * escreve o resultado em PINK_DESKTOP_SELFTEST_OUT. Nunca corre em uso normal.
+ *
+ * Fase 3 — fluxo completo: além do arranque e do rascunho genérico, semeia
+ * uma sessão local de demonstração (só aceite porque o bundle de self-test
+ * foi construído com VITE_PINK_DESKTOP_SELFTEST=1 — ver authService) e
+ * navega no fluxo real: criacao/carrossel-fluxo (banner de demonstração
+ * visível) e sistema/ia (ecrã de ligação). Se PINK_DESKTOP_SELFTEST_PROJECT
+ * apontar para um project.json de prova, guarda-o como rascunho desktop e
+ * prova o round-trip via preload. Screenshots reais em test-evidence/.
  */
 async function runSelfTest(win: BrowserWindow): Promise<void> {
   const api = (expr: string) => win.webContents.executeJavaScript(expr);
   const result: Record<string, unknown> = { startedAt: new Date().toISOString() };
+  const shotDir = path.dirname(selfTestOut || process.cwd());
+  const takeShot = async (name: string): Promise<number> => {
+    const shot = await win.webContents.capturePage();
+    const shotPath = path.join(shotDir, name);
+    fs.mkdirSync(path.dirname(shotPath), { recursive: true });
+    fs.writeFileSync(shotPath, shot.toPNG());
+    return fs.statSync(shotPath).size;
+  };
+  const waitForText = async (text: string, timeoutMs = 20000): Promise<boolean> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (await api(`document.body.innerText.includes(${JSON.stringify(text)})`)) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  };
 
   // Dar tempo ao React para pintar antes de inspeccionar/capturar.
   await new Promise((r) => setTimeout(r, 3000));
@@ -193,14 +217,77 @@ async function runSelfTest(win: BrowserWindow): Promise<void> {
     Array.isArray(result.listed) &&
     (result.listed as Array<{ id: string }>).some((d) => d.id === 'selftest-projecto');
   const shot = await win.webContents.capturePage();
-  const shotPath = path.join(path.dirname(selfTestOut || process.cwd()), 'screenshot.png');
+  const shotPath = path.join(shotDir, 'screenshot.png');
   fs.mkdirSync(path.dirname(shotPath), { recursive: true });
   fs.writeFileSync(shotPath, shot.toPNG());
   result.screenshot = shotPath;
   result.screenshotBytes = fs.statSync(shotPath).size;
+
+  // --- Fase 3: navegação real no fluxo (sessão local de demonstração) ---
+  await api(`localStorage.setItem('pinklogic.auth.session', ${JSON.stringify(JSON.stringify({ email: 'selftest@pinklogic.local', name: 'Self-test', role: 'Self-test' }))})`);
+  await api(`location.hash = '#/criacao/carrossel-fluxo'`);
+  result.flowVisible = await waitForText('Fluxo de Carrosséis');
+  result.flowUrl = win.webContents.getURL();
+  result.flowDemoBanner = await api(`document.querySelector('[data-testid="ai-demo-banner"]') !== null`);
+  result.flowAiLink = await api(`document.querySelector('[data-testid="go-ai-connection"]') !== null`);
+  result.flowBodySample = await api(`document.body.innerText.slice(0, 300)`);
+  // Dar tempo ao React para pintar a rota antes da captura.
+  await new Promise((r) => setTimeout(r, 1500));
+  result.screenshotFlowBytes = await takeShot('screenshot-flow.png');
+  result.screenshotFlow = path.join(shotDir, 'screenshot-flow.png');
+
+  await api(`location.hash = '#/sistema/ia'`);
+  // 'Ligação de IA' também existe na página do fluxo (botão do passo 2) —
+  // esperar pelo texto próprio do ecrã de ligação, não pelo título.
+  result.iaVisible = await waitForText('Modo de teste (predefinido)');
+  result.iaUrl = win.webContents.getURL();
+  result.iaBodySample = await api(`document.body.innerText.slice(0, 300)`);
+  await new Promise((r) => setTimeout(r, 1500));
+  result.screenshotIaBytes = await takeShot('screenshot-ia.png');
+  result.screenshotIa = path.join(shotDir, 'screenshot-ia.png');
+
+  // Estado efectivo da IA no main (predefinição tem de ser modo de teste).
+  try {
+    const aiState = await api(`window.pinkLogicDesktop.getAiConnection()`) as { settings?: { mode?: string } } | null;
+    result.aiMode = aiState?.settings?.mode ?? null;
+    result.aiModeTeste = result.aiMode === 'teste';
+  } catch (e) {
+    result.aiMode = null;
+    result.aiModeTeste = false;
+    result.aiModeError = e instanceof Error ? e.message : String(e);
+  }
+
+  // --- Fase 3: round-trip do projecto de prova via preload (rascunho desktop) ---
+  const projectFile = process.env.PINK_DESKTOP_SELFTEST_PROJECT || '';
+  if (projectFile && fs.existsSync(projectFile)) {
+    const projectData = JSON.parse(fs.readFileSync(projectFile, 'utf8')) as { title?: string; slides?: unknown[] };
+    const userData = app.getPath('userData');
+    const meta = saveDraft(userData, {
+      id: 'fase3-primeira-prova',
+      title: projectData.title || 'Carrossel Fase 3 — primeira prova',
+      updatedAt: new Date().toISOString(),
+      data: projectData,
+    });
+    result.projectDraftMeta = meta;
+    const reloaded = await api(`window.pinkLogicDesktop.loadDraft('fase3-primeira-prova')`) as { data?: { title?: string; slides?: unknown[] } } | null;
+    result.projectRoundTripOk =
+      reloaded?.data?.title === projectData.title &&
+      Array.isArray(reloaded?.data?.slides) &&
+      (reloaded?.data?.slides as unknown[]).length === (projectData.slides ?? []).length;
+    result.projectDraftFile = path.join(draftsDir(userData), 'fase3-primeira-prova.json');
+    result.projectDraftFileExists = fs.existsSync(result.projectDraftFile as string);
+  } else {
+    result.projectRoundTripOk = null;
+    result.projectCheck = 'skipped — PINK_DESKTOP_SELFTEST_PROJECT sem ficheiro de prova';
+  }
+
   result.finishedAt = new Date().toISOString();
   result.ok = result.apiPresent === true && result.roundTripOk === true && (result.screenshotBytes as number) > 0
-    && (result.rootChildren as number) > 0 && (result.bodyTextLength as number) > 0;
+    && (result.rootChildren as number) > 0 && (result.bodyTextLength as number) > 0
+    && result.flowVisible === true && result.flowDemoBanner === true && result.flowAiLink === true
+    && result.iaVisible === true && result.aiModeTeste === true
+    && (result.screenshotFlowBytes as number) > 0 && (result.screenshotIaBytes as number) > 0
+    && (result.projectRoundTripOk === true || result.projectRoundTripOk === null);
   if (selfTestOut) {
     fs.mkdirSync(path.dirname(selfTestOut), { recursive: true });
     fs.writeFileSync(selfTestOut, JSON.stringify(result, null, 2), 'utf8');

@@ -7,6 +7,7 @@
 // público e pode falhar por CORS — nesse caso diz-se, não se contorna.
 // ---------------------------------------------------------------------------
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBrand, type BrandSchema } from '../../providers/BrandProvider';
 import { useCentralStore } from '../../store/CentralStore';
 import { useCarouselAutosave } from '../../hooks/useCarouselAutosave';
@@ -34,7 +35,29 @@ import {
   setSlideReviewStatus, checkBrandConsistency, slideTextContents, buildCaptionText,
   type CoverVariantId,
 } from '../../services/carouselDocument';
+import { renderSlideToBlob } from '../../services/carouselRender';
 import type { Slide } from '../../contexts/EditorContext';
+
+// Mapa dos 15 passos do fluxo completo (Fase 3) para as 6 etapas desta
+// página + ecrã de IA + app desktop. Nada aqui é um passo novo: é só a
+// navegação explícita entre o que já existe, para a Cristiane ver onde está.
+const FIFTEEN_STEPS: { n: number; label: string; where: string; stage: CarouselFlowStep | 'ia' | 'app' }[] = [
+  { n: 1, label: 'Instalar / abrir a app', where: 'Aplicação desktop Pink Logic', stage: 'app' },
+  { n: 2, label: 'Ligar a IA (modo de teste predefinido)', where: 'Sistema → Ligação de IA', stage: 'ia' },
+  { n: 3, label: 'Site ou descrição do negócio', where: 'Etapa 1 — Marca (importar website)', stage: 'marca' },
+  { n: 4, label: 'Contexto Oficial da Marca por entrevista', where: 'Etapa 1 — Marca (entrevista guiada)', stage: 'marca' },
+  { n: 5, label: 'Brand Kit guardado', where: 'Etapa 1 — Marca («Guardar no Brand Kit»)', stage: 'marca' },
+  { n: 6, label: '30 pautas, 10 destacadas', where: 'Etapa 2 — Radar', stage: 'radar' },
+  { n: 7, label: 'Tema + estrutura do carrossel', where: 'Etapa 3 — Arquitetura', stage: 'arquitetura' },
+  { n: 8, label: 'Copy com revisões', where: 'Etapa 4 — Copy', stage: 'copy' },
+  { n: 9, label: 'Até 3 capas', where: 'Etapa 5 — Slides (variantes de capa)', stage: 'slides' },
+  { n: 10, label: 'Escolher capa e aplicar a identidade aos restantes cards', where: 'Etapa 5 — Slides', stage: 'slides' },
+  { n: 11, label: 'Correcção individual por card', where: 'Etapa 4 — Copy (editar cada card)', stage: 'copy' },
+  { n: 12, label: 'Legenda, CTA e materiais complementares', where: 'Etapa 6 — Entrega', stage: 'entrega' },
+  { n: 13, label: 'Exportar (ZIP com PNG/JPG + caption + PDF + DM)', where: 'Etapa 6 — Entrega', stage: 'entrega' },
+  { n: 14, label: 'Guardar e recuperar o projecto', where: 'Autosave (desktop/browser) + «Guardar projecto agora»', stage: 'entrega' },
+  { n: 15, label: 'Instagram / agendamento / analytics / automação', where: 'Etapa 6 — Entrega (desactivado — só esqueleto)', stage: 'entrega' },
+];
 
 const label = { fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4, display: 'block' } as const;
 const inputStyle = { width: '100%', padding: '0.6rem', borderRadius: 8, border: '1px solid var(--border, #ddd)', fontSize: '0.9rem' } as const;
@@ -68,6 +91,7 @@ const OFENSIVA_CONTEXT: BrandContext = normalizeBrandContext({
 });
 
 export default function CarouselFlowPage() {
+  const navigate = useNavigate();
   const { activeBrand, createBrand } = useBrand();
   const { activeProjectId } = useCentralStore();
   const ai = useAiConnection();
@@ -276,20 +300,43 @@ export default function CarouselFlowPage() {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const delivery = { brandName: brand?.name ?? '', title: topic, caption, hashtags, slides: slides.map(slideTextContents), cta: context.defaultCta };
+      // PNG/JPG reais de cada slide, renderizados no canvas do browser a
+      // partir da mesma geometria do motor de templates (Fase 3). Se o
+      // browser não conseguir renderizar um slide, o ZIP não sai a fingir
+      // que saiu: o erro é mostrado e nada é descarregado.
+      for (let i = 0; i < slides.length; i++) {
+        zip.file(`slide-${i + 1}.png`, await renderSlideToBlob(slides[i], 'png'));
+        zip.file(`slide-${i + 1}.jpg`, await renderSlideToBlob(slides[i], 'jpeg'));
+      }
       zip.file('caption.txt', buildCaptionText({ brandName: brand?.name, title: topic, caption, hashtags }));
       zip.file('plano.pdf', buildPlanPdf(delivery));
       zip.file('dm.txt', buildDmText(delivery));
       zip.file('project.json', serializeProject(project));
       const manifest = buildExportManifest({ slideCount: Math.max(slides.length, 1) });
       zip.file('MANIFESTO.txt', [
-        'Ficheiros do ZIP de entrega (os PNG/JPG dos slides saem do Editor — Fase 1):',
+        'Ficheiros do ZIP de entrega (PNG/JPG renderizados no canvas do browser):',
         ...manifest.map((m) => ` - ${m.name}`),
         '',
         'Conteúdo composto a partir de templates locais (sem IA).',
       ].join('\n'));
       const blob = await zip.generateAsync({ type: 'blob' });
       download(`pinklogic-carrossel-${new Date().toISOString().split('T')[0]}.zip`, blob);
-      setNotice('ZIP de entrega descarregado (caption + plano.pdf + dm + project.json). Os PNG/JPG exportam-se no Editor.');
+      setNotice(`ZIP de entrega descarregado (${slides.length} slides PNG+JPG 1080×1350, caption, plano.pdf, dm, project.json).`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const restoreSavedProject = async () => {
+    setError(null);
+    setNotice(null);
+    try {
+      const restored = await autosave.restore();
+      if (!restored) { setNotice('Não há projecto guardado para recuperar (neste dispositivo).'); return; }
+      const same = serializeProject(restored) === (project ? serializeProject(project) : '');
+      setNotice(same
+        ? `Projecto recuperado — igual ao guardado (título «${restored.title}», ${restored.slides.length} slides).`
+        : `Projecto guardado recuperado («${restored.title}», ${restored.slides.length} slides) — difere do estado actual em ecrã; o autosave vai voltar a guardar o estado actual.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -317,16 +364,35 @@ export default function CarouselFlowPage() {
         )}
       </p>
       {ai.status === 'teste' && (
-        <p data-testid="ai-demo-banner" style={{ background: '#FFF7E0', border: '1px solid #D4AF37', borderRadius: 8, padding: '0.7rem', fontSize: '0.85rem' }}>
+        <p data-testid="ai-demo-banner" style={{ background: '#FFF7E0', border: '1px solid #D4AF37', borderRadius: 8, padding: '0.7rem', fontSize: '0.85rem', color: '#4a3600' }}>
           <strong>Conteúdo de demonstração — modo de teste.</strong> A copy deste fluxo é gerada por
           templates locais e não usa os modelos da OpenAI. Para a geração real, abre «Ligação de IA».
         </p>
       )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <button onClick={() => navigate('/sistema/ia')} data-testid="go-ai-connection"
+          style={{ padding: '0.4rem 0.7rem', borderRadius: 999, border: '1px solid #D4AF37', background: '#FFF7E0', color: '#4a3600', cursor: 'pointer', fontSize: '0.8rem' }}>
+          Passo 2 — Ligação de IA ({ai.status === 'teste' ? 'modo de teste' : ai.status === 'api' ? 'API ligada' : 'desligada'}) →
+        </button>
+      </div>
+      <details style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
+        <summary style={{ cursor: 'pointer' }}>Fluxo completo — 15 passos (onde está cada um)</summary>
+        <ol style={{ paddingLeft: '1.2rem', margin: '0.5rem 0 0' }}>
+          {FIFTEEN_STEPS.map((s) => (
+            <li key={s.n} style={{ marginBottom: 2, fontWeight: s.stage === step || (s.stage === 'ia' && ai.status === 'teste') ? 700 : 400 }}>
+              {s.n}. {s.label} — <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>{s.where}</span>
+              {s.stage === 'ia' && <button onClick={() => navigate('/sistema/ia')} style={{ marginLeft: 6, fontSize: '0.8rem', cursor: 'pointer' }}>Abrir →</button>}
+              {s.stage !== 'ia' && s.stage !== 'app' && <button onClick={() => setStep(s.stage as CarouselFlowStep)} style={{ marginLeft: 6, fontSize: '0.8rem', cursor: 'pointer' }}>Ir →</button>}
+            </li>
+          ))}
+        </ol>
+      </details>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1rem' }}>
         {FLOW_STEPS.map((s, i) => (
           <button key={s.id} onClick={() => setStep(s.id)} disabled={i > stepIndex + 1}
-            style={{ padding: '0.4rem 0.7rem', borderRadius: 999, border: '1px solid var(--border, #ddd)', background: s.id === step ? '#103B78' : '#fff', color: s.id === step ? '#fff' : 'inherit', cursor: 'pointer', fontSize: '0.8rem' }}>
+            style={{ padding: '0.4rem 0.7rem', borderRadius: 999, border: '1px solid var(--border, #ddd)', background: s.id === step ? '#103B78' : '#fff', color: s.id === step ? '#fff' : '#111', cursor: 'pointer', fontSize: '0.8rem' }}>
             {i + 1}. {s.label}
           </button>
         ))}
@@ -492,7 +558,7 @@ export default function CarouselFlowPage() {
               );
             })}
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Pré-visualização simples (cores e texto reais). A renderização final PNG/JPG é no Editor.</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Pré-visualização simples (cores e texto reais). A exportação inclui os PNG/JPG dos slides (botão «Exportar ZIP de entrega» na Entrega).</p>
           <button className="btn-primary" onClick={() => setStep('entrega')} disabled={!slides.length}>Continuar para a Entrega →</button>
         </div>
       )}
@@ -519,6 +585,16 @@ export default function CarouselFlowPage() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={exportDeliveryZip} disabled={!slides.length}>Exportar ZIP de entrega</button>
             <button onClick={() => project && download('plano.pdf', new Blob([buildPlanPdf({ brandName: brand?.name ?? '', title: topic, caption, hashtags, slides: slides.map(slideTextContents), cta: context.defaultCta })], { type: 'application/pdf' }))} disabled={!slides.length}>Descarregar plano.pdf</button>
+          </div>
+          <h4 style={{ margin: '0.4rem 0 0' }}>Guardar e recuperar (passo 14)</h4>
+          <p style={{ fontSize: '0.85rem', margin: 0 }}>
+            {autosave.storage
+              ? `Guardado em ${autosave.storage === 'desktop' ? 'rascunho desktop' : 'browser (localStorage)'}${autosave.lastSavedAt ? ` · ${autosave.lastSavedAt.slice(11, 19)}` : ''} (autosave).`
+              : 'Ainda sem autosave — preenche a marca e gera a copy para o projecto existir.'}
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => { void autosave.saveNow().then(() => setNotice('Projecto guardado agora.')); }} disabled={!project}>Guardar projecto agora</button>
+            <button onClick={() => void restoreSavedProject()} disabled={!project}>Recuperar projecto guardado</button>
           </div>
           <h4 style={{ margin: '0.4rem 0 0' }}>Aprovação humana (gate de agendamento)</h4>
           <div style={{ display: 'flex', gap: 8 }}>

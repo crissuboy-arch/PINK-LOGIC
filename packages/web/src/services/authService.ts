@@ -16,6 +16,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Sessão local só em desenvolvimento e sem Supabase configurado. Em produção, login é sempre Supabase Auth.
 const devLocalAuth = import.meta.env.DEV && !isSupabaseConfigured;
 
+// Self-test Electron (Fase 3): SÓ quando o bundle foi construído com
+// VITE_PINK_DESKTOP_SELFTEST=1 (o script run-selftest.mjs fá-lo; o
+// pack:win normal NÃO define a flag, por isso em builds normais isto é
+// false). Permite ao self-test automatizado semear uma sessão local de
+// demonstração em localStorage e navegar no fluxo sem conta — sem tocar
+// na API (as chamadas autenticadas continuam a exigir sessão Supabase
+// real). Não é um bypass de produção: a flag não existe no bundle final.
+const selfTestAuth = import.meta.env.VITE_PINK_DESKTOP_SELFTEST === '1';
+
 /** Traduz as mensagens do Supabase Auth mais comuns para PT. */
 function translateAuthError(message?: string): string {
   const m = (message || '').toLowerCase();
@@ -139,6 +148,8 @@ class AuthService {
 
   /** Confirma a sessão real (Supabase) e atualiza o cache. Devolve se há sessão válida. */
   async syncSession(): Promise<boolean> {
+    // Self-test: a sessão local semeada pelo main basta (sem Supabase aqui).
+    if (selfTestAuth && this.isAuthenticated()) return true;
     if (supabase) {
       const { data } = await supabase.auth.getSession();
       const hadCache = this.isAuthenticated();

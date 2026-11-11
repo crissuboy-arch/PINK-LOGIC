@@ -132,3 +132,50 @@ test('buildCaptionText: inclui legenda, hashtags e o aviso de conteúdo de demon
   assert.ok(text.includes('#Marketing #IA'));
   assert.ok(text.includes('sem IA'));
 });
+
+// ---------------------------------------------------------------------------
+// Contraste (Fase 3): a paleta do seed da Ofensiva usa background #FFFFFF +
+// texto #071D3A — a convenção oposta à da app (fundo escuro + texto claro).
+// Antes do fix por luminância, o corpo dos slides saía branco sobre branco
+// (contraste 1,0) apesar de «0 violações» de consistência. O motor tem de
+// resolver os papéis por luminância para as duas convenções darem texto
+// legível (WCAG AA, 4,5:1) em todas as variantes de capa.
+// ---------------------------------------------------------------------------
+function testLuminance(hex) {
+  const h = hex.replace('#', '');
+  const ch = [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+
+function contrastRatio(a, b) {
+  const [hi, lo] = [testLuminance(a), testLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('contraste: paleta com background claro + texto escuro dá texto legível em todas as capas', () => {
+  const seedBrand = {
+    ...OFENSIVA_BRAND,
+    palette: { primary: '#103B78', secondary: '#071D3A', accent: '#D4AF37', background: '#FFFFFF', text: '#071D3A', surface: '#F5F7FA' },
+  };
+  for (const variant of ['classica', 'destaque', 'minimal']) {
+    const slides = applyBrandTemplate(seedBrand, DEMO_INPUTS, { coverVariant: variant });
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      const shapes = slide.elements.filter((el) => el.type === 'shape');
+      for (const el of slide.elements) {
+        if (el.type !== 'text' || !el.color) continue;
+        // Fundo efectivo: a forma (barra) por baixo do texto, se existir.
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height / 2;
+        const under = shapes.filter((s) => cx >= s.x && cx <= s.x + s.width && cy >= s.y && cy <= s.y + s.height)
+          .sort((a, b) => a.zIndex - b.zIndex).at(-1);
+        const bg = under?.color || slide.background.value;
+        const ratio = contrastRatio(el.color, bg);
+        assert.ok(ratio >= 4.5, `${variant} slide ${i + 1}: «${el.content.slice(0, 30)}» ${el.color} sobre ${bg} — contraste ${ratio.toFixed(2)} < 4.5`);
+      }
+    }
+  }
+});
