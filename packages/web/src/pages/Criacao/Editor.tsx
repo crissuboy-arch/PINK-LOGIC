@@ -36,7 +36,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCentralStore } from '../../store/CentralStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { apiPost } from '../../lib/apiClient';
-import { buildEditableCarousel, type CarouselContent } from '../../services/carouselDocument';
+import { buildEditableCarousel, type CarouselContent, applyBrandTemplate, buildCoverVariants, applyCoverVariant, correctSlide, setSlideReviewStatus, slideTextContents, buildCaptionText, type CoverVariantId, type SlideReviewStatus } from '../../services/carouselDocument';
 
 const getGradientCss = (color1: string, color2: string, direction: 'tb' | 'lr' | 'diag') => {
   const dirMap = {
@@ -177,6 +177,24 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     ? { topLeft: corner('top', 'left'), topRight: corner('top', 'right'), bottomLeft: corner('bottom', 'left'), bottomRight: corner('bottom', 'right') }
     : undefined;
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fluxo de carrossel (motor de templates 4:5, sem IA): escolha de capa,
+  // revisão por card e correção individual. O estado de revisão vive em
+  // cada slide (reviewStatus) e é persistido com o documento ao guardar.
+  const [coverOptions, setCoverOptions] = useState<{ variant: CoverVariantId; label: string; description: string }[] | null>(null);
+  const [coverError, setCoverError] = useState('');
+  const [correctTitle, setCorrectTitle] = useState('');
+  const [correctBody, setCorrectBody] = useState('');
+  const [correctionMessage, setCorrectionMessage] = useState('');
+  // Prefill do formulário de correção com o título/corpo do card ativo.
+  useEffect(() => {
+    const current = slides[currentSlideIndex];
+    if (!current) return;
+    const { title, body } = slideTextContents(current);
+    setCorrectTitle(title);
+    setCorrectBody(body);
+    setCorrectionMessage('');
+  }, [currentSlideIndex, slides.length]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const designApplied = useRef(false);
 
@@ -1589,7 +1607,8 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
       });
       if (!result.ok || !result.data?.document) throw new Error(result.error || 'A geração não devolveu slides.');
       const document = result.data.document;
-      const nextSlides = buildEditableCarousel(document, canvasFormat, activeBrandKit);
+      const nextSlides = buildEditableCarousel(document, canvasFormat, activeBrandKit)
+        .map(slide => ({ ...slide, reviewStatus: 'pendente' as const }));
       if (canvasFormat.id === 'carousel') {
         setSlides(nextSlides);
         setCurrentSlideIndex(0);
@@ -1604,6 +1623,51 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // --- Fluxo de carrossel com o motor de templates (sem IA) ---
+  /** Gera 3 opções de capa a partir do título/corpo já aprovados (sem regenerar a copy). */
+  const handleBuildCoverOptions = () => {
+    setCoverError('');
+    if (!slides.length) { setCoverError('Não há slides para gerar a capa.'); return; }
+    try {
+      const options = buildCoverVariants(activeBrandKit, slideTextContents(slides[0]), slides.length, canvasFormat);
+      setCoverOptions(options.map(({ variant, label, description }) => ({ variant, label, description })));
+    } catch (error) {
+      setCoverError(error instanceof Error ? error.message : 'Não foi possível gerar as opções de capa.');
+    }
+  };
+
+  /** Aplica uma variante de capa: substitui APENAS o slide 1; os restantes ficam intactos. */
+  const handleApplyCover = (variant: CoverVariantId) => {
+    setSlides(prev => applyCoverVariant(prev, variant, activeBrandKit, canvasFormat));
+    setCoverOptions(null);
+    setCurrentSlideIndex(0);
+  };
+
+  /** Marca o estado de revisão de um card (aprovado/pendente/corrigido). */
+  const handleSetReviewStatus = (index: number, status: SlideReviewStatus) => {
+    setSlides(prev => setSlideReviewStatus(prev, index, status));
+  };
+
+  /** Corrige APENAS o card ativo (novo título/corpo) e regista a correção; os outros cards não são tocados. */
+  const handleCorrectCurrentSlide = () => {
+    if (!correctTitle.trim()) { setCorrectionMessage('O título corrigido não pode ficar vazio.'); return; }
+    setSlides(prev => correctSlide(prev, currentSlideIndex, { title: correctTitle.trim(), body: correctBody.trim() }, activeBrandKit, canvasFormat));
+    setCorrectionMessage(`Card ${currentSlideIndex + 1} corrigido — os restantes ${slides.length - 1} cards não foram alterados.`);
+  };
+
+  /** Aplica o template da marca (sem IA) aos passos locais do tema — alternativa sem custo ao Gerar Post. */
+  const handleApplyBrandTemplate = () => {
+    const topic = (aiInputs.topic || aiInputs.niche).trim();
+    if (topic.length < 3) { setGenerationError('Descreva o tema com pelo menos 3 caracteres para aplicar o template.'); return; }
+    const isDefault = slides.length === 1 && slides[0]?.elements[0]?.content === 'PinkLogic';
+    if (!isDefault && slides.some(slide => slide.elements.length > 0) &&
+      !window.confirm('Aplicar o template da marca? Os slides atuais serão substituídos.')) return;
+    const steps = getCarouselSteps(topic, canvasFormat.id === 'carousel' ? slideCount : 3);
+    setSlides(applyBrandTemplate(activeBrandKit, steps.map(s => ({ title: s.title, body: s.desc })), { format: canvasFormat }));
+    setCurrentSlideIndex(0);
+    setSelectedElementId(null);
   };
 
   const drawSlideToCanvas = async (slide: Slide, canvas: HTMLCanvasElement) => {
@@ -1877,6 +1941,36 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
     }
   };
 
+  const handleExportJpg = async (onlyActive: boolean = false) => {
+    setIsProcessing(true);
+    try {
+      const slidesToExport = onlyActive
+        ? [{ slide: slides[currentSlideIndex], originalIndex: currentSlideIndex }]
+        : slides.map((s, idx) => ({ slide: s, originalIndex: idx }));
+
+      for (let i = 0; i < slidesToExport.length; i++) {
+        const { slide, originalIndex } = slidesToExport[i];
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasFormat.width;
+        canvas.height = canvasFormat.height;
+
+        await drawSlideToCanvas(slide, canvas);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const link = document.createElement('a');
+        link.download = `PinkLogic-${canvasFormat.name}-${originalIndex + 1}.jpg`;
+        link.href = dataUrl;
+        link.click();
+
+        if (slidesToExport.length > 1) await new Promise(r => setTimeout(r, 500));
+      }
+    } catch (err) {
+      console.error('JPG Export failed', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     setIsProcessing(true);
     try {
@@ -1923,14 +2017,23 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
         canvas.height = canvasFormat.height;
         await drawSlideToCanvas(slide, canvas);
 
-        const blob = await new Promise<Blob | null>((resolve) => {
+        const pngBlob = await new Promise<Blob | null>((resolve) => {
           canvas.toBlob((b) => resolve(b), 'image/png', 1.0);
         });
+        if (pngBlob) zip.file(`slide-${i + 1}.png`, pngBlob);
 
-        if (blob) {
-          zip.file(`slide-${i + 1}.png`, blob);
-        }
+        const jpgBlob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92);
+        });
+        if (jpgBlob) zip.file(`slide-${i + 1}.jpg`, jpgBlob);
       }
+
+      // Legenda incluída no ZIP para publicação (caption.txt).
+      const cover = slides.length ? slideTextContents(slides[0]) : { title: '', body: '' };
+      zip.file('caption.txt', buildCaptionText({
+        brandName: activeBrandKit?.name, title: cover.title,
+        caption: generatedCaption, hashtags: [],
+      }));
 
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);
@@ -2223,6 +2326,52 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         }}>Baixar legenda</button>
       </details>
+      <details style={{ gridColumn: '1 / -1', padding: 16 }}>
+        <summary>Revisão do carrossel — capa, estado por card e correção (sem IA)</summary>
+        {canvasFormat.id === 'carousel' ? (
+          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+            <div>
+              <p style={{ margin: '0 0 8px' }}>Escolha de capa — 3 opções geradas a partir do título aprovado, sem regenerar a copy:</p>
+              <button className="btn-secondary" onClick={handleBuildCoverOptions} disabled={isProcessing || !slides.length}>Gerar 3 opções de capa</button>
+              {coverError && <div role="alert" style={{ color: '#ffb4b4', marginTop: 8 }}>{coverError}</div>}
+              {coverOptions && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  {coverOptions.map(opt => (
+                    <button key={opt.variant} className="btn-secondary" onClick={() => handleApplyCover(opt.variant)} title={opt.description}>
+                      Aplicar capa {opt.label}
+                    </button>
+                  ))}
+                  <button className="btn-secondary" onClick={() => setCoverOptions(null)}>Cancelar</button>
+                </div>
+              )}
+            </div>
+            <div>
+              <p style={{ margin: '0 0 8px' }}>Estado de revisão por card:</p>
+              {slides.map((slide, i) => (
+                <div key={slide.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+                  <span style={{ minWidth: 110 }}>Card {i + 1}: <strong>{slide.reviewStatus || 'pendente'}</strong>{slide.correctedAt ? ` (corrigido ${new Date(slide.correctedAt).toLocaleString('pt-BR')})` : ''}</span>
+                  <button className="btn-secondary" onClick={() => handleSetReviewStatus(i, 'aprovado')} disabled={slide.reviewStatus === 'aprovado'}>Aprovar</button>
+                  <button className="btn-secondary" onClick={() => handleSetReviewStatus(i, 'pendente')} disabled={slide.reviewStatus === 'pendente'}>Pendente</button>
+                  <button className="btn-secondary" onClick={() => handleSetReviewStatus(i, 'corrigido')} disabled={slide.reviewStatus === 'corrigido'}>Corrigido</button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p style={{ margin: '0 0 8px' }}>Corrigir o card ativo ({currentSlideIndex + 1} de {slides.length}) — só este card muda:</p>
+              <input type="text" className="input-field" aria-label="Título corrigido do card ativo" placeholder="Título corrigido" value={correctTitle} onChange={e => setCorrectTitle(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
+              <textarea aria-label="Corpo corrigido do card ativo" placeholder="Corpo corrigido" value={correctBody} onChange={e => setCorrectBody(e.target.value)} rows={3} style={{ width: '100%' }} />
+              <button className="btn-secondary" onClick={handleCorrectCurrentSlide} disabled={isProcessing} style={{ marginTop: 8 }}>Aplicar correção só a este card</button>
+              {correctionMessage && <div role="status" style={{ marginTop: 8 }}>{correctionMessage}</div>}
+            </div>
+            <div>
+              <p style={{ margin: '0 0 8px' }}>Template da marca sem IA — aplica o Brand Kit aos passos locais do tema (não chama a AIsa):</p>
+              <button className="btn-secondary" onClick={handleApplyBrandTemplate} disabled={isProcessing}>Aplicar template da marca (sem IA)</button>
+            </div>
+          </div>
+        ) : (
+          <p style={{ marginTop: 12 }}>A revisão de carrossel está disponível no formato Carrossel (1080×1350).</p>
+        )}
+      </details>
       {/* Top Header */}
       <div className="editor-header">
         <div className="editor-header-left">
@@ -2292,10 +2441,16 @@ const Editor = ({ isCarouselOnly = false }: { isCarouselOnly?: boolean }) => {
               <button className="btn-secondary" onClick={() => handleExport(false)} disabled={isProcessing} title="Baixar todos os slides gerados como arquivos PNG individuais">
                 <Download size={16} /> Exportar PNGs (Todos)
               </button>
+              <button className="btn-secondary" onClick={() => handleExportJpg(true)} disabled={isProcessing} title="Baixar apenas o slide ativo como JPG">
+                <Download size={16} /> Baixar Slide Ativo (JPG)
+              </button>
+              <button className="btn-secondary" onClick={() => handleExportJpg(false)} disabled={isProcessing} title="Baixar todos os slides gerados como arquivos JPG individuais">
+                <Download size={16} /> Exportar JPGs (Todos)
+              </button>
               <button className="btn-secondary" onClick={handleExportPDF} disabled={isProcessing} title="Exportar todos os slides do carrossel em um único arquivo PDF">
                 <Download size={16} /> Exportar PDF
               </button>
-              <button className="btn-primary" onClick={handleExportZip} disabled={isProcessing} title="Exportar todos os slides como PNG compactados em um arquivo ZIP verdadeiro">
+              <button className="btn-primary" onClick={handleExportZip} disabled={isProcessing} title="Exportar todos os slides como PNG e JPG compactados em um arquivo ZIP verdadeiro, incluindo caption.txt">
                 <Download size={16} /> Exportar ZIP Real
               </button>
             </>
