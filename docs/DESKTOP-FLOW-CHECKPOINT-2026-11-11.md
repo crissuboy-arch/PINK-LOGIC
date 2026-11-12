@@ -34,3 +34,5 @@ Sem deploy, publicação, alteração de base de produção ou consumo de crédi
 ## Instalador — 12/11/2026
 
 Instalação silenciosa, desinstalação e reinstalação: saída 0. Os hashes dos ficheiros do perfil de teste foram preservados na desinstalação. O aplicativo instalado passou o percurso completo e duas reaberturas, incluindo gravação no fecho: .proof/windows-acceptance-2026-11-12T07-09-34-406Z/installer-validation.json . PDF de sete páginas e ZIP gerados pelo executável instalado. A verificação interativa foi interrompida após o diálogo de idioma; restantes páginas do assistente não foram validadas interativamente. Instalador sem assinatura digital.
+
+O instalador final com ajuste do aviso local (commit 2279129) passou novamente no executável instalado: .proof/windows-acceptance-2026-11-12T07-21-10-245Z/ . Três fases aprovadas, zero pedidos pagos, sete PNGs 1080x1350. SHA256: c24b911bc1689dfb275d47aadebbb895dc3579577abf26637b671ec85095b7cd.
