@@ -1,5 +1,5 @@
 import { useCentralStore } from '../store/CentralStore';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -12,11 +12,9 @@ const Layout = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   // Mobile: a sidebar vira gaveta (off-canvas) aberta pelo botão de menu do header.
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileNavRoute, setMobileNavRoute] = useState<string | null>(null);
+  const mobileNavOpen = isMobile && mobileNavRoute === location.pathname;
 
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [location.pathname, isMobile]);
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
 
   useEffect(() => {
@@ -61,22 +59,24 @@ const Layout = () => {
 
   const sidebarWidth = isCollapsed ? '72px' : '260px';
 
+  const localWorkspace = !!window.pinkLogicDesktop && localStorage.getItem('pinklogic.local-workspace') === '1';
+
   if (!isAuthenticated) return null;
 
   return (
-    <div className="app-container" style={{ '--sidebar-width': sidebarWidth } as any}>
+    <div className="app-container" style={{ '--sidebar-width': sidebarWidth } as CSSProperties}>
       <Sidebar
         isCollapsed={isMobile ? false : isCollapsed}
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileNavOpen}
       />
       {isMobile && mobileNavOpen && (
-        <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} />
+        <div className="mobile-nav-backdrop" onClick={() => setMobileNavRoute(null)} />
       )}
       <main className="main-content" style={{ transition: 'margin-left 0.2s cubic-bezier(0.16, 1, 0.3, 1)', marginLeft: 'var(--sidebar-width)' }}>
-        <Header onOpenMenu={() => setMobileNavOpen(true)} />
+        <Header onOpenMenu={() => setMobileNavRoute(location.pathname)} />
         <div className="page-container">
-          {persistenceError && <div role="alert" style={{ padding: 16, color: '#ffb4b4' }}>{persistenceError}</div>}
+          {localWorkspace ? <div role="status" style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Espaço local — os projetos são guardados neste computador. A sincronização na nuvem não está ativa.</div> : persistenceError && <div role="alert" style={{ padding: 16, color: '#ffb4b4' }}>{persistenceError}</div>}
           <Outlet />
         </div>
       </main>
