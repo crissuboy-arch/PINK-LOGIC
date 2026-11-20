@@ -7,6 +7,12 @@ files:
   - dist/**/*
   - dist-web/**/*
   - package.json
+# O ffmpeg (Cortes Virais) é um executável: tem de ficar FORA do app.asar para poder arrancar.
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+extraResources:
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
 win:
   icon: build/icon.ico
   target:
