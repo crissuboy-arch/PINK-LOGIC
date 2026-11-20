@@ -22,6 +22,21 @@ export interface ChatGPTConnectionStatus {
   textRequestAvailable: boolean; lastTextAt: string | null;
 }
 export interface PinkLogicDesktopApi {
+  // Cortes Virais (ver packages/desktop/src/cortes.ts). Opcionais: um desktop
+  // anterior a esta funcionalidade não tem estes métodos.
+  cortesFfmpegStatus?(): Promise<{ found: boolean; path: string }>;
+  cortesPickVideo?(): Promise<{ canceled: true } | { canceled: false; name: string; sizeBytes: number }>;
+  cortesRun?(options: {
+    clips: number; minSec: number; maxSec: number; style: 'destaque' | 'limpo' | 'karaoke'; accent: string; language?: string;
+  }): Promise<{
+    outputDir: string;
+    clips: { index: number; file: string; start: number; end: number; hook: string; score: number; reason: string }[];
+    dropped: string[]; costUsd: number; durationSec: number;
+  }>;
+  onCortesProgress?(listener: (p: { stage: 'audio' | 'transcricao' | 'selecao' | 'render' | 'fim'; message: string; current?: number; total?: number }) => void): () => void;
+  cortesOpen?(filePath: string): Promise<boolean>;
+  cortesReveal?(filePath: string): Promise<boolean>;
+
   saveDraftSync(draft: {id:string;title:string;data:unknown}): {ok:boolean;error?:string};
   listDraftVersions(id: string): Promise<{id: string; updatedAt: string}[]>;
   restoreDraftVersion(id: string,version: string): Promise<{id: string; title: string; updatedAt: string}>;

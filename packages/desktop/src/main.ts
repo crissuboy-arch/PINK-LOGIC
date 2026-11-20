@@ -1,6 +1,7 @@
 import { PinkChatGPTOAuth } from './chatgptOAuth';
 import { runAcceptance } from './acceptance';
 import { startTransfer, stopTransfer } from './localTransfer';
+import { checkFfmpeg, runCortes, type CortesInput, type CortesProgress } from './cortes';
 /**
  * Pink Logic — processo main (Electron).
  * Segurança: contextIsolation=true, nodeIntegration=false, sem `remote`,
@@ -114,6 +115,40 @@ function registerIpc(): void {
 
   ipcMain.handle('pink-logic:get-version', () => app.getVersion());
   ipcMain.handle('pink-logic:get-user-data-path', () => app.getPath('userData'));
+
+  // Cortes Virais — o vídeo é escolhido num diálogo do main (o renderer nunca
+  // fornece caminhos arbitrários) e os resultados só abrem se estiverem na pasta de saída.
+  const cortesOutputRoot = () => path.join(app.getPath('documents'), 'Pink Logic', 'Cortes');
+  let cortesPickedVideo: string | null = null;
+  ipcMain.handle('pink-logic:cortes-ffmpeg', () => checkFfmpeg(app.getPath('userData')));
+  ipcMain.handle('pink-logic:cortes-pick-video', async () => {
+    const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+    if (!win) return { canceled: true };
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      filters: [{ name: 'Vídeo', extensions: ['mp4', 'mov', 'mkv', 'webm', 'm4v'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return { canceled: true };
+    cortesPickedVideo = result.filePaths[0];
+    return { canceled: false, name: path.basename(cortesPickedVideo), sizeBytes: fs.statSync(cortesPickedVideo).size };
+  });
+  ipcMain.handle('pink-logic:cortes-run', async (event, opts: Omit<CortesInput, 'videoPath' | 'outputRoot'>) => {
+    if (!cortesPickedVideo) throw new Error('Escolhe primeiro um vídeo.');
+    const emit = (p: CortesProgress) => { if (!event.sender.isDestroyed()) event.sender.send('pink-logic:cortes-progress', p); };
+    return runCortes(app.getPath('userData'), { ...opts, videoPath: cortesPickedVideo, outputRoot: cortesOutputRoot() }, emit);
+  });
+  const insideCortes = (p: unknown): string => {
+    if (typeof p !== 'string') throw new Error('Caminho inválido.');
+    const root = path.resolve(cortesOutputRoot());
+    const target = path.resolve(p);
+    if (target !== root && !target.startsWith(root + path.sep)) throw new Error('Só é possível abrir ficheiros da pasta de cortes.');
+    return target;
+  };
+  ipcMain.handle('pink-logic:cortes-open', async (_e, filePath: string) => {
+    const err = await shell.openPath(insideCortes(filePath));
+    return err === '';
+  });
+  ipcMain.handle('pink-logic:cortes-reveal', (_e, filePath: string) => { shell.showItemInFolder(insideCortes(filePath)); return true; });
 
   ipcMain.handle('pink-logic:save-draft', (_e, draft: Draft) => saveDraft(app.getPath('userData'), draft));
   ipcMain.handle('pink-logic:load-draft', (_e, id: string) => loadDraft(app.getPath('userData'), id));

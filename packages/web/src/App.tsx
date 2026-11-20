@@ -21,6 +21,7 @@ import LogoStudioIA from './pages/Criacao/LogoStudioIA';
 import BrandKitPro from './pages/Criacao/BrandKitPro';
 import MockupStudio from './pages/Criacao/MockupStudio';
 import QRCodeStudio from './pages/Criacao/QRCodeStudio';
+import CortesVirais from './pages/Criacao/CortesVirais';
 import BrandManual from './pages/Criacao/BrandManual';
 import TemplatesPremium from './pages/Criacao/TemplatesPremium';
 import Estrategia from './pages/Estrategia';
@@ -72,6 +73,7 @@ function App() {
                     <Route path="criacao/vision" element={<StrategicVision />} />
                     <Route path="criacao/stickers" element={<StickerStudio />} />
                     <Route path="criacao/legendas" element={<CaptionStudio />} />
+                    <Route path="criacao/cortes" element={<CortesVirais />} />
                     <Route path="criacao/models" element={<HubModels />} />
                     
                     <Route path="estrategia" element={<Estrategia />} />

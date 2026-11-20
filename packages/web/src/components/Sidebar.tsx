@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard,
   Captions,
+  Scissors,
   Calendar, 
   Lightbulb, 
   CheckSquare, 
@@ -99,6 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, mobile
         { label: 'Estúdio de Código QR', icon: QrCode, path: '/criacao/qrcode' },
         { label: 'Estúdio de Stickers IA', icon: Sticker, path: '/criacao/stickers' },
         { label: 'Legendas Animadas', icon: Captions, path: '/criacao/legendas' },
+        { label: 'Cortes Virais', icon: Scissors, path: '/criacao/cortes' },
         { label: 'Gerador de Copy', icon: FileText, path: '/criacao/copy' },
       ]
     },

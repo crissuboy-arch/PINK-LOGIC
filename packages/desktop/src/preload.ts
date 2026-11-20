@@ -78,7 +78,21 @@ export interface ChatGPTConnectionStatus {
   sessionOwnedBy: 'Pink Logic'; subscriptionAuthorized: boolean; textGenerationVerified: boolean;
   textRequestAvailable: boolean; lastTextAt: string | null;
 }
+export type CortesCaptionStyle = 'destaque' | 'limpo' | 'karaoke';
+export interface CortesRunOptions { clips: number; minSec: number; maxSec: number; style: CortesCaptionStyle; accent: string; language?: string }
+export interface CortesProgressEvent { stage: 'audio' | 'transcricao' | 'selecao' | 'render' | 'fim'; message: string; current?: number; total?: number }
+export interface CortesClipResult { index: number; file: string; start: number; end: number; hook: string; score: number; reason: string }
+export interface CortesRunResult { outputDir: string; clips: CortesClipResult[]; dropped: string[]; costUsd: number; durationSec: number }
 export interface PinkLogicDesktopApi {
+  /** Cortes Virais: o ffmpeg arranca? (a UI avisa antes de começar). */
+  cortesFfmpegStatus(): Promise<{ found: boolean; path: string }>;
+  cortesPickVideo(): Promise<{ canceled: true } | { canceled: false; name: string; sizeBytes: number }>;
+  cortesRun(options: CortesRunOptions): Promise<CortesRunResult>;
+  /** Devolve a função que cancela a subscrição. */
+  onCortesProgress(listener: (p: CortesProgressEvent) => void): () => void;
+  cortesOpen(filePath: string): Promise<boolean>;
+  cortesReveal(filePath: string): Promise<boolean>;
+
   saveDraftSync(draft: {id:string;title:string;data:unknown}): {ok:boolean;error?:string};
   listDraftVersions(id: string): Promise<{id: string; updatedAt: string}[]>;
   restoreDraftVersion(id: string,version: string): Promise<{id: string; title: string; updatedAt: string}>;
@@ -118,6 +132,16 @@ export interface PinkLogicDesktopApi {
 }
 
 const api: PinkLogicDesktopApi = {
+  cortesFfmpegStatus: () => ipcRenderer.invoke('pink-logic:cortes-ffmpeg'),
+  cortesPickVideo: () => ipcRenderer.invoke('pink-logic:cortes-pick-video'),
+  cortesRun: (options) => ipcRenderer.invoke('pink-logic:cortes-run', options),
+  onCortesProgress: (listener) => {
+    const handler = (_e: unknown, p: CortesProgressEvent) => listener(p);
+    ipcRenderer.on('pink-logic:cortes-progress', handler);
+    return () => { ipcRenderer.removeListener('pink-logic:cortes-progress', handler); };
+  },
+  cortesOpen: (filePath) => ipcRenderer.invoke('pink-logic:cortes-open', filePath),
+  cortesReveal: (filePath) => ipcRenderer.invoke('pink-logic:cortes-reveal', filePath),
   saveDraftSync: draft => ipcRenderer.sendSync('pink-logic:save-draft-sync',draft),
   listDraftVersions: id => ipcRenderer.invoke('pink-logic:list-versions',id),
   restoreDraftVersion: (id,version) => ipcRenderer.invoke('pink-logic:restore-version',id,version),
