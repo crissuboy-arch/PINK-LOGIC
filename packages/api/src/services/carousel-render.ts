@@ -57,6 +57,27 @@ export interface CarouselSlide {
   counter?: string;
 }
 
+/** Forma aceita por CarouselRenderSchema: itens estruturados {title?, body?}. */
+export interface CarouselRenderItem {
+  title?: string;
+  body?: string;
+}
+
+/**
+ * CarouselRenderSchema valida `items` como {title?, body?}[], mas CarouselSlide
+ * (e wrapText, abaixo) sempre esperou string[] — o handler passava os objetos
+ * direto, e wrapText quebrava em `item.split(...)` (TypeError: text.split is
+ * not a function). Achata cada item numa única linha de exibição.
+ */
+export function flattenCarouselItems(items: Array<CarouselRenderItem | string> = []): string[] {
+  return items
+    .map((it) => {
+      if (typeof it === "string") return it;
+      return [it?.title, it?.body].filter(Boolean).join(": ");
+    })
+    .filter((line) => line.length > 0);
+}
+
 const BLUE = "#1e3fae";
 const PAPER = "#f5eeda";
 
