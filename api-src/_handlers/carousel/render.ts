@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "@pink-logic/api/services/auth.js";
 import { CarouselRenderSchema } from "@pink-logic/shared";
-import { renderSlide } from "@pink-logic/api/services/carousel-render.js";
+import { renderSlide, flattenCarouselItems } from "@pink-logic/api/services/carousel-render.js";
 import { generationLimiter, rateLimitKey, enforceRateLimit } from "@pink-logic/api/services/rate-limit.js";
 import { toPublicError } from "@pink-logic/api/services/http-errors.js";
 
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const png = await renderSlide({
       title: parsed.data.title,
-      items: parsed.data.items,
+      items: flattenCarouselItems(parsed.data.items),
       footer: parsed.data.footer,
       handle: parsed.data.handle || "",
       counter: parsed.data.counter || "",
